@@ -1,3 +1,15 @@
 [submodule "musl"]
 	path = musl
 	url = git://git.musl-libc.org/musl
+[submodule "ELFIO"]
+	path = ELFIO
+	url = https://github.com/serge1/ELFIO.git
+[submodule "zydis"]
+	path = zydis
+	url = https://github.com/zyantific/zydis.git
+[submodule "hash-library"]
+	path = hash-library
+	url = https://github.com/stbrumme/hash-library.git
+[submodule "cxxopts"]
+	path = cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
