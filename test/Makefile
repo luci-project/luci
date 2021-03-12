@@ -1,5 +1,6 @@
 CC = /usr/local/musl/bin/musl-gcc
 CFLAGS = --std=gnu11 -Wall -pedantic
+LDFLAGS = -Wl,-q -Wl,-rpath=.
 LIBSOURCE = answer.c
 LIBS = $(addprefix lib,$(LIBSOURCE:.c=.so))
 LIBFLAGS = -L. $(addprefix -l,$(LIBSOURCE:.c=))
@@ -13,10 +14,10 @@ test: $(BINARY)
 	LD_LIBRARY_PATH=. ./$<
 
 $(BINARY)-self: $(OBJECTS) $(LIBSOURCE:.c=.o)
-	$(CC) --static -o $@ $^
+	$(CC) --static $(LDFLAGS) -o $@ $^
 
 $(BINARY): $(OBJECTS) $(LIBS)
-	$(CC) -o $@ $(OBJECTS) $(LIBFLAGS)
+	$(CC) -o $@ $(OBJECTS) $(LDFLAGS) $(LIBFLAGS)
 
 lib%.so: %.c Makefile
 	$(CC) $(CFLAGS) -fpic -shared -o $@ $<
