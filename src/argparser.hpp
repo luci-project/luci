@@ -54,7 +54,7 @@ struct ArgParser : Opts {
 				std::stringstream s;
 				s << value;
 				s >> this->*element;
-				return !s.eof();
+				return s.eof();
 			}
 		}, arg.element);
 	}
