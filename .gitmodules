@@ -10,6 +10,3 @@
 [submodule "hash-library"]
 	path = hash-library
 	url = https://github.com/stbrumme/hash-library.git
-[submodule "cxxopts"]
-	path = cxxopts
-	url = https://github.com/jarro2783/cxxopts.git
