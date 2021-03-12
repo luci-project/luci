@@ -10,3 +10,6 @@
 [submodule "hash-library"]
 	path = hash-library
 	url = https://github.com/stbrumme/hash-library.git
+[submodule "plog"]
+	path = plog
+	url = https://github.com/SergiusTheBest/plog.git

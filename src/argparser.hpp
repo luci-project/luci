@@ -3,13 +3,14 @@
 #include <algorithm>
 #include <functional>
 #include <typeinfo>
-#include <iostream>
 #include <cctype>
 #include <set>
 #include <string>
 #include <sstream>
 #include <variant>
 #include <vector>
+
+#include "generic.hpp"
 
 template <class Opts>
 struct ArgParser : Opts {
@@ -23,10 +24,10 @@ struct ArgParser : Opts {
 		std::variant<std::string Opts::*, int Opts::*, bool Opts::*> element;
 		std::string help;
 		std::string def;
-		std::function<bool(std::string)> validate;
-		bool assigned;
+		std::function<bool(const std::string &)> validate;
+		bool present;
 
-		std::string getName() const {
+		std::string get_name() const {
 			return name.substr(0, name.find(" "));
 		}
 	};
@@ -34,7 +35,7 @@ struct ArgParser : Opts {
  private:
 	std::vector<Parameter> args;
 	std::vector<std::string> positional, terminal;
-	std::function<bool(std::string)> validate_positional, validate_terminal;
+	std::function<bool(const std::string &)> validate_positional, validate_terminal;
 
 	ArgParser() = default;
 	ArgParser(const ArgParser&) = delete;
@@ -87,14 +88,14 @@ struct ArgParser : Opts {
 	}
 
  public:
-	ArgParser(const std::initializer_list<Parameter> & list, std::function<bool(std::string)> validate_positional, std::function<bool(std::string)> validate_terminal) : validate_positional(validate_positional), validate_terminal(validate_terminal) {
+	ArgParser(const std::initializer_list<Parameter> & list, std::function<bool(const std::string &)> validate_positional, std::function<bool(const std::string &)> validate_terminal) : validate_positional(validate_positional), validate_terminal(validate_terminal) {
 		std::set<std::string> opts;
 		for (auto arg : list) {
-			std::string name = arg.getName();
+			std::string name = arg.get_name();
 
 			// Check if parameter is unqiue
 			if (!opts.insert(name).second) {
-				std::cerr << "Parameter '" << name << "' is not unqiue!" << std::endl;
+				LOG_FATAL << "Parameter '" << name << "' is not unqiue!";
 				continue;
 			}
 
@@ -102,17 +103,17 @@ struct ArgParser : Opts {
 			if (arg.def.empty())
 				arg.def = get(arg);
 			if (!set(arg, arg.def)) {
-				std::cerr << "Invalid default value '" << arg.def << "' for parameter " << name << "!" << std::endl;
+				LOG_FATAL << "Invalid default value '" << arg.def << "' for parameter " << name << "!";
 				continue;
 			}
 
 			// valid parameter.
-			arg.assigned = false;
+			arg.present = false;
 			args.push_back(arg);
 		}
 	}
 
-	ArgParser(const std::initializer_list<Parameter> & list) : ArgParser(list, [](std::string str) -> bool { if (str.rfind("-", 0) == 0) { std::cerr << "Positional parameter '" << str << "' looks like its not meant to be positional!" << std::endl ; return false; } else { return true; } }, [](std::string str) -> bool { return true; }) {}
+	ArgParser(const std::initializer_list<Parameter> & list) : ArgParser(list, [](const std::string & str) -> bool { if (str.rfind("-", 0) == 0) { LOG_ERROR << "Positional parameter '" << str << "' looks like its not meant to be positional!" ; return false; } else { return true; } }, [](const std::string &) -> bool { return true; }) {}
 
 	~ArgParser() = default;
 
@@ -181,7 +182,7 @@ struct ArgParser : Opts {
 				if (validate_terminal(current)) {
 					terminal.push_back(current);
 				} else {
-					std::cerr << "Terminal argument '" << current << "' is not valid!" << std::endl;
+					LOG_ERROR << "Terminal argument '" << current << "' is not valid!";
 					error = true;
 				}
 			} else if (current == TERMINATOR) {
@@ -191,7 +192,7 @@ struct ArgParser : Opts {
 				bool found = false;
 				// Check all parameter names
 				for (auto & arg : args) {
-					if (current == arg.getName()) {
+					if (current == arg.get_name()) {
 						found = true;
 
 						const bool hasNext = idx < argc - 1;
@@ -206,22 +207,22 @@ struct ArgParser : Opts {
 								if (set(arg, next)) {
 									return true;
 								} else {
-									std::cerr << "Invalid value '" << next << "' for parameter " << arg.getName() << "!" << std::endl;
+									LOG_ERROR << "Invalid value '" << next << "' for parameter " << arg.get_name() << "!";
 									return false;
 								}
 							} else {
-								std::cerr << "Missing value for parameter " << current << "!" << std::endl;
+								LOG_ERROR << "Missing value for parameter " << current << "!";
 								return false;
 							}
 						}, arg.element);
 
 						if (!valid) {
 							error = true;
-						} else if (arg.assigned) {
-							std::cerr << "Parameter " << current << " used multiple times (= reassigned)!" << std::endl;
+						} else if (arg.present) {
+							LOG_ERROR << "Parameter " << current << " used multiple times (= reassigned)!";
 							error = true;
 						} else {
-							arg.assigned = true;
+							arg.present = true;
 						}
 					}
 				}
@@ -231,15 +232,15 @@ struct ArgParser : Opts {
 					if (validate_positional(current)) {
 						positional.push_back(current);
 					} else {
-						std::cerr << "Positional argument '" << current << "' is not valid!" << std::endl;
+						LOG_ERROR << "Positional argument '" << current << "' is not valid!";
 						error = true;
 					}
 				}
 			}
 		}
 		for (auto arg : args)
-			if (arg.def == REQUIRED && !arg.assigned) {
-				std::cerr << "Parameter " << arg.getName() << " is required!" << std::endl;
+			if (arg.def == REQUIRED && !arg.present) {
+				LOG_ERROR << "Parameter " << arg.get_name() << " is required!";
 				error = true;
 			}
 
@@ -248,42 +249,55 @@ struct ArgParser : Opts {
 
 	bool has(const std::string &parameter) {
 		for (auto arg : args)
-			if (parameter == arg.getName())
-				return arg.assigned;
+			if (parameter == arg.get_name())
+				return arg.present;
 		return false;
 	}
 
-	bool hasPositionall() {
+	bool has_positional() {
 		return positional.size() > 0;
 	}
 
-	std::vector<std::string> getPositional() {
+	std::vector<std::string> get_positional() {
 		return positional;
 	}
 
-	bool hasTerminal() {
+	bool has_terminal() {
 		return terminal.size() > 0;
 	}
 
-	std::vector<std::string> getTerminal() {
+	std::vector<std::string> get_terminal() {
 		return terminal;
 	}
 
 	bool set(const std::string name, const std::string value) {
 		for (auto & arg : args)
-			if (name == arg.getName())
+			if (name == arg.get_name())
 				return set(arg, value);
 		return false;
 	}
 
 	std::string get(const std::string & name) {
 		for (auto & arg : args)
-			if (name == arg.getName())
+			if (name == arg.get_name())
 				return get(arg);
 		return "";
 	}
 
-	Opts getAll() {
+	Opts get_all() {
 		return static_cast<Opts>(*this);
 	}
 };
+
+
+template <class Opts>
+const std::string ArgParser<Opts>::REQUIRED({ '\0' });
+
+template <class Opts>
+const std::string ArgParser<Opts>::TERMINATOR("--");
+
+template <class Opts>
+const std::string ArgParser<Opts>::SPACE("                  ");
+
+template <class Opts>
+const std::string ArgParser<Opts>::TAB("    ");
