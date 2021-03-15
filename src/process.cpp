@@ -3,10 +3,12 @@
 #include <cstring>
 #include <unistd.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
+
 #include <iostream>
+#include <iterator>
 
 #include "generic.hpp"
-#include "memory.hpp"
 
 // auxilliary structure
 typedef struct {
@@ -30,7 +32,7 @@ Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(sta
 	}
 
 	// Allocate stack
-	if (this->stack_pointer == 0 && (this->stack_pointer = Memory::allocate_stack(this->stack_size)) == 0) {
+	if (this->stack_pointer == 0 && (this->stack_pointer = allocate_stack(this->stack_size)) == 0) {
 		LOG_ERROR << "Cannot create process without stack!";
 		exit(EXIT_FAILURE);
 	}
@@ -50,6 +52,19 @@ Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(sta
 	// Adjust
 //	aux[AT_RANDOM] = address + (aux[AT_RANDOM] & 0xfff);
 }
+
+uintptr_t Process::allocate_stack(size_t stack_size) {
+	errno = 0;
+	void *stack = ::mmap(NULL, stack_size, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_STACK | MAP_ANONYMOUS, -1, 0);
+	if (stack == MAP_FAILED) {
+		LOG_ERROR << "Mapping Stack with " << stack_size << " Bytes failed: " << strerror(errno);
+		return 0;
+	} else {
+		LOG_DEBUG << "Stack at " << stack << " with " << stack_size << std::endl;
+		return reinterpret_cast<uintptr_t>(stack) + stack_size;
+	}
+}
+
 
 void Process::init(const std::vector<std::string> &arg) {
 	IF_PLOG(plog::info) {

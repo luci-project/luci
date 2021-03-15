@@ -3,7 +3,7 @@
 // todo: query system for page size
 
 struct Page {
-	const size_t SIZE = 0x1000;
+	static const size_t SIZE = 0x1000;
 	uintptr_t addr;
 	size_t size;
 
