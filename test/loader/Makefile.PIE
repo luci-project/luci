@@ -1,0 +1,22 @@
+CC=gcc
+CFLAGS=-Og -g -nostdlib -mcmodel=large -shared -fPIC
+LDFLAGS=
+SOURCE=sys.c start.c hello.c
+OBJECTS=$(SOURCE:.c=.o)
+BINARY=test-pie
+
+all: $(BINARY)
+
+$(BINARY): $(OBJECTS)
+	ld $(LDFLAGS) -o $@ $^
+
+%.o: %.c Makefile
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -f $(OBJECTS)
+
+mrproper: clean
+	rm -f $(BINARY)
+
+.PHONY: all clean mrproper

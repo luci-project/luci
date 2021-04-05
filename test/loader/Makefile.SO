@@ -1,0 +1,26 @@
+CC=gcc
+CFLAGS=-Og -g -Wall -nostdlib
+LDFLAGS=-nostdlib -ffreestanding -L.
+LIBS=sys
+SOURCE=start.c hello.c
+OBJECTS=$(SOURCE:.c=.o)
+BINARY=test-so
+
+all: $(BINARY)
+
+$(BINARY): $(OBJECTS) | $(addprefix lib,$(addsuffix .so,$(LIBS)))
+	$(CC) $(LDFLAGS) -o $@ $^ $(addprefix -l,$(LIBS))
+
+lib%.so: %.c Makefile
+	$(CC) $(CFLAGS) -fpic --shared -o $@ $<
+
+%.o: %.c Makefile
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -f $(OBJECTS)
+
+mrproper: clean
+	rm -f $(BINARY)
+
+.PHONY: all clean mrproper
