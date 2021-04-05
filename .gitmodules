@@ -1,9 +1,6 @@
 [submodule "musl"]
 	path = musl
 	url = git://git.musl-libc.org/musl
-[submodule "ELFIO"]
-	path = ELFIO
-	url = https://github.com/serge1/ELFIO.git
 [submodule "zydis"]
 	path = zydis
 	url = https://github.com/zyantific/zydis.git
@@ -13,3 +10,6 @@
 [submodule "plog"]
 	path = plog
 	url = https://github.com/SergiusTheBest/plog.git
+[submodule "elfo"]
+	path = elfo
+	url = git@gitlab.cs.fau.de:heinloth/elfo.git

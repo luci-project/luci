@@ -1,115 +1,134 @@
-#include <bits/auxv.h>
+#include "object.hpp"
+
 #include <ext/stdio_filebuf.h>
+#include <fstream>
 #include <iostream>
 #include <filesystem>
 
-#include "object.hpp"
+#include "auxiliary.hpp"
 #include "object_dyn.hpp"
 #include "object_exec.hpp"
 #include "object_rel.hpp"
 #include "process.hpp"
+#include "utils.hpp"
 #include "generic.hpp"
 
-// TODO: Parse /etc/ld.so.conf
-std::vector<std::string> Object::librarypath = {
-	"/usr/lib/x86_64-linux-gnu/libfakeroot",
-	"/usr/local/lib/i386-linux-gnu",
-	"/lib/i386-linux-gnu",
-	"/usr/lib/i386-linux-gnu",
-	"/usr/local/lib/i686-linux-gnu",
-	"/lib/i686-linux-gnu",
-	"/usr/lib/i686-linux-gnu",
-	"/usr/local/lib",
-	"/usr/local/lib/x86_64-linux-gnu",
-	"/lib/x86_64-linux-gnu",
-	"/usr/lib/x86_64-linux-gnu",
-	"/lib32",
-	"/usr/lib32",
-	"/libx32",
-	"/usr/libx32"
-};
-
 std::vector<Object *> Object::objects;
+std::vector<std::string> Object::library_path_runtime, Object::library_path_config, Object::library_path_default = { "/lib", "/usr/lib" };
 
-bool Object::load_library(std::string lib, const std::vector<std::string> & rpath, const std::vector<std::string> & runpath) {
-	std::vector<std::string> search;
-	search.insert(std::end(search), std::begin(rpath), std::end(rpath));
-	search.insert(std::end(search), std::begin(librarypath), std::end(librarypath));
-	search.insert(std::end(search), std::begin(runpath), std::end(runpath));
+Object * Object::load_library(const std::string & file, const std::vector<std::string> & search, DL::Lmid_t ns) {
 	for (auto & dir : search) {
-		std::filesystem::path path = dir + "/" + lib;
+		std::filesystem::path path = std::string(dir) + "/" + std::string(file);
 		LOG_DEBUG << "Checking " << path << "...";
 		if (std::filesystem::exists(path))
-			return load_file(std::filesystem::absolute(path));
+			return load_file(std::filesystem::absolute(path), ns);
 	}
-	return false;
+	return nullptr;
 }
 
-bool Object::load_file(std::string path) {
-	LOG_DEBUG << "Loading " << path << "...";
-	errno = 0;
-	int fd = open(path.c_str(), O_RDONLY);
-	if (fd < 0) {
-		LOG_ERROR << "Reading file " << path << " failed: " << strerror(errno);
-	} else {
-		// TODO: This is very inefficient...
-		ELFIO::elfio elf;
-		if (elf.load(path)) {
-			Object * o = nullptr;;
-			switch (elf.get_type()) {
-				case ET_EXEC:
-					o = new ObjectExecutable(path, fd);
-					break;
-				case ET_DYN:
-					o = new ObjectDynamic(path, fd);
-					break;
-				case ET_REL:
-					o = new ObjectRelocatable(path, fd);
-					break;
-				default:
-					LOG_ERROR << "Unsupported ELF type " << elf.get_type();
-					return false;
-			}
-			if (o == nullptr) {
-				LOG_ERROR << "Object is a nullptr";
-				return false;
-			}
+Object * Object::load_library(const std::string & file, const std::vector<std::string> & rpath, const std::vector<std::string> & runpath, DL::Lmid_t ns) {
+	Object * lib = nullptr;
+	if (runpath.empty()) {
+		lib = load_library(file, rpath, ns);
+	}
+	if (lib == nullptr) {
+		lib = load_library(file, library_path_runtime, ns);
+	}
+	if (lib == nullptr) {
+		lib = load_library(file, runpath, ns);
+	}
+	if (lib == nullptr) {
+		lib = load_library(file, library_path_config, ns);
+	}
+	if (lib == nullptr) {
+		lib = load_library(file, library_path_default, ns);
+	}
+	if (lib == nullptr) {
+		LOG_ERROR << "Library '" << lib << "' cannot be found";
+	}
 
-			// Add to list
-			objects.push_back(o);
+	return lib;
+}
 
-			if (!o->load()) {
-				LOG_ERROR << "Loading of " << path << " failed...";
-				return false;
-			}
-			return true;
-		} else {
-			LOG_ERROR << "File '" << path << "' cannot be found or at least it is not a valid ELF file";
-			exit(EXIT_FAILURE);
+Object * Object::load_file(const std::string & path, DL::Lmid_t ns) {
+	for (auto & obj : objects)
+		if (obj->path == path) {  // TODO: Use Inode
+			LOG_DEBUG << "Already loaded " << path << "...";
+			return obj;
 		}
+
+	LOG_DEBUG << "Loading " << path << "...";
+	int fd = -1;
+	size_t length = 0;
+	void * addr = Utils::mmap_file(path.c_str(), fd, length);
+	if (addr == nullptr) {
+		LOG_ERROR << "Unable to load " << path << "!";
+		return nullptr;
 	}
-	LOG_INFO << "Successfully loaded " << path;
-	return true;
-}
 
-bool Object::run_all(std::vector<std::string> args, uintptr_t stack_pointer, size_t stack_size) {
-	// Allocate
-	LOG_DEBUG << "Allocate memory";
-	for (auto & obj : objects)
-		if (!obj->allocate())
-			return false;
+	// Check ELF
+	Elf::Header * header = reinterpret_cast<Elf::Header *>(addr);
 
-	// Relocate
-	LOG_DEBUG << "Relocate";
+	if (length < sizeof(Elf::Header) || !header->valid()) {
+		LOG_ERROR << "No valid ELF identification header in " << path << "!";
+		return nullptr;
+	}
 
-	// Protect
-	LOG_DEBUG << "Protect memory";
-	for (auto & obj : objects)
-		if (!obj->protect())
-			return false;
+	switch (header->ident_abi()) {
+		case Elf::ELFOSABI_NONE:
+		case Elf::ELFOSABI_LINUX:
+			break;
+		default:
+			LOG_ERROR << "Unsupported OS ABI " << (int)header->ident_abi();
+			return nullptr;
+	}
 
-	// Run main binary
-	return objects.front()->run(args, stack_pointer, stack_size);
+	switch (header->machine()) {
+#ifdef __i386__
+		case Elf::EM_386:
+		case Elf::EM_486:
+			break;
+#endif
+#ifdef __x86_64__
+		case Elf::EM_X86_64:
+			break;
+#endif
+		default:
+			LOG_ERROR << "Unsupported machine!" ;
+			return nullptr;
+	}
+
+	Object * o = nullptr;
+	switch (header->type()) {
+		case Elf::ET_EXEC:
+			assert(objects.empty());
+			o = new ObjectExecutable(path, fd, addr);
+			break;
+		case Elf::ET_DYN:
+			o = new ObjectDynamic(path, fd, addr);
+			break;
+		case Elf::ET_REL:
+			o = new ObjectRelocatable(path, fd, addr);
+			break;
+		default:
+			LOG_ERROR << "Unsupported ELF type!";
+			return nullptr;
+	}
+	if (o == nullptr) {
+		LOG_ERROR << "Object is a nullptr";
+		return nullptr;
+	}
+
+	// Add to global list
+	objects.push_back(o);
+
+	if (o->preload()) {
+		LOG_INFO << "Successfully loaded " << path;
+		return o;
+	} else {
+		LOG_ERROR << "Loading of " << path << " failed...";
+		return nullptr;
+	}
 }
 
 void Object::unload_all() {
@@ -117,48 +136,40 @@ void Object::unload_all() {
 		delete obj;
 }
 
-Object::Object(std::string path, int fd) : path(path), fd(fd) {
-	// Hacky hack
-	//__gnu_cxx::stdio_filebuf<char> filebuf{fd, std::ios_base::in | std::ios_base::binary};
-	//std::istream fd_stream{&filebuf};
-	elf.load(path);
-};
+Object::Object(std::string path, int fd, void * mem) : path(path), fd(fd), elf(reinterpret_cast<uintptr_t>(mem)) {}
 
-Object::~Object(){
-	for (auto & seg : segments)
+Object::~Object() {
+	for (auto & seg : memory_map)
 		seg.unmap();
 
 	close(fd);
 }
 
-std::string Object::get_file_name() {
+std::string Object::file_name() const {
 	return std::filesystem::path(path).filename();
 }
 
-bool Object::get_memory_range(uintptr_t & start, uintptr_t & end) {
-	if (segments.size() > 0) {
-		start = segments.front().memory.get_start();
-		end = segments.back().memory.get_end();
+bool Object::memory_range(uintptr_t & start, uintptr_t & end) const {
+	if (memory_map.size() > 0) {
+		start = memory_map.front().target.page_start();
+		end = memory_map.back().target.page_end();
 		return true;
 	} else {
 		return false;
 	}
 }
 
-bool Object::allocate(bool copy) {
-	for (auto & seg : segments)
-		if (!seg.map(fd, copy))
+bool Object::allocate() {
+	for (auto & seg : memory_map)
+		if (!seg.map())
 			return false;
 
 	return true;
 }
 
-bool Object::relocate() {
-	return false;
-}
 
 bool Object::protect() {
-	for (auto & seg : segments)
+	for (auto & seg : memory_map)
 		if (!seg.protect())
 			return false;
 
@@ -167,31 +178,67 @@ bool Object::protect() {
 
 
 bool Object::run(std::vector<std::string> args, uintptr_t stack_pointer, size_t stack_size) {
-	if (segments.size() == 0)
+	if (memory_map.size() == 0)
 		return false;
 
-	uintptr_t base = segments[0].memory.base;
+	// Allocate
+	LOG_DEBUG << "Allocate memory";
+	for (auto & obj : objects)
+		if (!obj->allocate())
+			return false;
 
+	// Relocate
+	LOG_DEBUG << "Relocate";
+	for (auto & obj : objects)
+		if (!obj->relocate())
+			return false;
+
+	// Protect
+	LOG_DEBUG << "Protect memory";
+	for (auto & obj : objects)
+		if (!obj->protect())
+			return false;
+
+	// Init (not binary itself)
+	for (auto & obj : objects)
+		if (obj == this)
+			continue;
+		else if (!obj->init())
+			return false;
+
+	// Prepare binary start
 	Process p(stack_pointer, stack_size);
 
 	// TODO: Should not be hard coded...
-	p.aux[AT_PHDR] = base + elf.get_segments_offset();
-	p.aux[AT_PHNUM] = elf.segments.size();
+	uintptr_t base = memory_map[0].target.base;
+	p.aux[Auxiliary::AT_PHDR] = base + elf.header.e_phoff;
+	p.aux[Auxiliary::AT_PHNUM] = elf.header.e_phnum;
 
 	args.insert(args.begin(), 1, path);
 	p.init(args);
 
-	uintptr_t entry = elf.get_entry();
+	uintptr_t entry = elf.header.entry();
 	LOG_INFO << "Start at " << (void*)base << " + " << (void*)(entry);
 	p.start(base + entry);
 	return true;
 }
 
-uintptr_t Object::get_next_address() {
+/*
+Symbol Object::get_symbol(const std::string & name, bool only_defined) const {
+	Symbol sym;
+	for (auto & table : symbol_tables) {
+		Symbol tmp(table, name);
+		if (tmp.is_valid() && (only_defined == false || tmp.is_defined()) && (!sym.is_valid() || tmp.bind == STB_GLOBAL || (tmp.bind == STB_WEAK && sym.bind == STB_LOCAL)))
+			sym = tmp;
+	}
+	return sym;
+}
+*/
+uintptr_t Object::next_address() {
 	uintptr_t next = 0;
 	for (auto & obj : objects) {
 		uintptr_t start = 0, end = 0;
-		if (obj->get_memory_range(start, end) && end > next) {
+		if (obj->memory_range(start, end) && end > next) {
 			next = end;
 		}
 	}

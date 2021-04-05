@@ -1,9 +1,9 @@
 #pragma once
 
-#include <bits/auxv.h>
-
 #include <map>
 #include <vector>
+
+#include "auxiliary.hpp"
 
 class Process {
 	/*! \brief argument count
@@ -29,7 +29,7 @@ class Process {
 
 	/*! \brief Auxilary vectors
 	 */
-	std::map<unsigned long, unsigned long> aux;
+	std::map<Auxiliary::type, long int> aux;
 
 	/*! \brief stack pointer (on start of process)
 	 */
@@ -53,7 +53,7 @@ class Process {
 	 * \brief env           environment variables
 	 * \brief aux           auxiliary vectors
 	 */
-	Process(uintptr_t stack_pointer, size_t stack_size, std::vector<std::string> & env, std::map<unsigned long, unsigned long> & aux)
+	Process(uintptr_t stack_pointer, size_t stack_size, std::vector<std::string> & env, std::map<Auxiliary::type, long int> & aux)
 	 : env(env), aux(aux), stack_pointer(stack_pointer), stack_size(stack_size) {}
 
 	/*! \brief Setup process frame

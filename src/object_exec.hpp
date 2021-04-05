@@ -2,12 +2,16 @@
 
 #include "object.hpp"
 
-struct ObjectExecutable : Object {
-	using Object::Object;
+struct ObjectExecutable : public virtual Object {
+	ObjectExecutable() {}
+
+	ObjectExecutable(std::string path, int fd, void * mem)
+	  : Object(path, fd, mem) {}
 
  protected:
-	bool load();
+	virtual bool preload() override;
 
 	/*! \brief initialize segments */
-	bool load_segments(uintptr_t base = 0);
+	bool preload_segments(uintptr_t base = 0);
+
 };

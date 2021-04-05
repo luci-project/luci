@@ -297,7 +297,7 @@ template <class Opts>
 const std::string ArgParser<Opts>::TERMINATOR("--");
 
 template <class Opts>
-const std::string ArgParser<Opts>::SPACE("                  ");
+const std::string ArgParser<Opts>::SPACE("                    ");
 
 template <class Opts>
 const std::string ArgParser<Opts>::TAB("    ");

@@ -1,3 +1,4 @@
 .build
 .stdafx.c++.pch
 lilo
+libpath.conf

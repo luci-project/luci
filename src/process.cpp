@@ -10,14 +10,6 @@
 
 #include "generic.hpp"
 
-// auxilliary structure
-typedef struct {
-	long int a_type;
-	union {
-		long int a_val;
-	} a_un;
-} elf_aux_entry;
-
 Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(stack_pointer), stack_size(stack_size) {
 	if (this->stack_size == 0) {
 		struct rlimit l;
@@ -44,9 +36,11 @@ Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(sta
 	}
 
 	// Read current auxiliary vectors
-	elf_aux_entry * auxv = reinterpret_cast<elf_aux_entry *>(environ + envc + 1);
-	for (int auxc = 0 ; auxv[auxc].a_type != AT_NULL; auxc++) {
-		aux.insert(std::make_pair(auxv[auxc].a_type, auxv[auxc].a_un.a_val));
+	Auxiliary * auxv = reinterpret_cast<Auxiliary *>(environ + envc + 1);
+	for (int auxc = 0 ; auxv[auxc].a_type != Auxiliary::AT_NULL; auxc++) {
+		Auxiliary::type t = auxv[auxc].a_type;
+		auto v = auxv[auxc].a_un.a_val;
+		aux.insert({ t, v });
 	}
 
 	// Adjust
@@ -95,10 +89,10 @@ void Process::init(const std::vector<std::string> &arg) {
 	// padding
 	stack_pointer -= stack_pointer % 16;
 
-	elf_aux_entry * aux_addr = reinterpret_cast<elf_aux_entry *>(stack_pointer);
+	Auxiliary * aux_addr = reinterpret_cast<Auxiliary *>(stack_pointer);
 	// Auxilary vectors
 	aux_addr--;
-	aux_addr->a_type = AT_NULL;
+	aux_addr->a_type = Auxiliary::AT_NULL;
 	aux_addr->a_un.a_val = 0;
 	for (auto it = aux.begin(); it != aux.end(); ++it) {
 		aux_addr--;
@@ -151,9 +145,9 @@ void Process::dump(int argc, const char **argv, const char ** envp) {
 		std::cout << envp + envc << ": envp[" << envc << "] = " << (void*)envp[envc] << " (" << envp[envc] << ")" << std::endl;
 	std::cout << envp + envc << ": envp[" << envc << "] = " << (void*)envp[envc] << std::endl;
 
-	elf_aux_entry * auxv = reinterpret_cast<elf_aux_entry *>(envp + envc + 1);
+	Auxiliary * auxv = reinterpret_cast<Auxiliary *>(envp + envc + 1);
 	int auxc;
-	for (auxc = 0 ; auxv[auxc].a_type != AT_NULL; auxc++)
+	for (auxc = 0 ; auxv[auxc].a_type != Auxiliary::AT_NULL; auxc++)
 		std::cout <<  auxv + auxc << ": auxv[" << auxc << "] = " <<  auxv[auxc].a_type << ": " << auxv[auxc].a_un.a_val << std::endl;
 	std::cout <<  auxv + auxc << ": auxv[" << auxc << "] = " <<  auxv[auxc].a_type << ": " << auxv[auxc].a_un.a_val << std::endl;
 }

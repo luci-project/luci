@@ -1,7 +1,7 @@
 VERBOSE = @
 
 CXX = g++
-CXXFLAGS := -std=c++2a -pie -pedantic -Wall -Wno-comment -Og -g -I src -I ELFIO -I cxxopts/include -I zydis/include -I zydis/dependencies/zycore/include -I plog/include
+CXXFLAGS := -std=c++2a -pie -Wall -Wno-comment -Og -g -I src -I elfo/include -I zydis/include -I zydis/dependencies/zycore/include -I plog/include
 
 BUILDDIR ?= .build
 CXX_SOURCES = $(wildcard src/*.cpp)
@@ -11,9 +11,10 @@ LIBS = zydis/build/libZydis.a zydis/dependencies/zycore/build/libZycore.a
 CXXFLAGS += $(addprefix -I ,$(dir $(LIBS)))
 LDFLAGS = -L . $(addprefix -L ,$(dir $(LIBS))) -lZydis -lZycore
 TARGET_BIN = lilo
+LIBPATH_CONF = libpath.conf
 
 
-all: $(TARGET_BIN)
+all: $(TARGET_BIN) $(LIBPATH_CONF)
 
 %.a:
 	mkdir -p $(dir $@)
@@ -32,6 +33,9 @@ $(BUILDDIR)/%.o : %.cpp $(MAKEFILE_LIST)
 	@echo "CXX		$<"
 	@mkdir -p $(@D)
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
+	$(VERBOSE) ./gen-libpath.sh $< > $@
 
 clean:
 	@echo "RM		$(BUILDDIR)"
