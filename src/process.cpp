@@ -55,7 +55,7 @@ uintptr_t Process::allocate_stack(size_t stack_size) {
 		return 0;
 	} else {
 		LOG_DEBUG << "Stack at " << stack << " with " << stack_size << std::endl;
-		return reinterpret_cast<uintptr_t>(stack) + stack_size;
+		return reinterpret_cast<uintptr_t>(stack) + stack_size - sizeof(void*);
 	}
 }
 

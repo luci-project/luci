@@ -101,13 +101,16 @@ Object * Object::load_file(const std::string & path, DL::Lmid_t ns) {
 	Object * o = nullptr;
 	switch (header->type()) {
 		case Elf::ET_EXEC:
+			LOG_DEBUG << "Executable (standalone)";
 			assert(objects.empty());
 			o = new ObjectExecutable(path, fd, addr);
 			break;
 		case Elf::ET_DYN:
+			LOG_DEBUG << "Dynamic";
 			o = new ObjectDynamic(path, fd, addr);
 			break;
 		case Elf::ET_REL:
+			LOG_DEBUG << "Relocatable";
 			o = new ObjectRelocatable(path, fd, addr);
 			break;
 		default:

@@ -73,7 +73,7 @@ int main(int argc, const char* argv[]) {
 	}
 
 	// Logger
-	LOG_DEBUG << "Set log level to " << args.loglevel;
+	LOG_DEBUG << "Setting log level to " << args.loglevel;
 	plog::get()->setMaxSeverity(static_cast<plog::Severity>(args.loglevel));
 
 	if (args.has("--logfile")) {
@@ -96,7 +96,9 @@ int main(int argc, const char* argv[]) {
 		}
 	}
 
+	LOG_DEBUG << "Adding contents of '" << args.libpathconf << "' to library search path...";
 	Object::library_path_config = Utils::file_contents(args.libpathconf);
+	LOG_DEBUG << "Config has " << Object::library_path_config.size() << " entries!";
 
 	// Preload Library
 	if (args.has("--preload")) {
@@ -139,6 +141,7 @@ int main(int argc, const char* argv[]) {
 		return EXIT_FAILURE;
 	}
 
+	LOG_DEBUG << "Unloading...";
 	Object::unload_all();
 	return EXIT_SUCCESS;
 }

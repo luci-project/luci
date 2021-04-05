@@ -10,8 +10,10 @@ namespace Utils {
 std::vector<std::string> split(const std::string & source, const char delimiter) {
 	std::vector<std::string> r;
 	size_t i, l = 0;
-	while ((i = source.find(delimiter)) != source.npos) {
-		r.push_back(source.substr(l, i - l));
+	while ((i = source.find(delimiter, l)) != source.npos) {
+		auto s = source.substr(l, i - l);
+		if (!s.empty())
+			r.push_back(s);
 		l = i + 1;
 	}
 	r.push_back(source.substr(l));
@@ -26,6 +28,7 @@ std::vector<std::string> file_contents(const std::string & path) {
 	void * addr = mmap_file(path.c_str(), fd, length);
 
 	if (addr != nullptr) {
+		LOG_DEBUG << "Mapped '" << path << "' (" << length << " bytes)";
 		std::string lines(reinterpret_cast<const char *>(addr));
 		return split(lines, '\n');
 	} else {

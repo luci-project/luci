@@ -1,5 +1,7 @@
 #include "object_exec.hpp"
 
+#include "generic.hpp"
+
 bool ObjectExecutable::preload() {
 	return preload_segments();
 }
