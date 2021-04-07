@@ -1,13 +1,17 @@
 #include "object_dyn.hpp"
 
+#include "dl.hpp"
 #include "generic.hpp"
 
 bool ObjectDynamic::preload() {
-	return preload_segments(next_address())
+	base = next_address();
+	return preload_segments()
 	    && preload_libraries();
 }
 
 bool ObjectDynamic::preload_libraries() {
+	bool success = true;
+
 	// load needed libaries
 	std::vector<std::string> libs, rpath, runpath;
 	for (auto &dyn: dynamic) {
@@ -21,8 +25,8 @@ bool ObjectDynamic::preload_libraries() {
 			case Elf::DT_RUNPATH:
 				runpath.emplace_back(dyn.string());
 				break;
+
 /*
-			case Elf::DT_JMPREL:
 			case Elf::DT_REL:
 			case Elf::DT_RELA:
 				relocation_tables.push_back(ELFIO::const_relocation_section_accessor(elf, get_section(dyn.value())));
@@ -31,6 +35,7 @@ bool ObjectDynamic::preload_libraries() {
 */
 			case Elf::DT_PLTGOT:
 				global_offset_table = dyn.value();
+				LOG_DEBUG << "GOT of " << (void*)this << " is " << global_offset_table;
 				break;
 
 			case Elf::DT_INIT:
@@ -70,7 +75,7 @@ bool ObjectDynamic::preload_libraries() {
 		}
 	}
 
-	bool success = true;
+
 	for (auto & lib : libs) {
 		Object * o = load_library(lib, rpath, runpath);
 		if (o == nullptr) {
@@ -84,13 +89,28 @@ bool ObjectDynamic::preload_libraries() {
 	return success;
 }
 
+void* ObjectDynamic::resolve(size_t index) const {
+	auto reloc = dynamic_relocations[index];
+	auto need_symbol_index = reloc.symbol_index();
+	auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
+	assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
+	auto need_symbol = Symbol(*this, dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
+	LOG_DEBUG << "Need to relocate entry " << index << " with symbol " << need_symbol << "...";
+	auto res = find_symbol(need_symbol);
+	if (res.valid()) {
+		LOG_INFO << "Linking to " << res << " in dynamic object " << path << "...";
+		auto ptr = reinterpret_cast<void*>(reloc.relocate(res));
+		return ptr;
+	}
+	assert(false);
+	return nullptr;
+}
 
 Symbol ObjectDynamic::symbol(const Symbol & sym) const {
-	bool version_weak = false;
-	auto version = version_index(sym.version.name, sym.version.hash, version_weak);
-	auto found = dynamic_symbols.index(sym.name(), version);
+	auto found = dynamic_symbols.index(sym.name(), version_index(sym.version));
 	if (found != Elf::STN_UNDEF) {
-		return Symbol(*this, dynamic_symbols[found], version_name(dynamic_symbols.version(found)), version_weak);
+		auto symbol_version_index = dynamic_symbols.version(found);
+		return Symbol(*this, dynamic_symbols[found], version(symbol_version_index));
 	} else {
 		return Symbol(*this);
 	}
@@ -98,6 +118,23 @@ Symbol ObjectDynamic::symbol(const Symbol & sym) const {
 
 bool ObjectDynamic::relocate() {
 	bool success = true;
+	if (global_offset_table != 0) {
+		auto got = reinterpret_cast<uintptr_t *>(base + global_offset_table);
+		// 3 predefined got entries:
+		// got[0] is pointer to _DYNAMIC
+		got[1] = reinterpret_cast<uintptr_t>(this);
+		got[2] = reinterpret_cast<uintptr_t>(_dl_resolve);
+
+		// Rest for relocations
+		auto got_entries = dynamic_relocations.count() + 3;
+		assert(elf.section_by_virt_addr(global_offset_table).entries() == got_entries);
+		for (size_t i = 3 ; i < got_entries; i++)
+			got[i] += base;
+
+		// Print all entries
+		for (size_t i = 0 ; i < got_entries; i++)
+			LOG_DEBUG << file_name() << ".got["<< i << "] = " << (void*)got[i];
+	}
 	/*
 	// Load unresolved symbols
 	for (auto & table : symbol_tables) {

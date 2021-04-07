@@ -6,7 +6,7 @@ bool ObjectExecutable::preload() {
 	return preload_segments();
 }
 
-bool ObjectExecutable::preload_segments(uintptr_t base) {
+bool ObjectExecutable::preload_segments() {
 	// load segments
 	for (auto & segment : elf.segments)
 		if (Elf::PT_LOAD == segment.type())

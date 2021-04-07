@@ -8,9 +8,25 @@ Symbol::Symbol(const Object & object, const Elf::Symbol & sym, const char * vers
 	assert(sym.valid());
 }
 
-Symbol::Symbol(const Object & object, const Elf::Symbol & sym, const char * version_name, uint32_t version_hash, bool version_weak)
- : Elf::Symbol(sym), object(object), version(version_name, version_hash, version_weak) {
+Symbol::Symbol(const Object & object, const Elf::Symbol & sym, const Version & version)
+ : Elf::Symbol(sym), object(object), version(version) {
 	assert(sym.valid());
 }
 
 Symbol::Symbol(const Object & object) : Elf::Symbol(object.elf), object(object) {}
+
+std::ostream& operator<<(std::ostream& os, const Symbol & s) {
+	if (s.valid()) {
+		os << s.name();
+		if (s.version.valid) {
+			if (s.version.name != nullptr)
+				os << "@" << s.version.name;
+		} else {
+			os << " [invalid version]";
+		}
+	} else {
+		os << "*invalid*";
+	}
+	os << " (" << s.object.file_name() << ")";
+	return os;
+}

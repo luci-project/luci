@@ -53,3 +53,5 @@ struct link_map {
 };
 
 }
+
+extern "C" void _dl_resolve();

@@ -2,17 +2,17 @@
 
 #include "object.hpp"
 
-struct ObjectRelocatable : public virtual Object {
+struct ObjectRelocatable : public Object {
 	ObjectRelocatable() {}
 
-	ObjectRelocatable(std::string path, int fd, void * mem)
-	  : Object(path, fd, mem) {}
+	ObjectRelocatable(std::string path, int fd, void * mem, DL::Lmid_t ns)
+	  : Object(path, fd, mem, ns) {}
 
 	/*! \brief Relocate sections */
 	bool relocate();
 
  protected:
-	bool preload() {
+	virtual bool preload() override {
 		return false;
 	};
 };

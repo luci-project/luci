@@ -14,6 +14,7 @@
 #include "generic.hpp"
 
 std::vector<Object *> Object::objects;
+std::vector<std::vector<Object *>> Object::lookup = {{}};
 std::vector<std::string> Object::library_path_runtime, Object::library_path_config, Object::library_path_default = { "/lib", "/usr/lib" };
 
 Object * Object::load_library(const std::string & file, const std::vector<std::string> & search, DL::Lmid_t ns) {
@@ -103,15 +104,15 @@ Object * Object::load_file(const std::string & path, DL::Lmid_t ns) {
 		case Elf::ET_EXEC:
 			LOG_DEBUG << "Executable (standalone)";
 			assert(objects.empty());
-			o = new ObjectExecutable(path, fd, addr);
+			o = new ObjectExecutable(path, fd, addr, ns);
 			break;
 		case Elf::ET_DYN:
 			LOG_DEBUG << "Dynamic";
-			o = new ObjectDynamic(path, fd, addr);
+			o = new ObjectDynamic(path, fd, addr, ns);
 			break;
 		case Elf::ET_REL:
 			LOG_DEBUG << "Relocatable";
-			o = new ObjectRelocatable(path, fd, addr);
+			o = new ObjectRelocatable(path, fd, addr, ns);
 			break;
 		default:
 			LOG_ERROR << "Unsupported ELF type!";
@@ -122,11 +123,10 @@ Object * Object::load_file(const std::string & path, DL::Lmid_t ns) {
 		return nullptr;
 	}
 
-	// Add to global list
-	objects.push_back(o);
+	assert(valid(o));
 
 	if (o->preload()) {
-		LOG_INFO << "Successfully loaded " << path;
+		LOG_INFO << "Successfully loaded " << path << " at " << (void*)o ;
 		return o;
 	} else {
 		LOG_ERROR << "Loading of " << path << " failed...";
@@ -139,13 +139,51 @@ void Object::unload_all() {
 		delete obj;
 }
 
-Object::Object(std::string path, int fd, void * mem) : path(path), fd(fd), elf(reinterpret_cast<uintptr_t>(mem)) {}
+bool Object::valid(const Object & o) {
+	return valid(&o);
+}
+
+bool Object::valid(const Object * o) {
+	for (const auto & obj : objects) {
+		if (obj == o)
+			return true;
+	}
+	return false;
+}
+
+void* Object::resolve(size_t index) const {
+	LOG_ERROR << "Unable to resolve " << index << " -- Object " << path << " does not support dynamic loading!";
+	assert(false);
+	return nullptr;
+}
+
+Object::Object(std::string path, int fd, void * mem, DL::Lmid_t ns) : path(path), fd(fd), elf(reinterpret_cast<uintptr_t>(mem)), ns(ns) {
+	// Add to global list
+	objects.push_back(this);
+	// New namespace
+	if (ns == DL::LM_ID_NEWLN) {
+		ns = lookup.size();
+		lookup.push_back({this});
+	} else {
+		assert(ns >= 0 && ns < static_cast<DL::Lmid_t>(lookup.size()));
+		lookup[ns].push_back(this);
+	}
+}
 
 Object::~Object() {
 	for (auto & seg : memory_map)
 		seg.unmap();
 
 	close(fd);
+}
+
+Symbol Object::find_symbol(const Symbol & sym) const {
+	for (const auto & o : lookup[ns]) {
+		auto s = o->symbol(sym);
+		if (s.valid())
+			return s;
+	}
+	return Symbol(*this);
 }
 
 std::string Object::file_name() const {
@@ -213,7 +251,6 @@ bool Object::run(std::vector<std::string> args, uintptr_t stack_pointer, size_t 
 	Process p(stack_pointer, stack_size);
 
 	// TODO: Should not be hard coded...
-	uintptr_t base = memory_map[0].target.base;
 	p.aux[Auxiliary::AT_PHDR] = base + elf.header.e_phoff;
 	p.aux[Auxiliary::AT_PHNUM] = elf.header.e_phnum;
 

@@ -26,7 +26,7 @@ struct Object {
 	/*! \brief List of all loaded objects (for symbol resolving) */
 	static std::vector<Object *> objects;
 
-	static std::unordered_map<DL::Lmid_t, std::vector<Object *>> lookup;
+	static std::vector<std::vector<Object *>> lookup;
 
 	static void library_path(const std::string & runtime = "", const std::string & config_file = "ld.so.conf");
 
@@ -43,14 +43,27 @@ struct Object {
 	/*! \brief Unload all files */
 	static void unload_all();
 
+	/*! \brief Check if valid (loaded) object */
+	static bool valid(const Object * o);
+	static bool valid(const Object & o);
+
 	/*! \brief Full path to file */
-	std::string path;
+	const std::string path;
 
 	/*! \brief File deskriptor */
-	int fd;
+	const int fd;
 
 	/*! \brief Elf accessor */
-	Elf elf;
+	const Elf elf;
+
+	/*! \brief Namespace for object */
+	const DL::Lmid_t ns;
+
+	/*! \brief Begin offset of virtual memory area (for dynamic objects) */
+	uintptr_t base = 0;
+
+	/*! \brief File relative address of global offset table (for dynamic objects) */
+	uintptr_t global_offset_table = 0;
 
 	/*! \brief Library dependencies */
 	std::vector<Object *> dependencies;
@@ -67,13 +80,19 @@ struct Object {
 	/*! \brief Run */
 	bool run(std::vector<std::string> args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
 
+	/*! \brief resolve dynamic relocation entry (if possible!) */
+	virtual void* resolve(size_t index) const;
+
  protected:
-	Object() : elf(0) {
+	Object() : fd(-1), elf(0), ns(DL::LM_ID_NEWLN) {
 		assert(false);
 	};
 
+	Object(const Object&) = delete;
+	Object& operator=(const Object&) = delete;
+
 	/*! \brief create new object */
-	Object(std::string path, int fd, void * mem);
+	Object(std::string path, int fd, void * mem, DL::Lmid_t ns);
 
 	/*! \brief destroy object */
 	virtual ~Object();
@@ -93,9 +112,13 @@ struct Object {
 	/*! \brief Initialisation */
 	virtual bool init() { return true; };
 
-	/*! \brief find Symbol with same name and version
+	/*! \brief get symbol from this object with same name and version
 	 */
 	virtual Symbol symbol(const Symbol & sym) const { return Symbol(*this); };
+
+	/*! \brief find Symbol with same name and version from other objects in same namespace
+	 */
+	Symbol find_symbol(const Symbol & sym) const;
 
 	/*! \brief get next (page aligned) memory address */
 	static uintptr_t next_address();

@@ -68,7 +68,7 @@ int main(int argc, const char* argv[]) {
 		LOG_ERROR << std::endl << "Parsing Arguments failed -- run " << std::endl << ArgParser<Opts>::TAB << argv[0] << " --help" << std::endl << "for more information!" << std::endl;
 		return EXIT_FAILURE;
 	} else if (args.showHelp) {
-		std::cout << args.help("Luci", argv[0], "Footer", "file[s]", "[target args]");
+		std::cout << args.help("\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "[target args]");
 		return EXIT_SUCCESS;
 	}
 

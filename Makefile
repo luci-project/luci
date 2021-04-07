@@ -1,7 +1,8 @@
 VERBOSE = @
 
 CXX = g++
-CXXFLAGS := -std=c++2a -pie -Wall -Wno-comment -Og -g -I src -I elfo/include -I zydis/include -I zydis/dependencies/zycore/include -I plog/include
+# TODO:-mno-sse  -mno-mmx -mgeneral-regs-only -fno-rtti
+CXXFLAGS := -std=c++2a -pie -fno-exceptions  -Wall -Wno-comment -Og -g -I src -I elfo/include -I zydis/include -I zydis/dependencies/zycore/include -I plog/include
 
 BUILDDIR ?= .build
 CXX_SOURCES = $(wildcard src/*.cpp)

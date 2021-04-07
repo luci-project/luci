@@ -1,7 +1,7 @@
 DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CC=gcc
-CFLAGS=-Og -g -Wall -nostdlib
-LDFLAGS=-nostdlib -ffreestanding -L. -Wl,-rpath=$(DIR)
+CFLAGS=-Og -g -Wall -nostdlib -mcmodel=large
+LDFLAGS=-nostdlib -mcmodel=large -ffreestanding -L. -Wl,-rpath=$(DIR)
 LIBS=sys
 SOURCE=start.c hello.c
 OBJECTS=$(SOURCE:.c=.o)
@@ -13,7 +13,7 @@ $(BINARY): $(OBJECTS) | $(addprefix lib,$(addsuffix .so,$(LIBS)))
 	$(CC) $(LDFLAGS) -o $@ $^ $(addprefix -l,$(LIBS))
 
 lib%.so: %.c Makefile
-	$(CC) $(CFLAGS) -fpic --shared -o $@ $<
+	$(CC) $(CFLAGS) -fPIC --shared -o $@ $<
 
 %.o: %.c Makefile
 	$(CC) $(CFLAGS) -c -o $@ $<

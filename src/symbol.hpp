@@ -21,22 +21,22 @@ struct Symbol : Elf::Symbol {
 	struct Version {
 		const char * const name;
 		const uint32_t hash;
-		bool weak;
+		bool valid, weak;
 
 		bool operator==(const Version & that) const {
-			return this->hash == that.hash && strcmp(this->name, that.name) == 0;
+			return this->valid && that.valid && this->hash == that.hash && (this->name == that.name || strcmp(this->name, that.name) == 0);
 		}
 
-		Version(const char * name, uint32_t hash, bool weak = false) : name(name), hash(hash), weak(weak) {}
+		Version(const char * name, uint32_t hash, bool weak = false) : name(name), hash(hash), valid(true), weak(weak) {}
 
 		Version(const char * name, bool weak = false) : Version(name, ELF_Def::hash(name), weak) {}
 
-		Version() : Version(nullptr, 0, false) {}
+		Version(bool valid = true) : name(nullptr), hash(0), valid(valid), weak(false) {}
 	} version;
 
 	Symbol(const Object & object, const Elf::Symbol & sym, const char * version_name = nullptr, bool version_weak = false);
 
-	Symbol(const Object & object, const Elf::Symbol & sym, const char * version_name, uint32_t version_hash, bool version_weak = false);
+	Symbol(const Object & object, const Elf::Symbol & sym, const Version & version);
 
 	Symbol(const Object & object);
 
@@ -48,3 +48,5 @@ struct Symbol : Elf::Symbol {
 		return !operator==(o);
 	}
 };
+
+std::ostream& operator<<(std::ostream& os, const Symbol & s);
