@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <functional>
-#include <typeinfo>
-#include <cctype>
 #include <set>
 #include <string>
 #include <sstream>
@@ -44,19 +42,23 @@ struct ArgParser : Opts {
 	ArgParser& operator=(ArgParser&&) = delete;
 
 	bool set(const Parameter & arg, const std::string value) {
-		return visit([this, arg, value](auto&& element) -> bool {
-			if (typeid(element) == typeid(bool Opts::*)) {
+		if (std::holds_alternative<bool Opts::*>(arg.element)) {
+			return visit([this, arg, value](auto&& element) -> bool {
 				this->*element = false;
 				return value.empty() || value == "0";
-			} else if (arg.validate && !arg.validate(value)) {
-				return false;
-			} else {
-				std::stringstream s;
-				s << value;
-				s >> this->*element;
-				return s.eof();
-			}
-		}, arg.element);
+			}, arg.element);
+		} else {
+			return visit([this, arg, value](auto&& element) -> bool {
+				if (arg.validate && !arg.validate(value)) {
+					return false;
+				} else {
+					std::stringstream s;
+					s << value;
+					s >> this->*element;
+					return s.eof();
+				}
+			}, arg.element);
+		}
 	}
 
 	std::string get(const Parameter & arg) {
@@ -198,24 +200,28 @@ struct ArgParser : Opts {
 						const bool hasNext = idx < argc - 1;
 						const std::string next = hasNext ? argv[idx + 1] : "";
 
-						bool valid = visit([this, arg, &idx, current, hasNext, next](auto&& element) -> int {
-							if (typeid(element) == typeid(bool Opts::*)) {
+						bool valid;
+						if (std::holds_alternative<bool Opts::*>(arg.element)) {
+							valid = visit([this, arg, &idx, current, hasNext, next](auto&& element) -> bool {
 								this->*element = true;
 								return true;
-							} else if (hasNext) {
-								idx += 1;
-								if (set(arg, next)) {
-									return true;
+							}, arg.element);
+						} else {
+							valid = visit([this, arg, &idx, current, hasNext, next](auto&& element) -> bool {
+								if (hasNext) {
+									idx += 1;
+									if (set(arg, next)) {
+										return true;
+									} else {
+										LOG_ERROR << "Invalid value '" << next << "' for parameter " << arg.get_name() << "!";
+										return false;
+									}
 								} else {
-									LOG_ERROR << "Invalid value '" << next << "' for parameter " << arg.get_name() << "!";
+									LOG_ERROR << "Missing value for parameter " << current << "!";
 									return false;
 								}
-							} else {
-								LOG_ERROR << "Missing value for parameter " << current << "!";
-								return false;
-							}
-						}, arg.element);
-
+							}, arg.element);
+						}
 						if (!valid) {
 							error = true;
 						} else if (arg.present) {
