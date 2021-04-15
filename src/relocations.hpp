@@ -1,6 +1,7 @@
 #pragma once
 
 #include "elf.hpp"
+#include "elf_rel.hpp"
 #include "object.hpp"
 #include "symbol.hpp"
 
@@ -101,6 +102,15 @@ struct Relocations {
 		}
 
 		/*! \brief Relocate this entry */
+		uintptr_t relocate() const {
+			switch (table.type) {
+				case Elf::DT_REL: return table.relocate(rel);
+				case Elf::DT_RELA: return table.relocate(rela);
+				default: return 0;
+			}
+		}
+
+		/*! \brief Relocate this entry */
 		uintptr_t relocate(const Elf::Symbol & sym, const uintptr_t sym_base = 0) const {
 			switch (table.type) {
 				case Elf::DT_REL: return table.relocate(rel, sym, sym_base);
@@ -108,13 +118,18 @@ struct Relocations {
 				default: return 0;
 			}
 		}
+
 		uintptr_t relocate(const Symbol & sym) const {
 			return relocate(sym, sym.object.base);
 		}
 
 		/*! \brief Size of relocation */
 		size_t size() const {
-			return table.size(type());
+			switch (table.type) {
+				case Elf::DT_REL: return table.size(rel);
+				case Elf::DT_RELA: return table.size(rela);
+				default: return 0;
+			}
 		}
 	};
 
@@ -161,6 +176,14 @@ struct Relocations {
 		}
 	}
 
+	uintptr_t relocate(size_t index) const {
+		switch (type) {
+			case Elf::DT_REL: return relocate(rel[index]);
+			case Elf::DT_RELA: return relocate(rela[index]);
+			default: return 0;
+		}
+	}
+
 	uintptr_t relocate(size_t index, const Elf::Symbol & sym, const uintptr_t sym_base = 0) const {
 		switch (type) {
 			case Elf::DT_REL: return relocate(rel[index], sym, sym_base);
@@ -168,6 +191,7 @@ struct Relocations {
 			default: return 0;
 		}
 	}
+
 	uintptr_t relocate(size_t index, const Symbol & sym) const {
 		return relocate(index, sym, sym.object.base);
 	}
@@ -181,8 +205,18 @@ struct Relocations {
 	}
 
  protected:
-	size_t size(uint32_t type) const;
+	template<typename T>
+	size_t size(const T & entry) const {
+		return Relocation(entry).size();
+	}
 
-	uintptr_t relocate(const Elf::Relocation & entry, const Elf::Symbol & sym, const uintptr_t sym_base) const;
-	uintptr_t relocate(const Elf::RelocationWithAddend & entry, const Elf::Symbol & sym, const uintptr_t sym_base) const;
+	template<typename T>
+	uintptr_t relocate(const T & entry, const Elf::Symbol & sym, const uintptr_t sym_base) const {
+		return Relocation(entry).relocate(object.base, sym, sym_base, object.global_offset_table);
+	}
+
+	template<typename T>
+	uintptr_t relocate(const T & entry) const {
+		return Relocation(entry).relocate(object.base, object.global_offset_table);
+	}
 };
