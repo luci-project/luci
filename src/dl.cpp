@@ -4,11 +4,14 @@
 #include "generic.hpp"
 
 extern "C" void * dl_resolve(const Object & o, size_t index) {
+	alignas(64) uint8_t buf[1024];
+	asm volatile ("xsave (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
 	assert(Object::valid(o));
-	return o.resolve(index);
+	auto r = o.resolve(index);
+	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
+	return r;
 }
 
-// TODO: Save registers
 asm(R"(
 .globl _dl_resolve
 .hidden _dl_resolve

@@ -96,12 +96,13 @@ void* ObjectDynamic::resolve(size_t index) const {
 	assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
 	auto need_symbol = Symbol(*this, dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
 	LOG_DEBUG << "Need to relocate entry " << index << " with symbol " << need_symbol << "...";
-	auto res = find_symbol(need_symbol);
+	Symbol res = find_symbol(need_symbol);
 	if (res.valid()) {
 		LOG_INFO << "Linking to " << res << " in dynamic object " << path << "...";
 		auto ptr = reinterpret_cast<void*>(reloc.relocate(res));
 		return ptr;
 	}
+	LOG_ERROR << "Unable to resolve relocate entry " << index << " with symbol " << need_symbol << "...";
 	assert(false);
 	return nullptr;
 }
