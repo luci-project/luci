@@ -1,16 +1,15 @@
 VERBOSE = @
 
 CXX = g++
-# TODO:-mno-sse  -mno-mmx -mgeneral-regs-only -fno-rtti
-CXXFLAGS := -std=c++2a -pie -fno-exceptions  -Wall -Wno-comment -Og -g -I src -I elfo/include -I zydis/include -I zydis/dependencies/zycore/include -I plog/include
+# TODO:-mno-sse  -mno-mmx -mgeneral-regs-only -fno-rtti -static-libstdc++
+CXXFLAGS := -std=c++2a -pie -fno-exceptions -fno-rtti -Wall -Wno-comment -ffunction-sections -fdata-sections -Og -g -I src -I elfo/include -I plog/include
 
 BUILDDIR ?= .build
 CXX_SOURCES = $(wildcard src/*.cpp)
 CXX_OBJECTS = $(addprefix $(BUILDDIR)/,$(CXX_SOURCES:.cpp=.o))
 DEP_FILES = $(addprefix $(BUILDDIR)/,$(CXX_SOURCES:.cpp=.d) $(addsuffix .d,$(ASM_SOURCES)))
-LIBS = zydis/build/libZydis.a zydis/dependencies/zycore/build/libZycore.a
 CXXFLAGS += $(addprefix -I ,$(dir $(LIBS)))
-LDFLAGS = -L . $(addprefix -L ,$(dir $(LIBS))) -lZydis -lZycore
+LDFLAGS = -L . $(addprefix -L ,$(dir $(LIBS))) -Wl,--gc-sections
 TARGET_BIN = lilo
 LIBPATH_CONF = libpath.conf
 
