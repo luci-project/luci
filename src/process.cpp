@@ -68,6 +68,7 @@ void Process::init(const std::vector<std::string> &arg) {
 	}
 
 	// End marker
+	assert(reinterpret_cast<uintptr_t>(stack_pointer) % 8 == 0);
 	*reinterpret_cast<void**>(stack_pointer) = NULL;
 	stack_pointer -= sizeof(void*);
 

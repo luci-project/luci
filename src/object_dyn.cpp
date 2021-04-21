@@ -1,5 +1,7 @@
 #include "object_dyn.hpp"
 
+#include <elf_rel.hpp>
+
 #include "dl.hpp"
 #include "generic.hpp"
 
@@ -99,8 +101,8 @@ void* ObjectDynamic::resolve(size_t index) const {
 	Symbol res = find_symbol(need_symbol);
 	if (res.valid()) {
 		LOG_INFO << "Linking to " << res << " in dynamic object " << path << "...";
-		auto ptr = reinterpret_cast<void*>(reloc.relocate(res));
-		return ptr;
+		auto ptr = Relocator(reloc).apply(this->base, res, res.object.base, this->global_offset_table);
+		return reinterpret_cast<void*>(ptr);
 	}
 	LOG_ERROR << "Unable to resolve relocate entry " << index << " with symbol " << need_symbol << "...";
 	assert(false);

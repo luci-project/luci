@@ -7,7 +7,6 @@
 
 #include "object_rel.hpp"
 #include "object_exec.hpp"
-#include "relocations.hpp"
 
 struct ObjectDynamic : public ObjectExecutable {
 
@@ -19,7 +18,7 @@ struct ObjectDynamic : public ObjectExecutable {
 	    version_needed(get_section(Elf::DT_VERNEED).get_list<Elf::VersionNeeded>(true)),
 	    version_definition(get_section(Elf::DT_VERDEF).get_list<Elf::VersionDefinition>(true))
 	{
-		assert(!dynamic_relocations.valid() || reinterpret_cast<uintptr_t>(elf.sections[dynamic_relocations.symbol_table()].data()) == dynamic_symbols.address());
+		assert(dynamic_relocations.empty() || reinterpret_cast<uintptr_t>(elf.sections[dynamic_relocations[0].symtab].data()) == dynamic_symbols.address());
 	}
 
 	Symbol dynamic_symbol(const char * name, const char * version = nullptr) const;
@@ -39,7 +38,7 @@ struct ObjectDynamic : public ObjectExecutable {
  private:
 	Elf::Array<Elf::Dynamic> dynamic;
 	Elf::SymbolTable dynamic_symbols;
-	Relocations dynamic_relocations;
+	Elf::Array<Elf::Relocation> dynamic_relocations;
 	Elf::List<Elf::VersionNeeded> version_needed;
 	Elf::List<Elf::VersionDefinition> version_definition;
 
@@ -75,7 +74,7 @@ struct ObjectDynamic : public ObjectExecutable {
  		return elf.get<Elf::Dynamic>();
  	}
 
-	bool has_dynamic_value(Elf::dyn_tag tag, uintptr_t & value) const {
+	bool has_dynamic_value(const Elf::dyn_tag tag, uintptr_t & value) const {
 		for (auto &dyn: dynamic)
 			if (dyn.tag() == tag) {
 				value = dyn.value();
@@ -109,7 +108,7 @@ struct ObjectDynamic : public ObjectExecutable {
 		return Elf::SymbolTable(this->elf);
 	}
 
-	Relocations find_dynamic_relocation() const {
+	Elf::Array<Elf::Relocation> find_dynamic_relocation() const {
 		uintptr_t jmprel = 0;  // Address of PLT relocation table
 		uintptr_t pltrel = Elf::DT_NULL;  // Type of PLT relocation table (REL or RELA)
 		size_t pltrelsz = 0;   // Size of PLT relocation table (and, hence, GOT)
@@ -130,24 +129,15 @@ struct ObjectDynamic : public ObjectExecutable {
 			}
 		}
 
-		switch (pltrel) {
-			case Elf::DT_REL:
-			{
-				assert(jmprel != 0);
-				auto section = elf.section_by_offset(jmprel);
-				assert(section.size() == pltrelsz);
-				return Relocations(*this, section.get_array<Elf::Relocation>());
-			}
-			case Elf::DT_RELA:
-			{
-				assert(jmprel != 0);
-				auto section = elf.section_by_offset(jmprel);
-				assert(section.size() == pltrelsz);
-				return Relocations(*this, section.get_array<Elf::RelocationWithAddend>());
-			}
-			default:
-				assert(jmprel == 0 && pltrelsz == 0);
-				return Relocations(*this);
+		if (pltrel != Elf::DT_NULL) {
+			assert(jmprel != 0);
+			auto section = this->elf.section_by_offset(jmprel);
+			LOG_INFO << jmprel; //elf.sections.index(section);
+			assert(section.size() == pltrelsz);
+			return section.get_relocations();
+		} else {
+			assert(jmprel == 0);
+			return elf.sections[0].get_array<Elf::Relocation>();
 		}
 	}
 
