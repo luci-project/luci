@@ -1,39 +1,169 @@
 #pragma once
 
-#include <algorithm>
 #include <functional>
-#include <set>
 #include <string>
 #include <sstream>
+#include <ostream>
 #include <variant>
 #include <vector>
 
 #include "generic.hpp"
 
+namespace ArgElement {
+
+template<typename T>
+bool parse(T & element, const char * value) {
+	std::stringstream s;
+	s << value;
+	s >> element;
+	return s.eof();
+}
+
+template<>
+bool parse(const char * & element, const char * value) {
+	element = value;
+	return true;
+}
+
+template<>
+bool parse(bool & element, const char * value) {
+	element = (*value != '\0' && *value != '0');
+	return true;
+}
+
+template<typename T>
+bool parse(std::vector<T> & element, const char * value) {
+	T tmp;
+	parse<T>(tmp, value);
+	element.push_back(tmp);
+	return true;
+}
+
+template<typename T>
+std::string stringify(T & element) {
+	std::stringstream s;
+	s << element;
+	return s.str();
+}
+
+template<typename T>
+std::string stringify(std::vector<T> & element) {
+	std::stringstream s;
+	s << '{';
+	bool p = false;
+	for (const auto & e : element) {
+		if (p)
+			s << ',';
+		else
+			p = true;
+		s << e;
+	}
+	s << '}';
+	return s.str();
+}
+
+template<typename T>
+bool is_default(T & element) {
+	T x{};
+	return x == element;
+}
+
+template<typename T>
+bool multiple(T & element) {
+	return false;
+}
+
+template<typename T>
+bool multiple(std::vector<T> & element) {
+	return true;
+}
+
+}  // namespace ArgElement
+
 template <class Opts>
 struct ArgParser : Opts {
-	static const std::string REQUIRED;
-	static const std::string TERMINATOR;
-	static const std::string SPACE;
-	static const std::string TAB;
+	typedef std::variant<std::string Opts::*, const char * Opts::*, int Opts::*, bool Opts::*, std::vector<std::string> Opts::*, std::vector<const char *> Opts::*, std::vector<int> Opts::*> element_t;
 
 	using Parameter = struct {
-		std::string name;
-		std::variant<std::string Opts::*, int Opts::*, bool Opts::*> element;
-		std::string help;
-		std::string def;
-		std::function<bool(const std::string &)> validate;
+		const char name_short;
+		const char * name_long;
+		const char * name_arg;
+		element_t element;
+		bool required;
+		const char * help_text;
+		std::function<bool(const char *)> validate;
 		bool present;
 
-		std::string get_name() const {
-			return name.substr(0, name.find(" "));
+		bool matches(const char * name) {
+			return name[0] == '-'
+			   && (   (name_short != '\0' && name[1] == name_short)
+			       || (name_long != nullptr && name[1] == '-' && strcmp(name + 2, name_long) == 0));
+		}
+
+		bool parse() {
+			return false;
+		}
+
+		void help(std::ostream & out, std::string def = {}, size_t max_len = 70) {
+			size_t pos = 0;
+			auto text = [this, &out, max_len, &pos, &def](size_t len) -> bool {
+				size_t l = 0;
+				bool e = false;
+				while (help_text[pos] == ' ')
+					pos++;
+				for (size_t i = 0; i < max_len; i++)
+					if (help_text[pos + i] == '\0') {
+						e = def.empty();
+						l = i;
+						break;
+					} else if (help_text[pos + i] == ' ') {
+						l = i;
+					}
+				const char space[] = "                        ";
+				if (l > 0) {
+					if (len < sizeof(space))
+						out.write(space, sizeof(space) - len);
+					out.write(help_text + pos, l);
+					pos += l;
+				} else if (!def.empty()) {
+					if (len < sizeof(space))
+						out.write(space, sizeof(space) - len);
+					out << "(default: " << def << ")" << std::endl;
+					def = "";
+				}
+				if (l > 0 || len > 0)
+					out << std::endl;
+				return e;
+			};
+
+			if (name_short != '\0') {
+				out << "    -" << name_short;
+				if (name_arg == nullptr) {
+					text(7);
+				} else {
+					out << ' ' << name_arg;
+					text(8 + strlen(name_arg));
+				}
+			}
+			if (name_long != nullptr) {
+				out << "    --" << name_long;
+				if (name_arg == nullptr)
+					text(7 + strlen(name_long));
+				else {
+					out << ' ' << name_arg;
+					text(8 + strlen(name_long) + strlen(name_arg));
+				}
+			}
+			while (!text(0)) {}
+
+			out << std::endl;
 		}
 	};
 
  private:
 	std::vector<Parameter> args;
-	std::vector<std::string> positional, terminal;
-	std::function<bool(const std::string &)> validate_positional, validate_terminal;
+	std::vector<const char *> positional, terminal;
+	std::function<bool(const char *)> validate_positional, validate_terminal;
 
 	ArgParser() = default;
 	ArgParser(const ArgParser&) = delete;
@@ -41,143 +171,113 @@ struct ArgParser : Opts {
 	ArgParser& operator=(const ArgParser&) = delete;
 	ArgParser& operator=(ArgParser&&) = delete;
 
-	bool set(const Parameter & arg, const std::string value) {
-		if (std::holds_alternative<bool Opts::*>(arg.element)) {
-			return visit([this, arg, value](auto&& element) -> bool {
-				this->*element = false;
-				return value.empty() || value == "0";
-			}, arg.element);
-		} else {
-			return visit([this, arg, value](auto&& element) -> bool {
-				if (arg.validate && !arg.validate(value)) {
-					return false;
-				} else {
-					std::stringstream s;
-					s << value;
-					s >> this->*element;
-					return s.eof();
-				}
-			}, arg.element);
-		}
-	}
-
-	std::string get(const Parameter & arg) {
-		return visit([this, arg](auto&& element) -> std::string {
-			std::stringstream s;
-			s << this->*element;
-			return s.str();
+	bool set(const Parameter & arg, const char * value) {
+		return visit([this, arg, value](auto&& element) -> bool {
+			return arg.validate && !arg.validate(value) ? false : ArgElement::parse(this->*element, value);
 		}, arg.element);
 	}
 
-	std::vector<std::string> help_parameter(const Parameter & arg, std::size_t len = 70){
-		size_t l = arg.name.size();
-		std::vector<std::string> result({ l < SPACE.size() ? arg.name + SPACE.substr(l) : arg.name });
-
-		std::stringstream s;
-		s << arg.help;
-
-		std::string word;
-		while(s >> word) {
-			if ((result.back().size() + word.size()) <= len) {
-				result.back() += word + ' ';
-			} else {
-				result.back().pop_back();
-				result.push_back(SPACE + word + ' ');
-			}
-		}
-		result.back().pop_back();
-		return result;
+	std::string get(const Parameter & arg) {
+		return visit([this](auto&& element) -> std::string {
+			return ArgElement::stringify(this->*element);
+		}, arg.element);
 	}
 
+
  public:
-	ArgParser(const std::initializer_list<Parameter> & list, std::function<bool(const std::string &)> validate_positional, std::function<bool(const std::string &)> validate_terminal) : validate_positional(validate_positional), validate_terminal(validate_terminal) {
-		std::set<std::string> opts;
+	ArgParser(const std::initializer_list<Parameter> & list, std::function<bool(const char *)> validate_positional, std::function<bool(const char *)> validate_terminal) : validate_positional(validate_positional), validate_terminal(validate_terminal) {
 		for (auto arg : list) {
-			std::string name = arg.get_name();
-
 			// Check if parameter is unqiue
-			if (!opts.insert(name).second) {
-				LOG_FATAL << "Parameter '" << name << "' is not unqiue!";
-				continue;
-			}
-
-			// check default value
-			if (arg.def.empty())
-				arg.def = get(arg);
-			if (!set(arg, arg.def)) {
-				LOG_FATAL << "Invalid default value '" << arg.def << "' for parameter " << name << "!";
-				continue;
+			bool skip = false;
+			if (arg.name_short == '\0' && arg.name_long == nullptr) {
+				LOG_FATAL << "Parameter has neither short nor long name!";
+				skip = true;
+			} else {
+				for (const auto & other : args)
+					if (arg.name_short != '\0' && arg.name_short == other.name_short) {
+						LOG_FATAL << "Parameter '-" << arg.name_short << "' is not unqiue!";
+						skip = true;
+						break;
+					} else if (arg.name_long != nullptr && other.name_long != nullptr && strcmp(arg.name_long, other.name_long) == 0) {
+						LOG_FATAL << "Parameter '--" << arg.name_long << "' is not unqiue!";
+						skip = true;
+						break;
+					} else if (arg.element == other.element) {
+						if (arg.name_long != nullptr)
+							LOG_FATAL << "Element of parameter '--" << arg.name_long << "' is not unqiue!";
+						else
+							LOG_FATAL << "Element of parameter '-" << arg.name_short << "' is not unqiue!";
+						skip = true;
+						break;
+					}
 			}
 
 			// valid parameter.
-			arg.present = false;
-			args.push_back(arg);
+			if (!skip)
+				args.push_back(arg);
 		}
 	}
 
-	ArgParser(const std::initializer_list<Parameter> & list) : ArgParser(list, [](const std::string & str) -> bool { if (str.rfind("-", 0) == 0) { LOG_ERROR << "Positional parameter '" << str << "' looks like its not meant to be positional!" ; return false; } else { return true; } }, [](const std::string &) -> bool { return true; }) {}
+	ArgParser(const std::initializer_list<Parameter> & list) : ArgParser(list, [](const char * str) -> bool { if (str != nullptr && *str == '-') { LOG_ERROR << "Positional parameter '" << str << "' looks like its not meant to be positional!" ; return false; } else { return true; } }, [](const char *) -> bool { return true; }) {}
 
 	~ArgParser() = default;
 
-	std::string help(const std::string &header, const std::string &file, const std::string &footer, const std::string & positional = {}, const std::string & terminal = {}) {
+	void help(std::ostream & out, const char * header, const char * file, const char * footer, const char * positional = nullptr, const char * terminal = nullptr) {
+		// Usage line
+		if (header != nullptr)
+			out << std::endl << header << std::endl;
+		out << std::endl << " Usage: " << std::endl << '\t' << file;
+
 		bool hasRequired = false;
 		bool hasOptional = false;
-		std::stringstream out;
-
-		// Usage line
-		if (!header.empty())
-			out << std::endl << header << std::endl;
-		out << std::endl << " Usage: " << std::endl << TAB << file;
-
 		for (auto arg : args) {
-			if (arg.def == REQUIRED) {
-				out << " " << arg.name;
+			if (arg.required) {
+				if (arg.name_long != nullptr)
+					out << " --" << arg.name_long;
+				else
+					out << " -" << arg.name_short;
 				hasRequired = true;
 			} else {
-				out << " [" << arg.name << "]";
+				if (arg.name_long != nullptr)
+					out << " [--" << arg.name_long << "]";
+				else
+					out << " [-" << arg.name_short << "]";
 				hasOptional = true;
 			}
 		}
-		if (!positional.empty())
+		if (positional != nullptr)
 			out << " " << positional;
-		if (!terminal.empty())
-			out << " " << TERMINATOR << " " << terminal;
+		if (terminal != nullptr)
+			out << " -- " << terminal;
 		out << std::endl;
 
 		// Parameter details
 		if (hasRequired) {
 			out << std::endl << " Required parameters:" << std::endl;
 			for (auto arg : args)
-				if (arg.def == REQUIRED)
-					for (auto & line: help_parameter(arg))
-						out << TAB << line << std::endl;
+				if (arg.required)
+					arg.help(out);
 		}
 
 		if (hasOptional) {
 			out << std::endl << " Optional parameters:" << std::endl;
 			for (auto arg : args)
-				if (arg.def != REQUIRED) {
-					for (auto & line: help_parameter(arg))
-						out << TAB << line << std::endl;
-					if (!arg.def.empty())
-						out << TAB << SPACE << "(Default: " << arg.def << ")" << std::endl;
-				}
+				if (!arg.required)
+					arg.help(out, visit([this](auto&& element) -> bool { return ArgElement::is_default(this->*element); }, arg.element) ? "" : get(arg));
 		}
 
-		if (!footer.empty())
+		if (footer != nullptr)
 			out << std::endl << footer << std::endl;
 
 		out << std::endl;
-
-		return out.str();
 	}
 
-	bool parse(int argc, const char* argv[]) {
+	bool parse(int argc, char* argv[]) {
 		bool terminator = false;
 		bool error = false;
 
 		for (int idx = 1; idx < argc; ++idx) {
-			std::string current = argv[idx];
+			char * current = argv[idx];
 
 			if (terminator) {
 				// Terminal argument
@@ -187,33 +287,29 @@ struct ArgParser : Opts {
 					LOG_ERROR << "Terminal argument '" << current << "' is not valid!";
 					error = true;
 				}
-			} else if (current == TERMINATOR) {
+			} else if (current[0] == '-' && current[1] == '-' && current[2] == '\0') {
 				terminator = true;
 				continue;
 			} else {
 				bool found = false;
 				// Check all parameter names
 				for (auto & arg : args) {
-					if (current == arg.get_name()) {
+					if (arg.matches(current)) {
 						found = true;
-
-						const bool hasNext = idx < argc - 1;
-						const std::string next = hasNext ? argv[idx + 1] : "";
-
 						bool valid;
 						if (std::holds_alternative<bool Opts::*>(arg.element)) {
-							valid = visit([this, arg, &idx, current, hasNext, next](auto&& element) -> bool {
-								this->*element = true;
-								return true;
+							valid = visit([this](auto&& element) -> bool {
+								return ArgElement::parse(this->*element, "1");
 							}, arg.element);
 						} else {
-							valid = visit([this, arg, &idx, current, hasNext, next](auto&& element) -> bool {
-								if (hasNext) {
+							const char * next = idx < argc - 1 ? argv[idx + 1] : nullptr;
+							valid = visit([this, arg, &idx, current, next](auto&& element) -> bool {
+								if (next != nullptr) {
 									idx += 1;
 									if (set(arg, next)) {
 										return true;
 									} else {
-										LOG_ERROR << "Invalid value '" << next << "' for parameter " << arg.get_name() << "!";
+										LOG_ERROR << "Invalid value '" << next << "' for parameter " << current << "!";
 										return false;
 									}
 								} else {
@@ -224,12 +320,13 @@ struct ArgParser : Opts {
 						}
 						if (!valid) {
 							error = true;
-						} else if (arg.present) {
-							LOG_ERROR << "Parameter " << current << " used multiple times (= reassigned)!";
+						} else if (arg.present && !visit([this](auto&& element) -> bool { return ArgElement::multiple(this->*element); }, arg.element)) {
+							LOG_ERROR << "Parameter " << current << " occured multiple times (= reassigned)!";
 							error = true;
 						} else {
 							arg.present = true;
 						}
+						break;
 					}
 				}
 
@@ -244,18 +341,29 @@ struct ArgParser : Opts {
 				}
 			}
 		}
+
 		for (auto arg : args)
-			if (arg.def == REQUIRED && !arg.present) {
-				LOG_ERROR << "Parameter " << arg.get_name() << " is required!";
+			if (arg.required && !arg.present) {
+				if (arg.name_long != nullptr)
+					LOG_ERROR << "Parameter '--" << arg.name_long << "' is required!";
+				else
+					LOG_ERROR << "Parameter '-" << arg.name_short << "' is required!";
 				error = true;
 			}
 
 		return !error;
 	}
 
-	bool has(const std::string &parameter) {
+	bool has(const char * name) {
 		for (auto arg : args)
-			if (parameter == arg.get_name())
+			if (arg.matches(name))
+				return arg.present;
+		return false;
+	}
+
+	bool has(element_t element) {
+		for (auto arg : args)
+			if (element == arg.element)
 				return arg.present;
 		return false;
 	}
@@ -264,7 +372,7 @@ struct ArgParser : Opts {
 		return positional.size() > 0;
 	}
 
-	std::vector<std::string> get_positional() {
+	std::vector<const char *> get_positional() {
 		return positional;
 	}
 
@@ -272,20 +380,26 @@ struct ArgParser : Opts {
 		return terminal.size() > 0;
 	}
 
-	std::vector<std::string> get_terminal() {
+	std::vector<const char *> get_terminal() {
 		return terminal;
 	}
 
-	bool set(const std::string name, const std::string value) {
+	bool set(const char * name, const char * value) {
 		for (auto & arg : args)
-			if (name == arg.get_name())
+			if (arg.matches(name))
+				return set(arg, value);
+	}
+
+	bool set(element_t element, const char * value) {
+		for (auto & arg : args)
+			if (element == arg.element)
 				return set(arg, value);
 		return false;
 	}
 
-	std::string get(const std::string & name) {
+	std::string get(element_t element) {
 		for (auto & arg : args)
-			if (name == arg.get_name())
+			if (element == arg.element)
 				return get(arg);
 		return "";
 	}
@@ -294,16 +408,3 @@ struct ArgParser : Opts {
 		return static_cast<Opts>(*this);
 	}
 };
-
-
-template <class Opts>
-const std::string ArgParser<Opts>::REQUIRED({ '\0' });
-
-template <class Opts>
-const std::string ArgParser<Opts>::TERMINATOR("--");
-
-template <class Opts>
-const std::string ArgParser<Opts>::SPACE("                    ");
-
-template <class Opts>
-const std::string ArgParser<Opts>::TAB("    ");
