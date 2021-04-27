@@ -10,3 +10,6 @@
 [submodule "elfo"]
 	path = elfo
 	url = git@gitlab.cs.fau.de:heinloth/elfo.git
+[submodule "bean"]
+	path = bean
+	url = git@gitlab.cs.fau.de:heinloth/bean.git

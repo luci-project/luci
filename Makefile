@@ -1,8 +1,10 @@
 VERBOSE = @
 
+INCLUDE = src elfo/include bean/include bean/capstone/include bean/xxhash  plog/include
+
 CXX = g++
 # TODO:-mno-sse  -mno-mmx -mgeneral-regs-only -fno-rtti -static-libstdc++
-CXXFLAGS := -std=c++2a -pie -fno-exceptions -fno-rtti -Wall -Wno-comment -ffunction-sections -fdata-sections -Og -g -I src -I elfo/include -I plog/include
+CXXFLAGS := -std=c++2a -pie -fno-exceptions -fno-rtti -Wall -static-libstdc++ -static-libgcc -Wno-comment -ffunction-sections -fdata-sections -Og -g $(addprefix -I , $(INCLUDE))
 
 BUILDDIR ?= .build
 CXX_SOURCES = $(wildcard src/*.cpp)
