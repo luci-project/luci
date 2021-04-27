@@ -6,16 +6,16 @@
 #include <sys/stat.h>
 #include <bits/auxv.h>
 #include <inttypes.h>
+#include <unistd.h>
 
-#include <iostream>
 #include <set>
 #include <map>
 #include <vector>
-#include <filesystem>
 #include <unordered_map>
 
 #include "argparser.hpp"
 #include "utils.hpp"
+#include "loader.hpp"
 #include "object.hpp"
 
 #include <plog/Log.h>
@@ -27,48 +27,60 @@
 
 extern char **environ;
 
-int main(int argc, const char* argv[]) {
+static char * env(const char * name, bool consume = false) {
+	for (char ** ep = environ; *ep != NULL; ep++) {
+		char * e = *ep;
+		const char * n = name;
+		while (*n == *e && *e != '\0') {
+			n++;
+			e++;
+		}
+		if (*e == '=' && *n == '\0') {
+			if (consume)
+				**ep = '\0';
+			return e + 1;
+		}
+	}
+	return nullptr;
+}
+
+int main(int argc, char* argv[]) {
 	const int defaultLogLevel = plog::debug;
 
 	static plog::ColorConsoleAppender<plog::TxtFormatter> log_console;
 	plog::init(plog::debug, &log_console);
 
-	std::unordered_map<std::string, std::string> env;
-	for (char ** e = environ; *e != NULL; e++) {
-		std::string v(*e);
-		size_t p = v.find('=');
-		if (p != v.npos)
-			env.emplace(v.substr(0, p), v.substr(p+1));
-	}
-
 	struct Opts {
 		int loglevel{defaultLogLevel};
-		std::string logfile{};
+		const char * logfile{};
 		int logsize{};
-		std::string libpath{};
-		std::string libpathconf{"libpath.conf"};
-		std::string preload{};
+		std::vector<const char *> libpath{};
+		const char * libpathconf{"libpath.conf"};
+		std::vector<const char *> preload{};
+		bool dynamicUpdate{};
 		bool showHelp{};
 	};
 
 	auto args = ArgParser<Opts>({
-			{"--log LEVEL", &Opts::loglevel, "Set log level (0 = none, 3 = warning, 5 = debug)" , {}, [](const std::string & str) -> bool { int level = std::stoi(str); return level >= plog::none && level <= plog::verbose; } },
-			{"--logfile FILE", &Opts::logfile, "log to file" },
-			{"--logsize SIZE", &Opts::logsize, "set maximum log file size" },
-			{"--library-path DIR", &Opts::libpath, "add library search path (colon separated)" },
-			{"--library-conf FILE", &Opts::libpathconf, "library path configuration" },
-			{"--preload FILE", &Opts::preload, "library to be loaded first" },
-			{"--help", &Opts::showHelp, "Show this help" }
+			/* short & long name,  argument, element            required, help text,  optional validation function */
+			{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 5 = debug)", [](const std::string & str) -> bool { int level = std::stoi(str); return level >= plog::none && level <= plog::verbose; }},
+			{'\0', "logfile",      "FILE",  &Opts::logfile,       false, "Log to file" },
+			{'\0', "logsize",      "SIZE",  &Opts::logsize,       false, "Set maximum log file size" },
+			{'p',  "library-path", "DIR",   &Opts::libpath,       false, "Add library search path (this parameter may be used multiple times to specify additional directories)" },
+			{'c',  "library-conf", "FILE",  &Opts::libpathconf,   false, "library path configuration" },
+			{'P',  "preload",      "FILE",  &Opts::preload,       false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries)" },
+			{'d',  "dynamic",      nullptr, &Opts::dynamicUpdate, false, "Enable dynamic updates" },
+			{'h',  "help",         nullptr, &Opts::showHelp,      false, "Show this help" }
 		},
-		[](const std::string & str) -> bool { return std::filesystem::exists(str); },
-		[](const std::string &) -> bool { return true; }
+		[](const char * str) -> bool { return ::access(str, X_OK ) == 0; },
+		[](const char *) -> bool { return true; }
 	);
 
 	if (!args.parse(argc, argv)) {
-		LOG_ERROR << std::endl << "Parsing Arguments failed -- run " << std::endl << ArgParser<Opts>::TAB << argv[0] << " --help" << std::endl << "for more information!" << std::endl;
+		LOG_ERROR << std::endl << "Parsing Arguments failed -- run " << std::endl << "   " << argv[0] << " --help" << std::endl << "for more information!" << std::endl;
 		return EXIT_FAILURE;
 	} else if (args.showHelp) {
-		std::cout << args.help("\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "[target args]");
+		args.help(std::cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "[target args]");
 		return EXIT_SUCCESS;
 	}
 
@@ -78,42 +90,38 @@ int main(int argc, const char* argv[]) {
 
 	if (args.has("--logfile")) {
 		LOG_DEBUG << "Log to file " << args.logfile;
-		static plog::RollingFileAppender<plog::CsvFormatter> log_file(args.logfile.c_str(), args.logsize, 9);
+		static plog::RollingFileAppender<plog::CsvFormatter> log_file(args.logfile, args.logsize, 9);
 		plog::get()->addAppender(&log_file);
 	}
 
+	// New Loader
+	Loader loader(args.dynamicUpdate);
+
 	// Library search path
-	if (args.has("--library-path")) {
-		if (!args.libpath.empty()) {
-			LOG_DEBUG << "Add '" << args.libpath << "' (from --library-path) to library search path...";
-			Object::library_path_runtime = Utils::split(args.libpath, ';');
-		}
-	} else {
-		auto libpath = env.find("LD_LIBRARY_PATH");
-		if (libpath != env.end() && !libpath->second.empty()) {
-			LOG_DEBUG << "Add '" << libpath->second << "' (from " << libpath->first << ") to library search path...";
-			Object::library_path_runtime = Utils::split(libpath->second, ';');
-		}
+	for (auto & libpath : args.libpath) {
+		LOG_DEBUG << "Add '" << libpath << "' (from --library-path) to library search path...";
+		loader.library_path_runtime.push_back(libpath);
+	}
+	char * ld_library_path = env("LD_LIBRARY_PATH", true);
+	if (ld_library_path != nullptr && *ld_library_path != '\0') {
+		LOG_DEBUG << "Add '" << ld_library_path<< "' (from LD_LIBRARY_PATH) to library search path...";
+		loader.library_path_runtime = Utils::split(ld_library_path, ';');
 	}
 
 	LOG_DEBUG << "Adding contents of '" << args.libpathconf << "' to library search path...";
-	Object::library_path_config = Utils::file_contents(args.libpathconf);
-	LOG_DEBUG << "Config has " << Object::library_path_config.size() << " entries!";
+	loader.library_path_config = Utils::file_contents(args.libpathconf);
+	LOG_DEBUG << "Config has " << loader.library_path_config.size() << " entries!";
 
 	// Preload Library
-	if (args.has("--preload")) {
-		if (!args.preload.empty()) {
-			LOG_DEBUG << "Loading '" << args.preload << "' (from --preload)...";
-			for (auto & lib : Utils::split(args.preload, ';'))
-				Object::load_file(lib);
-		}
-	} else {
-		auto preload = env.find("LD_PRELOAD");
-		if (preload != env.end() && !preload->second.empty()) {
-			LOG_DEBUG << "Loading '" << preload->second << "' (from " << preload->first << ")...";
-			for (auto & lib : Utils::split(preload->second, ';'))
-				Object::load_file(lib);
-		}
+	for (auto & preload : args.preload) {
+		LOG_DEBUG << "Loading '" << preload << "' (from --preload)...";
+		loader.file(preload);
+	}
+	char * preload = env("LD_PRELOAD", true);
+	if (preload != nullptr && *preload != '\0') {
+		LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)...";
+		for (auto & lib : Utils::split(preload, ';'))
+			loader.file(lib);
 	}
 
 	// Binary Arguments
@@ -121,7 +129,7 @@ int main(int argc, const char* argv[]) {
 		Object * start = nullptr;
 		for (auto & bin : args.get_positional()) {
 			LOG_INFO << "Loading object " << bin;
-			Object * o = Object::load_file(bin);
+			Object * o = loader.file(bin);
 			if (o == nullptr) {
 				LOG_ERROR << "Failed loading " << bin;
 				return EXIT_FAILURE;
@@ -132,7 +140,7 @@ int main(int argc, const char* argv[]) {
 
 		assert(start != nullptr);
 
-		if (!start->run(args.get_terminal())) {
+		if (!loader.run(start, args.get_terminal())) {
 			LOG_ERROR << "Start failed";
 			return EXIT_FAILURE;
 		}
@@ -141,7 +149,5 @@ int main(int argc, const char* argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	LOG_DEBUG << "Unloading...";
-	Object::unload_all();
 	return EXIT_SUCCESS;
 }

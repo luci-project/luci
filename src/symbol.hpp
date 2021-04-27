@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string>
+#include <optional>
 
 #include <elf.hpp>
 
@@ -8,6 +8,7 @@
 
 class Object;
 
+/*! \brief Symbol with version and origin information */
 struct Symbol : Elf::Symbol {
 	using Elf::Symbol::valid;
 	using Elf::Symbol::name;
@@ -18,9 +19,9 @@ struct Symbol : Elf::Symbol {
 
 	const Object & object;
 
-	struct Version {
-		const char * const name;
-		const uint32_t hash;
+	const struct Version {
+		const char * name;
+		uint32_t hash;
 		bool valid, weak;
 
 		bool operator==(const Version & that) const {
@@ -50,3 +51,4 @@ struct Symbol : Elf::Symbol {
 };
 
 std::ostream& operator<<(std::ostream& os, const Symbol & s);
+std::ostream& operator<<(std::ostream& os, const std::optional<Symbol> & s);

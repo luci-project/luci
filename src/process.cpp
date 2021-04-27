@@ -31,9 +31,9 @@ Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(sta
 
 	// Read current environment variables
 	int envc;
-	for (envc = 0 ; environ[envc] != NULL; envc++) {
-		env.push_back(environ[envc]);
-	}
+	for (envc = 0 ; environ[envc] != nullptr; envc++)
+		if (*environ[envc] != '\0')
+			env.push_back(environ[envc]);
 
 	// Read current auxiliary vectors
 	Auxiliary * auxv = reinterpret_cast<Auxiliary *>(environ + envc + 1);
@@ -60,7 +60,7 @@ uintptr_t Process::allocate_stack(size_t stack_size) {
 }
 
 
-void Process::init(const std::vector<std::string> &arg) {
+void Process::init(const std::vector<const char *> &arg) {
 	IF_PLOG(plog::info) {
 		std::ostringstream imploded;
 		std::copy(arg.begin(), arg.end(), std::ostream_iterator<std::string>(imploded, " "));
@@ -75,16 +75,15 @@ void Process::init(const std::vector<std::string> &arg) {
 	// environment strings
 	std::vector<const char *> env_str;
 	for (auto it = env.rbegin(); it != env.rend(); ++it) {
-		stack_pointer -= it->size() + 1;
-		env_str.push_back(strcpy(reinterpret_cast<char *>(stack_pointer), it->c_str()));
-
+		stack_pointer -= strlen(*it) + 1;
+		env_str.push_back(strcpy(reinterpret_cast<char *>(stack_pointer), *it));
 	}
 
 	// argument strings
 	std::vector<const char *> arg_str;
 	for (auto it = arg.rbegin(); it != arg.rend(); ++it) {
-		stack_pointer -= it->size() + 1;
-		arg_str.push_back(strcpy(reinterpret_cast<char *>(stack_pointer), it->c_str()));
+		stack_pointer -= strlen(*it) + 1;
+		arg_str.push_back(strcpy(reinterpret_cast<char *>(stack_pointer), *it));
 	}
 
 	// padding

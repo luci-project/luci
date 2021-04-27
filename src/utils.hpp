@@ -5,11 +5,8 @@
 
 namespace Utils {
 
-std::vector<std::string> split(const std::string & source, const char delimiter);
+std::vector<const char *> split(char * source, const char delimiter);
 
-std::vector<std::string> file_contents(const std::string & path);
-
-void * mmap_file(const char * path, int & fd, size_t & length);
-
+std::vector<const char *> file_contents(const char * path);
 
 }

@@ -2,11 +2,12 @@
 
 #include <elf_rel.hpp>
 
+#include "loader.hpp"
 #include "dl.hpp"
 #include "generic.hpp"
 
 bool ObjectDynamic::preload() {
-	base = next_address();
+	base = file.loader->next_address();
 	return preload_segments()
 	    && preload_libraries();
 }
@@ -15,7 +16,7 @@ bool ObjectDynamic::preload_libraries() {
 	bool success = true;
 
 	// load needed libaries
-	std::vector<std::string> libs, rpath, runpath;
+	std::vector<const char *> libs, rpath, runpath;
 	for (auto &dyn: dynamic) {
 		switch (dyn.tag()) {
 			case Elf::DT_NEEDED:
@@ -79,7 +80,7 @@ bool ObjectDynamic::preload_libraries() {
 
 
 	for (auto & lib : libs) {
-		Object * o = load_library(lib, rpath, runpath);
+		Object * o = file.loader->library(lib, rpath, runpath);
 		if (o == nullptr) {
 			LOG_WARNING << "Unresolved dependency: " << lib;
 			success = false;
@@ -91,35 +92,7 @@ bool ObjectDynamic::preload_libraries() {
 	return success;
 }
 
-void* ObjectDynamic::resolve(size_t index) const {
-	auto reloc = dynamic_relocations[index];
-	auto need_symbol_index = reloc.symbol_index();
-	auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
-	assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
-	auto need_symbol = Symbol(*this, dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
-	LOG_DEBUG << "Need to relocate entry " << index << " with symbol " << need_symbol << "...";
-	Symbol res = find_symbol(need_symbol);
-	if (res.valid()) {
-		LOG_INFO << "Linking to " << res << " in dynamic object " << path << "...";
-		auto ptr = Relocator(reloc).apply(this->base, res, res.object.base, this->global_offset_table);
-		return reinterpret_cast<void*>(ptr);
-	}
-	LOG_ERROR << "Unable to resolve relocate entry " << index << " with symbol " << need_symbol << "...";
-	assert(false);
-	return nullptr;
-}
-
-Symbol ObjectDynamic::symbol(const Symbol & sym) const {
-	auto found = dynamic_symbols.index(sym.name(), version_index(sym.version));
-	if (found != Elf::STN_UNDEF) {
-		auto symbol_version_index = dynamic_symbols.version(found);
-		return Symbol(*this, dynamic_symbols[found], version(symbol_version_index));
-	} else {
-		return Symbol(*this);
-	}
-}
-
-bool ObjectDynamic::relocate() {
+bool ObjectDynamic::run_relocate(bool bind_now) {
 	bool success = true;
 	if (global_offset_table != 0) {
 		auto got = reinterpret_cast<uintptr_t *>(base + global_offset_table);
@@ -136,7 +109,7 @@ bool ObjectDynamic::relocate() {
 
 		// Print all entries
 		for (size_t i = 0 ; i < got_entries; i++)
-			LOG_DEBUG << file_name() << ".got["<< i << "] = " << (void*)got[i];
+			LOG_DEBUG << file.name() << ".got["<< i << "] = " << (void*)got[i];
 	}
 	/*
 	// Load unresolved symbols
@@ -157,4 +130,34 @@ bool ObjectDynamic::relocate() {
 		}
 	}*/
 	return success;
+}
+
+void* ObjectDynamic::dynamic_resolve(size_t index) const {
+	auto reloc = dynamic_relocations[index];
+	auto need_symbol_index = reloc.symbol_index();
+	auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
+	assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
+	Symbol need_symbol(*this, dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
+	LOG_DEBUG << "Need to relocate entry " << index << " with symbol " << need_symbol << "...";
+	auto symbol = file.loader->resolve_symbol(need_symbol, file.ns);
+	if (symbol) {
+		LOG_INFO << "Linking to " << symbol.value() << " in dynamic object " << file.path << "...";
+		auto ptr = Relocator(reloc).apply(this->base, symbol.value(), symbol->object.base, this->global_offset_table);
+		return reinterpret_cast<void*>(ptr);
+	}
+	LOG_ERROR << "Unable to resolve relocate entry " << index << " with symbol " << symbol << "...";
+	assert(false);
+	return nullptr;
+}
+
+std::optional<Symbol> ObjectDynamic::resolve_symbol(const Symbol & sym) const {
+	auto found = dynamic_symbols.index(sym.name(), version_index(sym.version));
+	if (found != Elf::STN_UNDEF) {
+		auto naked_sym = dynamic_symbols[found];
+		if (naked_sym.bind() == Elf::STB_GLOBAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
+			auto symbol_version_index = dynamic_symbols.version(found);
+			return Symbol(*this, naked_sym, version(symbol_version_index));
+		}
+	}
+	return std::nullopt;
 }

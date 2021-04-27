@@ -1,6 +1,5 @@
 #pragma once
 
-#include <string>
 #include <vector>
 
 #include <elf.hpp>
@@ -9,9 +8,8 @@
 #include "object_exec.hpp"
 
 struct ObjectDynamic : public ObjectExecutable {
-
-	ObjectDynamic(std::string path, int fd, void * mem, DL::Lmid_t ns)
-	  : ObjectExecutable(path, fd, mem, ns),
+	ObjectDynamic(const Object::File & file = Object::File())
+	  : ObjectExecutable(file),
 	    dynamic(find_dynamic()),
 	    dynamic_symbols(find_dynamic_symbol_table()),
 	    dynamic_relocations(find_dynamic_relocation()),
@@ -21,9 +19,7 @@ struct ObjectDynamic : public ObjectExecutable {
 		assert(dynamic_relocations.empty() || reinterpret_cast<uintptr_t>(elf.sections[dynamic_relocations[0].symtab].data()) == dynamic_symbols.address());
 	}
 
-	Symbol dynamic_symbol(const char * name, const char * version = nullptr) const;
-
-	void* resolve(size_t index) const override;
+	void* dynamic_resolve(size_t index) const override;
 
  protected:
 	bool preload() override;
@@ -31,9 +27,9 @@ struct ObjectDynamic : public ObjectExecutable {
 	/*! \brief load required libaries */
 	bool preload_libraries();
 
-	bool relocate() override;
+	bool run_relocate(bool bind_now = false) override;
 
-	Symbol symbol(const Symbol & sym) const override;
+	std::optional<Symbol> resolve_symbol(const Symbol & sym) const override;
 
  private:
 	Elf::Array<Elf::Dynamic> dynamic;
@@ -132,7 +128,6 @@ struct ObjectDynamic : public ObjectExecutable {
 		if (pltrel != Elf::DT_NULL) {
 			assert(jmprel != 0);
 			auto section = this->elf.section_by_offset(jmprel);
-			LOG_INFO << jmprel; //elf.sections.index(section);
 			assert(section.size() == pltrelsz);
 			return section.get_relocations();
 		} else {

@@ -2,10 +2,6 @@
 
 #include "generic.hpp"
 
-bool ObjectExecutable::preload() {
-	return preload_segments();
-}
-
 bool ObjectExecutable::preload_segments() {
 	// load segments
 	for (auto & segment : elf.segments)

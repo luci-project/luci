@@ -1,6 +1,6 @@
 #pragma once
 
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 #include "auxiliary.hpp"
@@ -25,11 +25,11 @@ class Process {
  public:
 	/*! \brief Environment variables
 	 */
-	std::vector<std::string> env;
+	std::vector<const char *> env;
 
 	/*! \brief Auxilary vectors
 	 */
-	std::map<Auxiliary::type, long int> aux;
+	std::unordered_map<Auxiliary::type, long int> aux;
 
 	/*! \brief stack pointer (on start of process)
 	 */
@@ -53,14 +53,14 @@ class Process {
 	 * \brief env           environment variables
 	 * \brief aux           auxiliary vectors
 	 */
-	Process(uintptr_t stack_pointer, size_t stack_size, std::vector<std::string> & env, std::map<Auxiliary::type, long int> & aux)
+	Process(uintptr_t stack_pointer, size_t stack_size, std::vector<const char *> & env, std::unordered_map<Auxiliary::type, long int> & aux)
 	 : env(env), aux(aux), stack_pointer(stack_pointer), stack_size(stack_size) {}
 
 	/*! \brief Setup process frame
 	 * construct stack for process start
 	 * \brief arg arguments
 	 */
-	void init(const std::vector<std::string> &arg);
+	void init(const std::vector<const char *> &arg);
 
 	/*! \brief Start Process
 	 * \param entry Start address

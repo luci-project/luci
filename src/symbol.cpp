@@ -27,6 +27,14 @@ std::ostream& operator<<(std::ostream& os, const Symbol & s) {
 	} else {
 		os << "*invalid*";
 	}
-	os << " (" << s.object.file_name() << ")";
+	os << " (" << s.object.file.name() << ")";
+	return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const std::optional<Symbol> & s) {
+	if (s)
+		os << s.value();
+	else
+		os << "[no symbol]";
 	return os;
 }

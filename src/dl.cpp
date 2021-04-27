@@ -6,11 +6,11 @@
 extern "C" void * dl_resolve(const Object & o, size_t index) {
 	alignas(64) uint8_t buf[1024];
 	asm volatile ("xsave (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
-	assert(Object::valid(o));
-	auto r = o.resolve(index);
+	auto r = o.dynamic_resolve(index);
 	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
 	return r;
 }
+
 
 asm(R"(
 .globl _dl_resolve
@@ -54,3 +54,20 @@ _dl_resolve:
 	# Jump to resolved function
 	jmp *%r11
 )");
+
+/*
+TODO:
+int    dlclose(void *);
+char  *dlerror(void);
+void  *dlopen(const char *, int);
+void  *dlsym(void *__restrict, const char *__restrict);
+
+typedef struct {
+	const char *dli_fname;
+	void *dli_fbase;
+	const char *dli_sname;
+	void *dli_saddr;
+} Dl_info;
+int dladdr(const void *, Dl_info *);
+int dlinfo(void *, int, void *);
+*/

@@ -1,6 +1,9 @@
 #pragma once
 
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
+
+struct Object;
 
 namespace DL {
 
@@ -51,7 +54,6 @@ struct link_map {
 	void *l_ld;    /* Dynamic section of the shared object */
 	struct link_map *l_next, *l_prev; /* Chain of loaded objects */
 };
-
 }
 
 extern "C" void _dl_resolve();

@@ -8,7 +8,7 @@
 
 bool MemorySegment::map() {
 	void * mem = nullptr;
-	const bool copy = source.object.fd < 0 || (source.size > 0 && (source.offset % Page::SIZE) != (target.address() % Page::SIZE));
+	const bool copy = source.object.file.fd < 0 || (source.size > 0 && (source.offset % Page::SIZE) != (target.address() % Page::SIZE));
 	if (copy || source.size == 0) {
 		LOG_DEBUG << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " anonymous...";
 		errno = 0;
@@ -19,9 +19,9 @@ bool MemorySegment::map() {
 	} else {
 		auto page_offset = target.address() % Page::SIZE;
 		assert(page_offset >= 0 && page_offset < Page::SIZE && source.offset >= page_offset);
-		LOG_DEBUG << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " from file " << source.object.path << " at " << (source.offset - page_offset) << "...";
+		LOG_DEBUG << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " from file " << source.object.file.path << " at " << (source.offset - page_offset) << "...";
 		errno = 0;
-		mem = ::mmap(reinterpret_cast<void*>(target.page_start()), target.page_size(), PROT_READ | PROT_WRITE, MAP_FIXED_NOREPLACE | MAP_PRIVATE, source.object.fd, source.offset - page_offset);
+		mem = ::mmap(reinterpret_cast<void*>(target.page_start()), target.page_size(), PROT_READ | PROT_WRITE, MAP_FIXED_NOREPLACE | MAP_PRIVATE, source.object.file.fd, source.offset - page_offset);
 	}
 	if (mem == MAP_FAILED) {
 		LOG_ERROR << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << strerror(errno);
