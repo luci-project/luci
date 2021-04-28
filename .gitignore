@@ -1,4 +1,4 @@
 .build
 .stdafx.c++.pch
-lilo
+luci
 libpath.conf

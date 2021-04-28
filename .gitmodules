@@ -1,9 +1,6 @@
 [submodule "musl"]
 	path = musl
 	url = git://git.musl-libc.org/musl
-[submodule "zydis"]
-	path = zydis
-	url = https://github.com/zyantific/zydis.git
 [submodule "plog"]
 	path = plog
 	url = https://github.com/SergiusTheBest/plog.git

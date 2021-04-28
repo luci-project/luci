@@ -1,6 +1,7 @@
+DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CC=gcc
 CFLAGS=-Og -g -nostdlib -static
-LDFLAGS=
+LDFLAGS=--dynamic-linker=$(realpath $(DIR)/../../luci)
 SOURCE=sys.c start.c hello.c
 OBJECTS=$(SOURCE:.c=.o)
 BINARY=test-static

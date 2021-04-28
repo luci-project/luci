@@ -3,7 +3,7 @@
 #include "object.hpp"
 #include "generic.hpp"
 
-extern "C" void * dl_resolve(const Object & o, size_t index) {
+extern "C" __attribute__((__used__)) void * dlresolve(const Object & o, size_t index) {
 	alignas(64) uint8_t buf[1024];
 	asm volatile ("xsave (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
 	auto r = o.dynamic_resolve(index);
@@ -13,11 +13,11 @@ extern "C" void * dl_resolve(const Object & o, size_t index) {
 
 
 asm(R"(
-.globl _dl_resolve
-.hidden _dl_resolve
-.type _dl_resolve, @function
+.globl _dlresolve
+.hidden _dlresolve
+.type _dlresolve, @function
 .align 16
-_dl_resolve:
+_dlresolve:
 	# Save base pointer
 	push %rbx
 	mov %rsp, %rbx
@@ -35,7 +35,7 @@ _dl_resolve:
 	mov 8(%rbx), %rdi
 	mov 16(%rbx), %rsi
 	# Call high level resolve function
-	call dl_resolve
+	call dlresolve
 	# Store result (resolved function) in temporary register
 	mov %rax, %r11
 
@@ -55,6 +55,21 @@ _dl_resolve:
 	jmp *%r11
 )");
 
+
+extern "C" int dlclose(void *) {
+	return 0;
+}
+
+extern "C" char *dlerror(void) {
+	return nullptr;
+}
+
+extern "C" void *dlopen(const char *, int) {
+	return nullptr;
+}
+extern "C" void *dlsym(void *__restrict, const char *__restrict) {
+	return nullptr;
+}
 /*
 TODO:
 int    dlclose(void *);

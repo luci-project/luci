@@ -14,7 +14,8 @@
 
 
 struct Loader {
-	bool dynamic_update;
+	/*! \brief enable dynamic updates? */
+	const bool dynamic_update;
 
 	/*! \brief default library path via argument / environment variable */
 	std::vector<const char *> library_path_runtime = {};
@@ -29,7 +30,7 @@ struct Loader {
 	mutable std::vector<Object *> lookup;
 
 	/*! \brief Constructor */
-	Loader(bool dynamicUpdate = false) : dynamic_update(dynamicUpdate) {}
+	Loader(const char * self, bool dynamicUpdate = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
@@ -55,4 +56,7 @@ struct Loader {
 
 	/*! \brief get next (page aligned) memory address */
 	uintptr_t next_address() const;
+
+ private:
+	Object * file_helper(const char * path, DL::Lmid_t ns = DL::LM_ID_BASE) const;
 };

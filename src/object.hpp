@@ -74,7 +74,7 @@ struct Object {
 	virtual void* dynamic_resolve(size_t index) const;
 
  protected:
-	friend class Loader;
+	friend struct Loader;
 
 	/*! \brief create new object */
 	Object(const File & file = File()) : file(file), elf(reinterpret_cast<uintptr_t>(file.data)) {

@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	// New Loader
-	Loader loader(args.dynamicUpdate);
+	Loader loader(argv[0], args.dynamicUpdate);
 
 	// Library search path
 	for (auto & libpath : args.libpath) {

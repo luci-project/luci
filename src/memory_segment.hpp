@@ -7,7 +7,7 @@
 
 #include "page.hpp"
 
-class Object;
+struct Object;
 
 struct MemorySegment {
 	/*! \brief Storage area relative to file */

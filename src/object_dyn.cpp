@@ -99,7 +99,7 @@ bool ObjectDynamic::run_relocate(bool bind_now) {
 		// 3 predefined got entries:
 		// got[0] is pointer to _DYNAMIC
 		got[1] = reinterpret_cast<uintptr_t>(this);
-		got[2] = reinterpret_cast<uintptr_t>(_dl_resolve);
+		got[2] = reinterpret_cast<uintptr_t>(_dlresolve);
 
 		// Rest for relocations
 		auto got_entries = dynamic_relocations.count() + 3;

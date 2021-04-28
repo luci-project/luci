@@ -9,6 +9,8 @@
 #include "object_rel.hpp"
 #include "object_exec.hpp"
 
+Loader::Loader(const char * self, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {}
+
 Loader::~Loader() {
 	for (auto & obj : lookup)
 		delete obj;
@@ -40,7 +42,6 @@ Object * Loader::file(const char * filename, const char * directory, DL::Lmid_t 
 	strncpy(path + directory_len + 1, filename, filename_len + 1);
 	return file(path, ns);
 }
-
 
 Object * Loader::file(const char * filepath, DL::Lmid_t ns) const {
 	// New namespace?
@@ -139,9 +140,6 @@ Object * Loader::file(const char * filepath, DL::Lmid_t ns) const {
 			return nullptr;
 	}
 
-	// TODO copy in memory if required
-	// calculate checksum with XXhash
-
 	// Create object
 	Object * o = nullptr;
 	switch (header->type()) {
@@ -162,25 +160,29 @@ Object * Loader::file(const char * filepath, DL::Lmid_t ns) const {
 			LOG_ERROR << "Unsupported ELF type!";
 			return nullptr;
 	}
+
 	if (o == nullptr) {
 		LOG_ERROR << "Object is a nullptr";
 		::close(file.fd);
 		::free(const_cast<char*>(file.path));
-		return nullptr;
 	}
+
+	// TODO: Hash functions?
 
 	// Add to lookup list
 	lookup.push_back(o);
 
 	// perform preload
 	if (o->preload()) {
-		LOG_INFO << "Successfully loaded " << file.path << " at " << (void*)o ;
+		LOG_INFO << "Successfully loaded " << o->file.path << " at " << (void*)o ;
 		return o;
 	} else {
-		LOG_ERROR << "Loading of " << file.path << " failed (while preloading)...";
+		LOG_ERROR << "Loading of " << o->file.path << " failed (while preloading)...";
 		delete o;
-		return nullptr;
+		o = nullptr;
 	}
+
+	return o;
 }
 
 bool Loader::run(const Object * start, std::vector<const char *> args, uintptr_t stack_pointer, size_t stack_size) const {
@@ -259,14 +261,12 @@ std::optional<Symbol> Loader::resolve_symbol(const Symbol & sym, DL::Lmid_t ns) 
 }
 
 uintptr_t Loader::next_address() const {
-	uintptr_t next = 0;
+	uintptr_t start = 0, end = 0, next = 0;
 	for (auto obj : lookup) {
 		LOG_DEBUG << "obj = " << (void*)obj;
-		uintptr_t start = 0, end = 0;
 		assert(valid(obj));
-		if (obj->memory_range(start, end) && end > next) {
+		if (obj->memory_range(start, end) && end > next)
 			next = end;
-		}
 	}
 	// Default address
 	if (next == 0) {

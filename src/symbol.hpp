@@ -6,7 +6,7 @@
 
 #include "generic.hpp"
 
-class Object;
+struct Object;
 
 /*! \brief Symbol with version and origin information */
 struct Symbol : Elf::Symbol {

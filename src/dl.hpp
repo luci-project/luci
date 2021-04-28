@@ -56,4 +56,9 @@ struct link_map {
 };
 }
 
-extern "C" void _dl_resolve();
+extern "C" void _dlresolve();
+
+extern "C" int dlclose(void *);
+extern "C" char *dlerror(void);
+extern "C" void *dlopen(const char *, int);
+extern "C" void *dlsym(void *__restrict, const char *__restrict);

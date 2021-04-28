@@ -1,18 +1,20 @@
 VERBOSE = @
 
-INCLUDE = src elfo/include bean/include bean/capstone/include bean/xxhash  plog/include
+INCLUDE = src elfo/include bean/include bean/capstone/include bean/xxhash plog/include
 
 CXX = g++
-# TODO:-mno-sse  -mno-mmx -mgeneral-regs-only -fno-rtti -static-libstdc++
-CXXFLAGS := -std=c++2a -pie -fno-exceptions -fno-rtti -Wall -static-libstdc++ -static-libgcc -Wno-comment -ffunction-sections -fdata-sections -Og -g $(addprefix -I , $(INCLUDE))
+#CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -Wall -static-libstdc++ -static-libgcc -static -Wno-comment -Og -g
+CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -Wall -Wno-comment -Og -g
+
+BASEADDRESS = 0xbadc000
 
 BUILDDIR ?= .build
 CXX_SOURCES = $(wildcard src/*.cpp)
 CXX_OBJECTS = $(addprefix $(BUILDDIR)/,$(CXX_SOURCES:.cpp=.o))
 DEP_FILES = $(addprefix $(BUILDDIR)/,$(CXX_SOURCES:.cpp=.d) $(addsuffix .d,$(ASM_SOURCES)))
-CXXFLAGS += $(addprefix -I ,$(dir $(LIBS)))
-LDFLAGS = -L . $(addprefix -L ,$(dir $(LIBS))) -Wl,--gc-sections
-TARGET_BIN = lilo
+CXXFLAGS += $(addprefix -I , $(INCLUDE)) $(addprefix -I ,$(dir $(LIBS)))
+LDFLAGS = -L . $(addprefix -L ,$(dir $(LIBS))) -Wl,-Ttext-segment=$(BASEADDRESS)
+TARGET_BIN = luci
 LIBPATH_CONF = libpath.conf
 
 
