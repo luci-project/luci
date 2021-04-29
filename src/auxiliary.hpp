@@ -1,7 +1,7 @@
 #pragma once
 
 /*! \brief Auxiliary vector */
-struct Auxiliary {
+struct alignas(16) Auxiliary {
 	enum type : long int {
 		AT_NULL              =  0,  ///< End of vector
 		AT_IGNORE            =  1,  ///< Entry should be ignored
