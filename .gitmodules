@@ -10,3 +10,9 @@
 [submodule "bean"]
 	path = bean
 	url = git@gitlab.cs.fau.de:heinloth/bean.git
+[submodule "capstone"]
+	path = capstone
+	url = https://github.com/aquynh/capstone.git
+[submodule "xxhash"]
+	path = xxhash
+	url = https://github.com/stbrumme/xxhash.git
