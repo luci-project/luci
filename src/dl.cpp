@@ -19,8 +19,8 @@ asm(R"(
 .align 16
 _dlresolve:
 	# Save base pointer
-	push %rbx
-	mov %rsp, %rbx
+	push %rbp
+	mov %rsp, %rbp
 
 	# Save register
 	push %rax
@@ -32,8 +32,8 @@ _dlresolve:
 	push %r9
 
 	# Read parameter (pushed bei plt) from stack
-	mov 8(%rbx), %rdi
-	mov 16(%rbx), %rsi
+	mov 8(%rbp), %rdi
+	mov 16(%rbp), %rsi
 	# Call high level resolve function
 	call dlresolve
 	# Store result (resolved function) in temporary register
@@ -47,9 +47,10 @@ _dlresolve:
 	pop %rdx
 	pop %rcx
 	pop %rax
+	pop %rbp
 
-	# Adjust stack (remove %rbx and parameter pushed by plt)
-	add $24, %rsp
+	# Adjust stack (remove parameter pushed by plt)
+	add $16, %rsp
 
 	# Jump to resolved function
 	jmp *%r11
