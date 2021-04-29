@@ -48,6 +48,22 @@ struct Symbol : Elf::Symbol {
 	bool operator!=(const Symbol & o) const {
 		return !operator==(o);
 	}
+
+	uint32_t hash_value() const {
+		if (!_hash_value.has_value())
+			_hash_value = ELF_Def::hash(this->name());
+		return _hash_value.value();
+	}
+
+	uint32_t gnu_hash_value() const {
+		if (!_gnu_hash_value.has_value())
+			_gnu_hash_value = ELF_Def::gnuhash(this->name());
+		return _gnu_hash_value.value();
+	}
+
+ private:
+	mutable std::optional<uint32_t> _hash_value;
+	mutable std::optional<uint32_t> _gnu_hash_value;
 };
 
 std::ostream& operator<<(std::ostream& os, const Symbol & s);

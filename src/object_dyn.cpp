@@ -151,7 +151,7 @@ void* ObjectDynamic::dynamic_resolve(size_t index) const {
 }
 
 std::optional<Symbol> ObjectDynamic::resolve_symbol(const Symbol & sym) const {
-	auto found = dynamic_symbols.index(sym.name(), version_index(sym.version));
+	auto found = dynamic_symbols.index(sym.name(), sym.hash_value(), sym.gnu_hash_value(), version_index(sym.version));
 	if (found != Elf::STN_UNDEF) {
 		auto naked_sym = dynamic_symbols[found];
 		if (naked_sym.bind() == Elf::STB_GLOBAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
