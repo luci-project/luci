@@ -22,7 +22,7 @@ LIBPATH_CONF = libpath.conf
 all: $(TARGET_BIN) $(LIBPATH_CONF)
 
 $(TARGET_BIN): $(CXX_OBJECTS) $(LIBCAPSTONE)
-	$(VERBOSE) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CXX_OBJECTS)
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(CXX_OBJECTS) $(LDFLAGS)
 
 $(BUILDDIR)/%.d : %.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"

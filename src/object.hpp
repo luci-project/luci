@@ -8,49 +8,31 @@
 #include <optional>
 
 #include "elf.hpp"
+#include "bean.hpp"
 
-#include "dl.hpp"
+#include "object_file.hpp"
 #include "symbol.hpp"
 #include "memory_segment.hpp"
 
-struct Loader;
 
 struct Object {
-	const struct File {
-		/*! \brief Full path to file */
-		const char * path;
+	/*! \brief Information about the object file (shared by all versions) */
+	ObjectFile & file;
 
-		/*! \brief File hash */
-		uint64_t hash;
-
+	/*! \brief Data (version specific) */
+	const struct Data {
 		/*! \brief File deskriptor */
-		int fd;
+		int fd = -1;
+
+		/*! \brief File size */
+		size_t size = 0;
 
 		/*! \brief Pointer to data */
-		const void * data;
+		void * ptr = nullptr;
 
-		/*! \brief Namespace for object */
-		DL::Lmid_t ns;
-
-		/*! \brief Parent */
-		//const Object * parent;
-
-		/*! \brief Loader */
-		const Loader * loader;
-
-		/*! \brief extract file name */
-		const char * name() const {
-			const char * r = path;
-			if (r != nullptr)
-				for (const char * i = path; *i != '\0'; ++i)
-					if (*i == '/')
-						r = i + 1;
-			return r;
-		}
-
-		/*! \brief constructor */
-		File(const Loader * loader = nullptr, DL::Lmid_t ns = DL::LM_ID_NEWLN, const char * path = nullptr, uint64_t hash = 0, int fd = -1, void * data = nullptr) : path(path), hash(hash), fd(fd), data(data), ns(ns), loader(loader) {}
-	} file;
+		/*! \brief File data hash */
+		uint64_t hash = 0;
+	} data;
 
 	/*! \brief Elf accessor */
 	const Elf elf;
@@ -61,11 +43,34 @@ struct Object {
 	/*! \brief File relative address of global offset table (for dynamic objects) */
 	uintptr_t global_offset_table = 0;
 
-	/*! \brief Library dependencies */
-	std::vector<Object *> dependencies;
+	/*! \brief status flags */
+	bool is_prepared = false;
+	bool is_protected = false;
+	bool is_initialized = false;
+
+	/*! \brief Symbol dependencies to other objects */
+	std::vector<ObjectFile *> dependencies;
 
 	/*! \brief Segments to be loaded in memory */
 	std::vector<MemorySegment> memory_map;
+
+	/*! \brief Binary symbol hashes */
+	std::optional<Bean> binary_hash;
+
+	/*! \brief Relocations to external symbols used in this object (cache) */
+	mutable std::vector<std::pair<Elf::Relocation, Symbol>> relocations;
+
+	/*! \brief Pointer to previous version */
+	Object * file_previous = nullptr;
+
+	/*! \brief create new object */
+	Object(ObjectFile & file, const Data & data);
+
+	Object(const Object&) = delete;
+	Object& operator=(const Object&) = delete;
+
+	/*! \brief destroy object */
+	virtual ~Object();
 
 	/*! \brief virtual memory range used by this object */
 	bool memory_range(uintptr_t & start, uintptr_t & end) const;
@@ -73,35 +78,23 @@ struct Object {
 	/*! \brief resolve dynamic relocation entry (if possible!) */
 	virtual void* dynamic_resolve(size_t index) const;
 
- protected:
-	friend struct Loader;
-
-	/*! \brief create new object */
-	Object(const File & file = File()) : file(file), elf(reinterpret_cast<uintptr_t>(file.data)) {
-		assert(file.data != nullptr);
-	}
-
-	Object(const Object&) = delete;
-	Object& operator=(const Object&) = delete;
-
-
-	/*! \brief destroy object */
-	virtual ~Object();
-
 	/*! \brief Initialisation of object (after creation) */
 	virtual bool preload() = 0;
 
 	/*! \brief allocate required segments in memory */
-	bool run_allocate();
+	bool map();
 
 	/*! \brief Relocate  */
-	virtual bool run_relocate(bool bind_now = false) { return true; };
+	virtual bool prepare() { return true; };
 
 	/*! \brief Set protection flags in memory */
-	bool run_protect();
+	bool protect();
 
 	/*! \brief Initialisation (before execution) */
-	virtual bool run_init() { return true; };
+	virtual bool initialize() { return true; };
+
+	/*! \brief Check if current object can patch a previous version */
+	virtual bool patchable() const { return false; };
 
 	/*! \brief Find (external visible) symbol in this object with same name and version */
 	virtual std::optional<Symbol> resolve_symbol(const Symbol & sym) const { return std::nullopt; };

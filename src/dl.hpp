@@ -54,6 +54,8 @@ struct link_map {
 	void *l_ld;    /* Dynamic section of the shared object */
 	struct link_map *l_next, *l_prev; /* Chain of loaded objects */
 };
+
+// TODO struct r_debug, struct r_debug * _dl_debug_initialize (ElfW(Addr) ldbase, Lmid_t ns)
 }
 
 extern "C" void _dlresolve();

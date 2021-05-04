@@ -1,31 +1,59 @@
 #include "loader.hpp"
 
+#include <sys/inotify.h>
+
 #include <utility>
 
 #include "xxhash64.h"
 
 #include "process.hpp"
-#include "object_dyn.hpp"
-#include "object_rel.hpp"
-#include "object_exec.hpp"
+#include "object_file.hpp"
+#include "object.hpp"
 
-Loader::Loader(const char * self, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {}
-
-Loader::~Loader() {
-	for (auto & obj : lookup)
-		delete obj;
+void * observer_kickoff(void * ptr) {
+	reinterpret_cast<Loader *>(ptr)->observer();
+	return nullptr;
 }
 
-Object * Loader::library(const char * filename, const std::vector<const char *> & search, DL::Lmid_t ns) const {
-	Object * lib;
+Loader::Loader(const char * self, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {
+	errno = 0;
+	if (::pthread_mutex_init(&mutex, nullptr) != 0) {
+		LOG_ERROR << "Creating loader mutex failed: " << strerror(errno);
+	} else if (dynamic_update) {
+		if ((inotifyfd = ::inotify_init1(IN_CLOEXEC)) == -1)
+			LOG_ERROR << "Initializing inotify failed: " << strerror(errno);
+		else if (::pthread_create(&observer_thread, nullptr, &observer_kickoff, this) != 0)
+			LOG_ERROR << "Creating background thread failed: " << strerror(errno);
+		else if (::pthread_detach(observer_thread) != 0)
+			LOG_ERROR << "Detaching background thread failed: " << strerror(errno);
+		else
+			LOG_INFO << "Created observer background thread";
+	}
+}
+
+Loader::~Loader() {
+	if (::pthread_mutex_destroy(&mutex) != 0) {
+		LOG_ERROR << "Destroying loader mutex failed: " << strerror(errno);
+	} else if (dynamic_update) {
+		if (close(inotifyfd) != 0)
+			LOG_ERROR << "Closing inotify failed: " << strerror(errno);
+		else
+			LOG_INFO << "Destroyed observer background thread";
+	}
+
+	lookup.clear();
+}
+
+ObjectFile * Loader::library(const char * filename, const std::vector<const char *> & search, DL::Lmid_t ns) {
+	ObjectFile * lib;
 	for (auto & dir : search)
 		if ((lib = file(filename, dir, ns)) != nullptr)
 			return lib;
 	return nullptr;
 }
 
-Object * Loader::library(const char * filename, const std::vector<const char *> & rpath, const std::vector<const char *> & runpath, DL::Lmid_t ns)   const {
-	Object * lib;
+ObjectFile * Loader::library(const char * filename, const std::vector<const char *> & rpath, const std::vector<const char *> & runpath, DL::Lmid_t ns)  {
+	ObjectFile * lib;
 	for (const std::vector<const char *> & path : { rpath, library_path_runtime, runpath, library_path_config, library_path_default })
 		if ((lib = library(filename, path, ns)) != nullptr)
 			return lib;
@@ -33,189 +61,110 @@ Object * Loader::library(const char * filename, const std::vector<const char *> 
 	return nullptr;
 }
 
-Object * Loader::file(const char * filename, const char * directory, DL::Lmid_t ns) const {
+ObjectFile * Loader::file(const char * filename, const char * directory, DL::Lmid_t ns) {
 	auto filename_len = strlen(filename);
 	auto directory_len = strlen(directory);
 	char path[directory_len + filename_len + 2];
-	strncpy(path, directory, directory_len);
+	::strncpy(path, directory, directory_len);
 	path[directory_len] = '/';
-	strncpy(path + directory_len + 1, filename, filename_len + 1);
+	::strncpy(path + directory_len + 1, filename, filename_len + 1);
 	return file(path, ns);
 }
 
-Object * Loader::file(const char * filepath, DL::Lmid_t ns) const {
-	// New namespace?
-	if (ns == DL::LM_ID_NEWLN) {
-		ns = DL::LM_ID_BASE + 1;
-		for (const auto & o : lookup)
-			if (o->file.ns >= ns)
-				ns = o->file.ns + 1;
-	}
-
-	// Create file
-	Object::File file(this, ns);
-
+ObjectFile * Loader::file(const char * filepath, DL::Lmid_t ns) {
 	// Get real path (if valid)
 	errno = 0;
-	file.path = realpath(filepath, nullptr);
-	if (file.path == nullptr) {
+	char path[PATH_MAX];
+	if (::realpath(filepath, path) == nullptr) {
 		LOG_ERROR << "Opening file " << filepath << " failed: " << strerror(errno);
 		return nullptr;
 	}
 
-	LOG_DEBUG << "Loading " << file.path << "...";
-	// Open file
-	errno = 0;
-	file.fd = ::open(file.path, O_RDONLY);
-	if (file.fd < 0) {
-		LOG_ERROR << "Reading file " << file.path << " failed: " << strerror(errno);
-		::free(const_cast<char*>(file.path));
-		return nullptr;
-	}
+	// Get / create file handle
+	ObjectFile * object_file = nullptr;
 
-	// Determine file size and inode
-	struct stat sb;
-	if (::fstat(file.fd, &sb) == -1) {
-		LOG_ERROR << "Stat file " << file.path << " failed: " << strerror(errno);
-		::close(file.fd);
-		::free(const_cast<char*>(file.path));
-		return nullptr;
-	}
-	size_t length = sb.st_size;
-	int inode = sb.st_ino;
+	// New namespace?
+	if (ns == DL::LM_ID_NEWLN) {
+		ns = DL::LM_ID_BASE + 1;
+		for (const auto & of : lookup)
+			if (of.ns >= ns)
+				ns = of.ns + 1;
 
-	// Map file
-	file.data = ::mmap(NULL, length, PROT_READ, MAP_PRIVATE, file.fd, 0);
-	if (file.data == MAP_FAILED) {
-		LOG_ERROR << "Mmap file " << file.path << " failed: " << strerror(errno);
-		::close(file.fd);
-		::free(const_cast<char*>(file.path));
-		return nullptr;
-	}
-
-	// Hash file contents
-	XXHash64 filehash(ELF_Def::hash(file.path));  // Path as seed
-	filehash.add(file.data, length);
-	file.hash = filehash.hash();
-	LOG_DEBUG << "File " << file.path << " has hash " << std::hex << file.hash << std::dec;
-
-	// Check if already loaded
-	for (auto & obj : lookup)
-		if (obj->file.hash == file.hash && strcmp(obj->file.path, file.path) == 0) {
-			LOG_INFO << "Already loaded " << file.path << "...";
-			::close(file.fd);
-			::free(const_cast<char*>(file.path));
-			return obj;
-		}
-
-	// Check ELF
-	const Elf::Header * header = reinterpret_cast<const Elf::Header *>(file.data);
-
-	if (length < sizeof(Elf::Header) || !header->valid()) {
-		LOG_ERROR << "No valid ELF identification header in " << file.path << "!";
-		return nullptr;
-	}
-
-	switch (header->ident_abi()) {
-		case Elf::ELFOSABI_NONE:
-		case Elf::ELFOSABI_LINUX:
-			break;
-		default:
-			LOG_ERROR << "Unsupported OS ABI " << (int)header->ident_abi();
-			return nullptr;
-	}
-
-	switch (header->machine()) {
-#ifdef __i386__
-		case Elf::EM_386:
-		case Elf::EM_486:
-			break;
-#endif
-#ifdef __x86_64__
-		case Elf::EM_X86_64:
-			break;
-#endif
-		default:
-			LOG_ERROR << "Unsupported machine!" ;
-			return nullptr;
-	}
-
-	// Create object
-	Object * o = nullptr;
-	switch (header->type()) {
-		case Elf::ET_EXEC:
-			LOG_DEBUG << "Executable (standalone)";
-			assert(lookup.empty());
-			o = new ObjectExecutable(file);
-			break;
-		case Elf::ET_DYN:
-			LOG_DEBUG << "Dynamic";
-			o = new ObjectDynamic(file);
-			break;
-		case Elf::ET_REL:
-			LOG_DEBUG << "Relocatable";
-			o = new ObjectRelocatable(file);
-			break;
-		default:
-			LOG_ERROR << "Unsupported ELF type!";
-			return nullptr;
-	}
-
-	if (o == nullptr) {
-		LOG_ERROR << "Object is a nullptr";
-		::close(file.fd);
-		::free(const_cast<char*>(file.path));
-	}
-
-	// TODO: Hash functions?
-
-	// Add to lookup list
-	lookup.push_back(o);
-
-	// perform preload
-	if (o->preload()) {
-		LOG_INFO << "Successfully loaded " << o->file.path << " at " << (void*)o ;
-		return o;
 	} else {
-		LOG_ERROR << "Loading of " << o->file.path << " failed (while preloading)...";
-		delete o;
-		o = nullptr;
+		// Check if handle already exists
+		auto hash = ELF_Def::gnuhash(path);
+		for (auto & o : lookup)
+			if (o.hash == hash && o.ns == ns && &o.loader == this && strcmp(path, o.path) == 0)
+				object_file = &o;
 	}
 
-	return o;
+	// new object, load
+	if (object_file == nullptr) {
+		LOG_DEBUG << "Loading " << path << "...";
+		object_file = &lookup.emplace_back(*this, path, ns);
+		if (!object_file->load()) {
+			LOG_ERROR << "Unable to open " << path;
+			lookup.pop_back();
+			return nullptr;
+		} else if (dynamic_update) {
+
+		}
+	}
+
+	return object_file;
 }
 
-bool Loader::run(const Object * start, std::vector<const char *> args, uintptr_t stack_pointer, size_t stack_size) const {
-	if (!valid(start))
-		return false;
+bool Loader::prepare() {
+	// Relocate
+	LOG_DEBUG << "Relocate...";
+	for (auto & of : lookup)
+		if (of.current->is_prepared)
+			continue;
+		else if (of.current->prepare())
+			of.current->is_prepared = true;
+		else
+			return false;
+
+	// Protect
+	LOG_DEBUG << "Protect memory...";
+	for (auto & of : lookup)
+		if (of.current->is_protected)
+			continue;
+		else if (of.current->protect())
+			of.current->is_protected = true;
+		else
+			return false;
+
+	// TODO: Inherit is_initalized from previous?
+	// Initialize (but not binary itself)
+	LOG_DEBUG << "Initialize...";
+	for (auto & of : lookup)
+		if (of.current->is_initialized)
+			continue;
+		else if (of.current->initialize())
+			of.current->is_initialized = true;
+		else
+			return false;
+
+	return true;
+}
+
+bool Loader::run(const ObjectFile * object_file, std::vector<const char *> args, uintptr_t stack_pointer, size_t stack_size) {
+	Object * start = object_file->current;
+	assert(start->file_previous == nullptr);
 
 	if (start->memory_map.size() == 0)
 		return false;
 
-	// Allocate
-	LOG_DEBUG << "Allocate memory";
-	for (auto & obj : lookup)
-		if (!obj->run_allocate())
-			return false;
+	// Executed binary will be initialized in _start automatically
+	start->is_initialized = true;
 
-	// Relocate
-	LOG_DEBUG << "Relocate";
-	for (auto & obj : lookup)
-		if (!obj->run_relocate())
-			return false;
-
-	// Protect
-	LOG_DEBUG << "Protect memory";
-	for (auto & obj : lookup)
-		if (!obj->run_protect())
-			return false;
-
-	// Init (not binary itself)
-	for (auto & obj : lookup)
-		if (obj == start)
-			continue;
-		else if (!obj->run_init())
-			return false;
+	// Prepare libraries
+	if (!prepare()) {
+		LOG_ERROR << "Preparation for execution of " << object_file->path << " failed...";
+		start->is_initialized = false;
+		return false;
+	}
 
 	// Prepare execution
 	Process p(stack_pointer, stack_size);
@@ -234,43 +183,65 @@ bool Loader::run(const Object * start, std::vector<const char *> args, uintptr_t
 	return true;
 }
 
-bool Loader::valid(const Object & o) const {
-	return valid(&o);
-}
-
-bool Loader::valid(const Object * o) const {
-	if (o != nullptr)
-		for (const auto & obj : lookup)
-			if (obj == o)
-				return true;
-	return false;
-}
-
-
 std::optional<Symbol> Loader::resolve_symbol(const Symbol & sym, DL::Lmid_t ns) const {
-	for (const auto & o : lookup) {
-		if (o->file.ns == ns) {
-			auto s = o->resolve_symbol(sym);
+	for (const auto & object_file : lookup)
+		if (object_file.ns == ns && object_file.current != nullptr) {
+			// Only compare to latest version
+			auto obj = object_file.current;
+			assert(obj != nullptr);
+			auto s = obj->resolve_symbol(sym);
 			if (s) {
 				assert(s->valid());
 				return s;
 			}
 		}
-	}
 	return std::nullopt;
 }
 
 uintptr_t Loader::next_address() const {
 	uintptr_t start = 0, end = 0, next = 0;
-	for (auto obj : lookup) {
-		LOG_DEBUG << "obj = " << (void*)obj;
-		assert(valid(obj));
-		if (obj->memory_range(start, end) && end > next)
-			next = end;
-	}
+	for (const auto & object_file : lookup)
+		for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous)
+			if (obj->memory_range(start, end) && end > next)
+				next = end;
+
 	// Default address
 	if (next == 0) {
 		next = 0x500000;
 	}
 	return next;
+}
+
+void Loader::observer() {
+	char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+
+	while (true) {
+		errno = 0;
+		ssize_t len = read(inotifyfd, buf, sizeof(buf));
+		if (len == -1 && errno != EAGAIN) {
+			LOG_ERROR << "Reading file modifications failed: " << strerror(errno);
+			break;
+		} else if (len <= 0) {
+			break;
+		}
+
+		char *ptr = buf;
+		while (ptr < buf + len) {
+			const struct inotify_event * event = reinterpret_cast<const struct inotify_event *>(ptr);
+			ptr += sizeof(struct inotify_event) + event->len;
+
+			// Get Object
+			lock();
+			for (auto & object_file : lookup)
+				if (event->wd == object_file.wd) {
+					LOG_DEBUG << "Possible file modification in " << object_file.path;
+					assert((event->mask & IN_ISDIR) == 0);
+					object_file.load();
+					prepare();
+					break;
+				}
+			unlock();
+		}
+	}
+	LOG_INFO << "File Observer background thread ends.";
 }

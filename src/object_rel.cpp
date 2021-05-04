@@ -1,5 +1,5 @@
 #include "object_rel.hpp"
 
-bool ObjectRelocatable::run_relocate(bool bind_now) {
+bool ObjectRelocatable::prepare() {
 	return false;
 }

@@ -10,15 +10,25 @@
 #include "object_rel.hpp"
 #include "generic.hpp"
 
+Object::Object(ObjectFile & file, const Data & data) : file(file), data(data), elf(reinterpret_cast<uintptr_t>(data.ptr)) {
+	assert(file.path != nullptr);
+	assert(data.ptr != nullptr);
+}
 
 Object::~Object() {
+	// TODO: Not really supported yet, just a stub...
+
+	// Remove this version from list
+	assert(file.current == this);
+	file.current = file_previous;
+
+	// Unmap virt mem
 	for (auto & seg : memory_map)
 		seg.unmap();
 
-	if (file.fd > 0)
-		close(file.fd);
-
-	free(const_cast<char*>(file.path));
+	// close file descriptor
+	if (data.fd > 0)
+		close(data.fd);
 
 	// TODO: unmap file.data?
 }
@@ -33,7 +43,7 @@ bool Object::memory_range(uintptr_t & start, uintptr_t & end) const {
 	}
 }
 
-bool Object::run_allocate() {
+bool Object::map() {
 	for (auto & seg : memory_map)
 		if (!seg.map())
 			return false;
@@ -41,8 +51,7 @@ bool Object::run_allocate() {
 	return true;
 }
 
-
-bool Object::run_protect() {
+bool Object::protect() {
 	for (auto & seg : memory_map)
 		if (!seg.protect())
 			return false;

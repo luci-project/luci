@@ -3,7 +3,8 @@
 #include "object.hpp"
 
 struct ObjectExecutable : public Object {
-	ObjectExecutable(const Object::File & file = Object::File()) : Object(file) {}
+	ObjectExecutable(ObjectFile & file, const Object::Data & data) : Object{file, data} {}
+
 
  protected:
 	virtual bool preload() override {

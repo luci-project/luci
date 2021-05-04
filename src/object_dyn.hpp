@@ -8,15 +8,17 @@
 #include "object_exec.hpp"
 
 struct ObjectDynamic : public ObjectExecutable {
-	ObjectDynamic(const Object::File & file = Object::File())
-	  : ObjectExecutable(file),
-	    dynamic(find_dynamic()),
-	    dynamic_symbols(find_dynamic_symbol_table()),
-	    dynamic_relocations(find_dynamic_relocation()),
-	    version_needed(get_section(Elf::DT_VERNEED).get_list<Elf::VersionNeeded>(true)),
-	    version_definition(get_section(Elf::DT_VERDEF).get_list<Elf::VersionDefinition>(true))
+	ObjectDynamic(ObjectFile & file, const Object::Data & data)
+	  : ObjectExecutable{file, data},
+	    dynamic{find_dynamic()},
+	    dynamic_symbols{find_dynamic_symbol_table()},
+	    dynamic_relocations{find_relocation_table(false)},
+	    dynamic_relocations_plt{find_relocation_table(true)},
+	    version_needed{get_section(Elf::DT_VERNEED).get_list<Elf::VersionNeeded>(true)},
+	    version_definition{get_section(Elf::DT_VERDEF).get_list<Elf::VersionDefinition>(true)}
 	{
 		assert(dynamic_relocations.empty() || reinterpret_cast<uintptr_t>(elf.sections[dynamic_relocations[0].symtab].data()) == dynamic_symbols.address());
+		assert(dynamic_relocations_plt.empty() || reinterpret_cast<uintptr_t>(elf.sections[dynamic_relocations_plt[0].symtab].data()) == dynamic_symbols.address());
 	}
 
 	void* dynamic_resolve(size_t index) const override;
@@ -27,14 +29,23 @@ struct ObjectDynamic : public ObjectExecutable {
 	/*! \brief load required libaries */
 	bool preload_libraries();
 
-	bool run_relocate(bool bind_now = false) override;
+	bool prepare() override;
+
+	bool patchable() const override;
 
 	std::optional<Symbol> resolve_symbol(const Symbol & sym) const override;
+
+	void* relocate(const Elf::Relocation & reloc) const;
+
+	bool initialize() override {
+		init.run();
+		return true;
+	};
 
  private:
 	Elf::Array<Elf::Dynamic> dynamic;
 	Elf::SymbolTable dynamic_symbols;
-	Elf::Array<Elf::Relocation> dynamic_relocations;
+	Elf::Array<Elf::Relocation> dynamic_relocations, dynamic_relocations_plt;
 	Elf::List<Elf::VersionNeeded> version_needed;
 	Elf::List<Elf::VersionDefinition> version_definition;
 
@@ -99,39 +110,66 @@ struct ObjectDynamic : public ObjectExecutable {
 				assert(section.type() == Elf::SHT_GNU_HASH || section.type() == Elf::SHT_HASH || section.type() == Elf::SHT_DYNSYM || section.type() == Elf::SHT_SYMTAB);
 				const Elf::Section version_section = get_section(Elf::DT_VERSYM);
 				assert(version_section.type() == Elf::SHT_NULL || version_section.type() == Elf::SHT_GNU_VERSYM);
-				return Elf::SymbolTable(this->elf, section, version_section);
+				return Elf::SymbolTable{this->elf, section, version_section};
 			}
-		return Elf::SymbolTable(this->elf);
+		return Elf::SymbolTable{this->elf};
 	}
 
-	Elf::Array<Elf::Relocation> find_dynamic_relocation() const {
-		uintptr_t jmprel = 0;  // Address of PLT relocation table
-		uintptr_t pltrel = Elf::DT_NULL;  // Type of PLT relocation table (REL or RELA)
-		size_t pltrelsz = 0;   // Size of PLT relocation table (and, hence, GOT)
+	Elf::Array<Elf::Relocation> find_relocation_table(bool plt) const {
+		uintptr_t offset = 0;   // Address offset of relocation table
+		size_t size = 0;        // Size of relocation table
+		size_t entry_size = 0;  // Size of relocation table entry
 
 		for (auto &dyn: dynamic) {
-			switch (dyn.tag()) {
-				case Elf::DT_JMPREL:
-					jmprel = dyn.value();
-					break;
-				case Elf::DT_PLTREL:
-					pltrel = dyn.value();
-					break;
-				case Elf::DT_PLTRELSZ:
-					pltrelsz = dyn.value();
-					break;
-				default:
-					continue;
-			}
+			if (plt)
+				switch (dyn.tag()) {
+					case Elf::DT_JMPREL:
+						offset = dyn.value();
+						break;
+					case Elf::DT_PLTREL:
+						switch (dyn.value()) {
+							case Elf::DT_REL:
+								entry_size = sizeof(*Elf::RelocationWithoutAddend::_data);
+								break;
+							case Elf::DT_RELA:
+								entry_size = sizeof(*Elf::RelocationWithAddend::_data);
+								break;
+							default:
+								assert(false);
+						}
+						break;
+					case Elf::DT_PLTRELSZ:
+						size = dyn.value();
+						break;
+					default:
+						continue;
+				}
+			else
+				switch (dyn.tag()) {
+					case Elf::DT_REL:
+					case Elf::DT_RELA:
+						offset = dyn.value();
+						break;
+					case Elf::DT_RELENT:
+					case Elf::DT_RELAENT:
+						entry_size = dyn.value();
+						break;
+					case Elf::DT_RELSZ:
+					case Elf::DT_RELASZ:
+						size = dyn.value();
+						break;
+					default:
+						continue;
+				}
 		}
 
-		if (pltrel != Elf::DT_NULL) {
-			assert(jmprel != 0);
-			auto section = this->elf.section_by_offset(jmprel);
-			assert(section.size() == pltrelsz);
-			return section.get_relocations();
+		if (offset != 0) {
+			auto section = this->elf.section_by_offset(offset);
+			assert(section.size() == size);
+			auto r = section.get_relocations();
+			assert(r.accessor().element_size() == entry_size);
+			return r;
 		} else {
-			assert(jmprel == 0);
 			return elf.sections[0].get_array<Elf::Relocation>();
 		}
 	}
@@ -159,17 +197,17 @@ struct ObjectDynamic : public ObjectExecutable {
 
 	Symbol::Version version(uint16_t index) const {
 		if (index == Elf::VER_NDX_GLOBAL)
-			return Symbol::Version(true);
+			return Symbol::Version{true};
 
 		for (auto & v : version_needed)
 			for (auto & aux : v.auxiliary())
 				if (aux.version_index() == index)
-					return Symbol::Version(aux.name(), aux.hash(), aux.weak());
+					return Symbol::Version{aux.name(), aux.hash(), aux.weak()};
 
 		for (auto & v : version_definition)
 			if (v.version_index() == index && !v.base())
-				return  Symbol::Version(v.auxiliary()[0].name(), v.hash(), v.weak());
+				return  Symbol::Version{v.auxiliary()[0].name(), v.hash(), v.weak()};
 
-		return Symbol::Version(false);
+		return Symbol::Version{false};
 	}
 };

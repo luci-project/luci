@@ -126,10 +126,10 @@ int main(int argc, char* argv[]) {
 
 	// Binary Arguments
 	if (args.has_positional()) {
-		Object * start = nullptr;
+		ObjectFile * start = nullptr;
 		for (auto & bin : args.get_positional()) {
 			LOG_INFO << "Loading object " << bin;
-			Object * o = loader.file(bin);
+			ObjectFile * o = loader.file(bin);
 			if (o == nullptr) {
 				LOG_ERROR << "Failed loading " << bin;
 				return EXIT_FAILURE;

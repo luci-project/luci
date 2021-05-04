@@ -1,6 +1,6 @@
 DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CC=gcc
-CFLAGS=-Og -g -nostdlib -mcmodel=large -shared -fPIC
+CFLAGS=-Og -g -nostdlib -mcmodel=large -shared -fPIC -fno-exceptions
 LDFLAGS=
 #--dynamic-linker=$(realpath $(DIR)/../../luci)
 SOURCE=sys.c util.c start.c hello.c
