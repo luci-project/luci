@@ -9,7 +9,7 @@
 
 const int version = VERSION;
 
-enum LOG_LEVEL log_level = 2;
+enum LOG_LEVEL log_level = WARNING;
 
 void sleep(int sec) {
 #if VERSION >= 2
@@ -35,6 +35,11 @@ void print(const char * str) {
 	sys_write(1, str, strlen(str));
 }
 
+void println(const char *str) {
+	print(str);
+	print("\n");
+}
+
 #if VERSION >= 4
 static void print_err(const char * str) {
 	sys_write(2, str, strlen(str));
@@ -42,7 +47,7 @@ static void print_err(const char * str) {
 #endif
 
 void log_message(enum LOG_LEVEL level, const char * str) {
-	if (level >= log_level)
+	if (level > log_level)
 		return;
 #if VERSION >= 3
 	if (str == NULL)
@@ -67,7 +72,7 @@ void log_message(enum LOG_LEVEL level, const char * str) {
 }
 
 void log_version() {
-	log_message(VERBOSE, "Utility library v" str(VERSION));
+	log_message(INFO, "[Utility library v" xstr(VERSION) "]\n");
 }
 
 #if VERSION >= 6

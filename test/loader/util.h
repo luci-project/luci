@@ -22,6 +22,8 @@ size_t strlen(const char *);
 
 void print(const char *);
 
+void println(const char *);
+
 void log_message(enum LOG_LEVEL, const char *);
 
 void log_version();
