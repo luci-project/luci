@@ -110,16 +110,16 @@ bool ObjectDynamic::prepare() {
 		got[2] = reinterpret_cast<uintptr_t>(_dlresolve);
 
 		// Remainder for relocations
-		auto relocation_entries = dynamic_relocations_plt.count();
-		assert(elf.section_by_virt_addr(global_offset_table).entries() == relocation_entries + 3);
-		for (size_t i = 0 ; i < relocation_entries; i++) {
-			got[i + 3] += base;
+		assert(elf.section_by_virt_addr(global_offset_table).entries() >= dynamic_relocations_plt.count() + 3);
+		for (const auto & reloc : dynamic_relocations_plt)
 			if (file.flags.bind_now)
-				relocate(dynamic_relocations_plt[i]);
-		}
+				relocate(reloc);
+			else
+				Relocator(reloc).increment_value(base, base);
 	}
 
 	// Patch relocations
+	// TODO: Local relocations?
 	if (file.loader.dynamic_update && file_previous != nullptr) {
 		assert(file.current == this);
 		for (const auto & object_file : file.loader.lookup)
@@ -139,20 +139,27 @@ bool ObjectDynamic::prepare() {
 
 void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 	auto need_symbol_index = reloc.symbol_index();
-	auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
-	assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
-	Symbol need_symbol(*this, dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
-
-	auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
-	if (symbol) {
-		LOG_INFO << "Linking to " << symbol.value() << " in dynamic object " << file.path << "...";
-		relocations.emplace_back(reloc, symbol.value());
-		auto ptr = Relocator(reloc).apply(this->base, symbol.value(), symbol->object.base, this->global_offset_table);
+	if (need_symbol_index == 0) {
+		LOG_INFO << "Local relocation in dynamic object " << file.path << "...";
+		auto ptr = Relocator(reloc).fix(this->base, this->global_offset_table);
 		return reinterpret_cast<void*>(ptr);
+	} else {
+		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
+		assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
+		Symbol need_symbol(*this, dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
+
+		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
+		if (symbol) {
+			LOG_INFO << "Relocating to " << symbol.value() << " (from " << symbol.value().object.file.path << ") in dynamic object " << file.path << "...";
+			relocations.emplace_back(reloc, symbol.value());
+			auto ptr = Relocator(reloc).fix(this->base, symbol.value(), symbol->object.base, this->global_offset_table);
+			return reinterpret_cast<void*>(ptr);
+		} else {
+			LOG_ERROR << "Unable to resolve relocate symbol " << symbol << "...";
+			assert(false);
+			return nullptr;
+		}
 	}
-	LOG_ERROR << "Unable to resolve relocate symbol " << symbol << "...";
-	assert(false);
-	return nullptr;
 }
 
 bool ObjectDynamic::patchable() const {
