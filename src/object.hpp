@@ -11,11 +11,11 @@
 #include "bean.hpp"
 
 #include "object_file.hpp"
-#include "symbol.hpp"
+#include "versioned_symbol.hpp"
 #include "memory_segment.hpp"
 
 
-struct Object {
+struct Object : public Elf {
 	/*! \brief Information about the object file (shared by all versions) */
 	ObjectFile & file;
 
@@ -33,9 +33,6 @@ struct Object {
 		/*! \brief File data hash */
 		uint64_t hash = 0;
 	} data;
-
-	/*! \brief Elf accessor */
-	const Elf elf;
 
 	/*! \brief Begin offset of virtual memory area (for dynamic objects) */
 	uintptr_t base = 0;
@@ -58,7 +55,7 @@ struct Object {
 	std::optional<Bean> binary_hash;
 
 	/*! \brief Relocations to external symbols used in this object (cache) */
-	mutable std::vector<std::pair<Elf::Relocation, Symbol>> relocations;
+	mutable std::vector<std::pair<Elf::Relocation, VersionedSymbol>> relocations;
 
 	/*! \brief Pointer to previous version */
 	Object * file_previous = nullptr;
@@ -72,6 +69,11 @@ struct Object {
 	/*! \brief destroy object */
 	virtual ~Object();
 
+	/*! check if this object is the current (latest) version */
+	bool is_latest_version() const {
+		return this == file.current;
+	}
+
 	/*! \brief virtual memory range used by this object */
 	bool memory_range(uintptr_t & start, uintptr_t & end) const;
 
@@ -84,8 +86,11 @@ struct Object {
 	/*! \brief allocate required segments in memory */
 	bool map();
 
-	/*! \brief Relocate  */
+	/*! \brief Prepare relocations */
 	virtual bool prepare() { return true; };
+
+	/*! \brief Update relocations */
+	virtual void update() { };
 
 	/*! \brief Set protection flags in memory */
 	bool protect();
@@ -97,5 +102,13 @@ struct Object {
 	virtual bool patchable() const { return false; };
 
 	/*! \brief Find (external visible) symbol in this object with same name and version */
-	virtual std::optional<Symbol> resolve_symbol(const Symbol & sym) const { return std::nullopt; };
+	virtual std::optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const { return std::nullopt; };
+
+	bool operator==(const Object & o) const {
+		return this == &o;
+	}
+
+	bool operator!=(const Object & o) const {
+		return !operator==(o);
+	}
 };

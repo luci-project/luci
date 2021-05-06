@@ -110,7 +110,7 @@ bool ObjectDynamic::prepare() {
 		got[2] = reinterpret_cast<uintptr_t>(_dlresolve);
 
 		// Remainder for relocations
-		assert(elf.section_by_virt_addr(global_offset_table).entries() >= dynamic_relocations_plt.count() + 3);
+		assert(this->section_by_virt_addr(global_offset_table).entries() >= dynamic_relocations_plt.count() + 3);
 		for (const auto & reloc : dynamic_relocations_plt)
 			if (file.flags.bind_now)
 				relocate(reloc);
@@ -118,42 +118,34 @@ bool ObjectDynamic::prepare() {
 				Relocator(reloc).increment_value(base, base);
 	}
 
-	// Patch relocations
-	// TODO: Local relocations?
-	if (file.loader.dynamic_update && file_previous != nullptr) {
-		assert(file.current == this);
-		for (const auto & object_file : file.loader.lookup)
-			for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous)
-				for (const auto & relpair : obj->relocations)
-					if (&relpair.second.object == file_previous) {
-						LOG_DEBUG << " - referenced symbol " << relpair.second.name();
-						if (!resolve_symbol(relpair.second)) {
-							LOG_WARNING << "Required symbol " << relpair.second.name() << " not found in new version of " << this->file.path << " -- not patching the library!";
-							return false;
-						}
-				}
-	}
-
 	return success;
+}
+
+void ObjectDynamic::update() {
+	for (const auto & relpair : relocations)
+		if (!relpair.second.object().is_latest_version())
+			relocate(relpair.first);
 }
 
 void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 	auto need_symbol_index = reloc.symbol_index();
 	if (need_symbol_index == 0) {
-		LOG_INFO << "Local relocation in dynamic object " << file.path << "...";
 		auto ptr = Relocator(reloc).fix(this->base, this->global_offset_table);
+		LOG_INFO << "Local relocation in dynamic object " << file.path << "...";
 		return reinterpret_cast<void*>(ptr);
 	} else {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
 		assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
-		Symbol need_symbol(*this, dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
+		VersionedSymbol need_symbol(dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
 
 		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
 		if (symbol) {
-			LOG_INFO << "Relocating to " << symbol.value() << " (from " << symbol.value().object.file.path << ") in dynamic object " << file.path << "...";
+			LOG_INFO << "Relocating to " << symbol.value() << " in dynamic object " << file.path << "...";
 			relocations.emplace_back(reloc, symbol.value());
-			auto ptr = Relocator(reloc).fix(this->base, symbol.value(), symbol->object.base, this->global_offset_table);
-			return reinterpret_cast<void*>(ptr);
+			Relocator relocator(reloc);
+			auto ptr = reinterpret_cast<void*>(relocator.fix(this->base, symbol.value(), symbol->object().base, this->global_offset_table));
+			LOG_DEBUG << "*" << (void*)relocator.address(this->base) << " = " << (void*)ptr;
+			return ptr;
 		} else {
 			LOG_ERROR << "Unable to resolve relocate symbol " << symbol << "...";
 			assert(false);
@@ -164,9 +156,9 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 
 bool ObjectDynamic::patchable() const {
 	if (file_previous == nullptr
-	 || file_previous->elf.header.identification != this->elf.header.identification
-	 || file_previous->elf.header.machine()      != this->elf.header.machine()
-	 || file_previous->elf.header.version()      != this->elf.header.version())
+	 || file_previous->header.identification != this->header.identification
+	 || file_previous->header.machine()      != this->header.machine()
+	 || file_previous->header.version()      != this->header.version())
 		return false;
 
 	assert(file_previous->binary_hash && this->binary_hash);
@@ -174,9 +166,10 @@ bool ObjectDynamic::patchable() const {
 
 	// Check if all required (referenced) symbols to previous object still exist in the new version
 	for (const auto & object_file : file.loader.lookup)
+		// TODO: If not partial, ignore &object_file == &file
 		for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous)
 			for (const auto & relpair : obj->relocations)
-				if (&relpair.second.object == file_previous) {
+				if (&relpair.second.object() == file_previous) {
 					// TODO: Check if relocations are in some protected memory part
 					LOG_DEBUG << " - referenced symbol " << relpair.second.name();
 					if (!resolve_symbol(relpair.second)) {
@@ -184,25 +177,26 @@ bool ObjectDynamic::patchable() const {
 						return false;
 					}
 			}
-
+/*
 	// Check if data section has changed (TODO: Other sections?)
 	for (const auto &sym : this->binary_hash.value().diff(file_previous->binary_hash.value(), true))
 		for (const auto & section : elf.sections)
-			if (section.type() == Elf::SHT_PROGBITS && section.allocate() && section.virt_addr() >= sym.address)
+			if (section.type() == Elf::SHT_PROGBITS && section.allocate() && section.virt_addr() >= sym.address) {
 				if (section.writeable() && strcmp(section.name(), ".data") == 0) {
 					LOG_WARNING << "Data section changed in new version of " << this->file.path << " -- not patching the library!";
 					return false;
 				}
-
+			}
+*/
 	// All good
 	return true;
 }
 
-std::optional<Symbol> ObjectDynamic::resolve_symbol(const Symbol & sym) const {
+std::optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const VersionedSymbol & sym) const {
 	auto found = dynamic_symbols.index(sym.name(), sym.hash_value(), sym.gnu_hash_value(), version_index(sym.version));
 	if (found != Elf::STN_UNDEF) {
 		auto naked_sym = dynamic_symbols[found];
-
+/*
 		// In case we have multiple versions, check if it is mapped here or delegate to previous version (required for partial update)
 		if (file.loader.dynamic_update && file_previous != nullptr) {
 			bool provided = false;
@@ -214,10 +208,10 @@ std::optional<Symbol> ObjectDynamic::resolve_symbol(const Symbol & sym) const {
 			if (!provided)
 				return file_previous->resolve_symbol(sym);
 		}
-
+*/
 		if (naked_sym.bind() == Elf::STB_GLOBAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
 			auto symbol_version_index = dynamic_symbols.version(found);
-			return Symbol{*this, naked_sym, version(symbol_version_index)};
+			return VersionedSymbol{naked_sym, version(symbol_version_index)};
 		}
 	}
 	return std::nullopt;

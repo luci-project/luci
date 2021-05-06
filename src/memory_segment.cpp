@@ -4,11 +4,14 @@
 
 #include "memory_segment.hpp"
 #include "object.hpp"
+#include "loader.hpp"
 #include "generic.hpp"
 
 bool MemorySegment::map() {
 	void * mem = nullptr;
-	const bool copy = source.object.data.fd < 0 || (source.size > 0 && (source.offset % Page::SIZE) != (target.address() % Page::SIZE));
+	const bool copy = source.object.file.loader.dynamic_update
+	               || source.object.data.fd < 0
+	               || (source.size > 0 && (source.offset % Page::SIZE) != (target.address() % Page::SIZE));
 	if (copy || source.size == 0) {
 		LOG_DEBUG << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " anonymous...";
 		errno = 0;

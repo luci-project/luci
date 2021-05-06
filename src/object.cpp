@@ -10,7 +10,7 @@
 #include "object_rel.hpp"
 #include "generic.hpp"
 
-Object::Object(ObjectFile & file, const Data & data) : file(file), data(data), elf(reinterpret_cast<uintptr_t>(data.ptr)) {
+Object::Object(ObjectFile & file, const Data & data) : Elf(reinterpret_cast<uintptr_t>(data.ptr)), file(file), data(data) {
 	assert(file.path != nullptr);
 	assert(data.ptr != nullptr);
 }
@@ -19,8 +19,15 @@ Object::~Object() {
 	// TODO: Not really supported yet, just a stub...
 
 	// Remove this version from list
-	assert(file.current == this);
-	file.current = file_previous;
+	if (file.current == this)
+		file.current = file_previous;
+	else
+		for (auto tmp = file.current; tmp != nullptr; tmp = tmp->file_previous)
+			if (tmp->file_previous == this) {
+				tmp->file_previous = file_previous;
+				break;
+			}
+
 
 	// Unmap virt mem
 	for (auto & seg : memory_map)

@@ -149,5 +149,6 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 
+	LOG_INFO << "DONE";
 	return EXIT_SUCCESS;
 }

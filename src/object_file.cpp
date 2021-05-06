@@ -78,10 +78,21 @@ Object * ObjectFile::load() {
 	data.size = sb.st_size;
 
 	// Map file
-	if ((data.ptr = ::mmap(NULL, data.size, PROT_READ, MAP_PRIVATE, data.fd, 0)) == MAP_FAILED) {
+	if ((data.ptr = ::mmap(NULL, data.size, PROT_READ, MAP_SHARED, data.fd, 0)) == MAP_FAILED) {
 		LOG_ERROR << "Mmap file " << path << " failed: " << strerror(errno);
 		::close(data.fd);
 		return nullptr;
+	}
+
+	// Copy contents into memory
+	if (loader.dynamic_update) {
+		void * old = data.ptr;
+	 	data.ptr = ::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+		assert(data.ptr != MAP_FAILED);
+		::memcpy(data.ptr, old, data.size);
+		::munmap(old, data.size);
+		::close(data.fd);
+		data.fd = -1;
 	}
 
 	// Check ELF
@@ -137,7 +148,7 @@ Object * ObjectFile::load() {
 
 	// If dynamic updates are enabled, calculate hash
 	if (loader.dynamic_update) {
-		o->binary_hash.emplace(o->elf);
+		o->binary_hash.emplace(*o);
 		// if previous version exist, check if we can patch it
 		if (current != nullptr) {
 			assert(current->binary_hash && o->binary_hash);
@@ -167,6 +178,7 @@ Object * ObjectFile::load() {
 
 ObjectFile::ObjectFile(Loader & loader, const char * path, DL::Lmid_t ns)
   : loader(loader), hash(ELF_Def::gnuhash(path)), ns(ns) {
+	LOG_DEBUG << "New File object for " << path;
 	flags.value = 0;
 	assert(path != nullptr);
 	::strcpy(this->path, path);

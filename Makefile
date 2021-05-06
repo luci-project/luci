@@ -5,7 +5,7 @@ LIBCAPSTONE = capstone/libcapstone.a
 
 CXX = g++
 #CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -Wall -static-libstdc++ -static-libgcc -static -Wno-comment -Og -g
-CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -Wall -Wno-comment -Og -g -pthread
+CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -DVIRTUAL -Wall -Wno-comment -Og -g -pthread
 
 BASEADDRESS = 0xbadc000
 

@@ -13,7 +13,7 @@
 #include "elf.hpp"
 
 #include "dl.hpp"
-#include "symbol.hpp"
+#include "versioned_symbol.hpp"
 #include "object_file.hpp"
 
 struct Loader {
@@ -54,7 +54,7 @@ struct Loader {
 
 	/*! \brief find Symbol with same name and version from other objects in same namespace
 	 */
-	std::optional<Symbol> resolve_symbol(const Symbol & sym, DL::Lmid_t ns = DL::LM_ID_BASE) const;
+	std::optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym, DL::Lmid_t ns = DL::LM_ID_BASE) const;
 
 	/*! \brief get next (page aligned) memory address */
 	uintptr_t next_address() const;

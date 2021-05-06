@@ -2,8 +2,7 @@
 
 #include <vector>
 
-#include <elf.hpp>
-
+#include "versioned_symbol.hpp"
 #include "object_rel.hpp"
 #include "object_exec.hpp"
 
@@ -17,8 +16,8 @@ struct ObjectDynamic : public ObjectExecutable {
 	    version_needed{get_section(Elf::DT_VERNEED).get_list<Elf::VersionNeeded>(true)},
 	    version_definition{get_section(Elf::DT_VERDEF).get_list<Elf::VersionDefinition>(true)}
 	{
-		assert(dynamic_relocations.empty() || reinterpret_cast<uintptr_t>(elf.sections[dynamic_relocations[0].symtab].data()) == dynamic_symbols.address());
-		assert(dynamic_relocations_plt.empty() || reinterpret_cast<uintptr_t>(elf.sections[dynamic_relocations_plt[0].symtab].data()) == dynamic_symbols.address());
+		assert(dynamic_relocations.empty() || reinterpret_cast<uintptr_t>(this->sections[dynamic_relocations[0].symtab].data()) == dynamic_symbols.address());
+		assert(dynamic_relocations_plt.empty() || reinterpret_cast<uintptr_t>(this->sections[dynamic_relocations_plt[0].symtab].data()) == dynamic_symbols.address());
 	}
 
 	void* dynamic_resolve(size_t index) const override;
@@ -31,9 +30,11 @@ struct ObjectDynamic : public ObjectExecutable {
 
 	bool prepare() override;
 
+	void update() override;
+
 	bool patchable() const override;
 
-	std::optional<Symbol> resolve_symbol(const Symbol & sym) const override;
+	std::optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const override;
 
 	void* relocate(const Elf::Relocation & reloc) const;
 
@@ -75,10 +76,10 @@ struct ObjectDynamic : public ObjectExecutable {
 	ObjectDynamic& operator=(const ObjectDynamic&) = delete;
 
  	Elf::Array<Elf::Dynamic> find_dynamic() const {
- 		for (auto & section : elf.sections)
+ 		for (auto & section : this->sections)
  			if (section.type() == Elf::SHT_DYNAMIC)
  				return section.get_dynamic();
- 		return elf.get<Elf::Dynamic>();
+ 		return this->get<Elf::Dynamic>();
  	}
 
 	bool has_dynamic_value(const Elf::dyn_tag tag, uintptr_t & value) const {
@@ -98,7 +99,7 @@ struct ObjectDynamic : public ObjectExecutable {
 	Elf::Section get_section(Elf::dyn_tag tag) const {
 		// We don't care about O(n) since n is quite small.
 		uintptr_t value;
-		return has_dynamic_value(tag, value) ? elf.section_by_offset(value) : elf.sections[0];
+		return has_dynamic_value(tag, value) ? this->section_by_offset(value) : this->sections[0];
 	}
 
 	Elf::SymbolTable find_dynamic_symbol_table() const {
@@ -106,13 +107,13 @@ struct ObjectDynamic : public ObjectExecutable {
 		uintptr_t offset;
 		for (auto & tag : search_tags)
 			if (has_dynamic_value(tag, offset)) {
-				const Elf::Section section = elf.section_by_offset(offset);
+				const Elf::Section section = this->section_by_offset(offset);
 				assert(section.type() == Elf::SHT_GNU_HASH || section.type() == Elf::SHT_HASH || section.type() == Elf::SHT_DYNSYM || section.type() == Elf::SHT_SYMTAB);
 				const Elf::Section version_section = get_section(Elf::DT_VERSYM);
 				assert(version_section.type() == Elf::SHT_NULL || version_section.type() == Elf::SHT_GNU_VERSYM);
-				return Elf::SymbolTable{this->elf, section, version_section};
+				return Elf::SymbolTable{*this, section, version_section};
 			}
-		return Elf::SymbolTable{this->elf};
+		return Elf::SymbolTable{*this};
 	}
 
 	Elf::Array<Elf::Relocation> find_relocation_table(bool plt) const {
@@ -164,17 +165,17 @@ struct ObjectDynamic : public ObjectExecutable {
 		}
 
 		if (offset != 0) {
-			auto section = this->elf.section_by_offset(offset);
+			auto section = this->section_by_offset(offset);
 			assert(section.size() == size);
 			auto r = section.get_relocations();
 			assert(r.accessor().element_size() == entry_size);
 			return r;
 		} else {
-			return elf.sections[0].get_array<Elf::Relocation>();
+			return this->sections[0].get_array<Elf::Relocation>();
 		}
 	}
 
-	uint16_t version_index(const Symbol::Version & version) const {
+	uint16_t version_index(const VersionedSymbol::Version & version) const {
 		if (!version.valid) {
 			return Elf::VER_NDX_LOCAL;
 		} else if (version.name != nullptr) {
@@ -195,19 +196,19 @@ struct ObjectDynamic : public ObjectExecutable {
 		return Elf::VER_NDX_GLOBAL;
 	}
 
-	Symbol::Version version(uint16_t index) const {
+	VersionedSymbol::Version version(uint16_t index) const {
 		if (index == Elf::VER_NDX_GLOBAL)
-			return Symbol::Version{true};
+			return VersionedSymbol::Version{true};
 
 		for (auto & v : version_needed)
 			for (auto & aux : v.auxiliary())
 				if (aux.version_index() == index)
-					return Symbol::Version{aux.name(), aux.hash(), aux.weak()};
+					return VersionedSymbol::Version{aux.name(), aux.hash(), aux.weak()};
 
 		for (auto & v : version_definition)
 			if (v.version_index() == index && !v.base())
-				return  Symbol::Version{v.auxiliary()[0].name(), v.hash(), v.weak()};
+				return  VersionedSymbol::Version{v.auxiliary()[0].name(), v.hash(), v.weak()};
 
-		return Symbol::Version{false};
+		return VersionedSymbol::Version{false};
 	}
 };

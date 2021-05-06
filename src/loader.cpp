@@ -9,6 +9,7 @@
 #include "process.hpp"
 #include "object_file.hpp"
 #include "object.hpp"
+#include "generic.hpp"
 
 void * observer_kickoff(void * ptr) {
 	reinterpret_cast<Loader *>(ptr)->observer();
@@ -119,7 +120,7 @@ bool Loader::prepare() {
 	LOG_DEBUG << "Relocate...";
 	for (auto & of : lookup)
 		if (of.current->is_prepared)
-			continue;
+			of.current->update();
 		else if (of.current->prepare())
 			of.current->is_prepared = true;
 		else
@@ -170,20 +171,20 @@ bool Loader::run(const ObjectFile * object_file, std::vector<const char *> args,
 	Process p(stack_pointer, stack_size);
 
 	// TODO: Should not be hard coded...
-	p.aux[Auxiliary::AT_PHDR] = start->base + start->elf.header.e_phoff;
-	p.aux[Auxiliary::AT_PHNUM] = start->elf.header.e_phnum;
+	p.aux[Auxiliary::AT_PHDR] = start->base + start->header.e_phoff;
+	p.aux[Auxiliary::AT_PHNUM] = start->header.e_phnum;
 
 	args.insert(args.begin(), 1, start->file.path);
 	p.init(args);
 
-	uintptr_t entry = start->elf.header.entry();
+	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry);
 	p.start(start->base + entry);
 
 	return true;
 }
 
-std::optional<Symbol> Loader::resolve_symbol(const Symbol & sym, DL::Lmid_t ns) const {
+std::optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sym, DL::Lmid_t ns) const {
 	for (const auto & object_file : lookup)
 		if (object_file.ns == ns && object_file.current != nullptr) {
 			// Only compare to latest version
@@ -236,8 +237,8 @@ void Loader::observer() {
 				if (event->wd == object_file.wd) {
 					LOG_DEBUG << "Possible file modification in " << object_file.path;
 					assert((event->mask & IN_ISDIR) == 0);
-					object_file.load();
-					prepare();
+					if (object_file.load() != nullptr)
+						prepare();
 					break;
 				}
 			unlock();

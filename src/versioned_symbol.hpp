@@ -1,23 +1,21 @@
 #pragma once
 
 #include <optional>
+#include <ostream>
 
 #include <elf.hpp>
 
-#include "generic.hpp"
-
 struct Object;
 
-/*! \brief Symbol with version and origin information */
-struct Symbol : Elf::Symbol {
+/*! \brief Symbol with version */
+struct VersionedSymbol : Elf::Symbol {
 	using Elf::Symbol::valid;
 	using Elf::Symbol::name;
 	using Elf::Symbol::value;
 	using Elf::Symbol::size;
 	using Elf::Symbol::bind;
 	using Elf::Symbol::type;
-
-	const Object & object;
+	using Elf::Symbol::elf;
 
 	const struct Version {
 		const char * name;
@@ -35,17 +33,13 @@ struct Symbol : Elf::Symbol {
 		Version(bool valid = true) : name(nullptr), hash(0), valid(valid), weak(false) {}
 	} version;
 
-	Symbol(const Object & object, const Elf::Symbol & sym, const char * version_name = nullptr, bool version_weak = false);
+	VersionedSymbol(const Elf::Symbol & sym, const char * version_name = nullptr, bool version_weak = false);
 
-	Symbol(const Object & object, const Elf::Symbol & sym, const Version & version);
+	VersionedSymbol(const Elf::Symbol & sym, const Version & version);
 
-	Symbol(const Object & object);
+	bool operator==(const VersionedSymbol & o) const;
 
-	bool operator==(const Symbol & o) const {
-		return this->_data == o._data || (&object == &o.object && (name() == o.name() || strcmp(name(), o.name()) == 0) && version == o.version);
-	}
-
-	bool operator!=(const Symbol & o) const {
+	bool operator!=(const VersionedSymbol & o) const {
 		return !operator==(o);
 	}
 
@@ -61,10 +55,12 @@ struct Symbol : Elf::Symbol {
 		return _gnu_hash_value.value();
 	}
 
+	const Object & object() const;
+
  private:
 	mutable std::optional<uint32_t> _hash_value;
 	mutable std::optional<uint32_t> _gnu_hash_value;
 };
 
-std::ostream& operator<<(std::ostream& os, const Symbol & s);
-std::ostream& operator<<(std::ostream& os, const std::optional<Symbol> & s);
+std::ostream& operator<<(std::ostream& os, const VersionedSymbol & s);
+std::ostream& operator<<(std::ostream& os, const std::optional<VersionedSymbol> & s);
