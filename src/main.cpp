@@ -115,21 +115,21 @@ int main(int argc, char* argv[]) {
 	// Preload Library
 	for (auto & preload : args.preload) {
 		LOG_DEBUG << "Loading '" << preload << "' (from --preload)...";
-		loader.file(preload);
+		loader.library(preload);
 	}
 	char * preload = env("LD_PRELOAD", true);
 	if (preload != nullptr && *preload != '\0') {
 		LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)...";
 		for (auto & lib : Utils::split(preload, ';'))
-			loader.file(lib);
+			loader.library(lib);
 	}
 
 	// Binary Arguments
 	if (args.has_positional()) {
-		ObjectFile * start = nullptr;
+		ObjectIdentity * start = nullptr;
 		for (auto & bin : args.get_positional()) {
 			LOG_INFO << "Loading object " << bin;
-			ObjectFile * o = loader.file(bin);
+			ObjectIdentity * o = loader.open(bin);
 			if (o == nullptr) {
 				LOG_ERROR << "Failed loading " << bin;
 				return EXIT_FAILURE;

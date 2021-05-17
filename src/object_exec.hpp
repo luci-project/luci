@@ -3,7 +3,7 @@
 #include "object.hpp"
 
 struct ObjectExecutable : public Object {
-	ObjectExecutable(ObjectFile & file, const Object::Data & data) : Object{file, data} {}
+	ObjectExecutable(ObjectIdentity & file, const Object::Data & data) : Object{file, data} {}
 
 
  protected:

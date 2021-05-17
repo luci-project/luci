@@ -7,7 +7,7 @@
 #include "object_exec.hpp"
 
 struct ObjectDynamic : public ObjectExecutable {
-	ObjectDynamic(ObjectFile & file, const Object::Data & data)
+	ObjectDynamic(ObjectIdentity & file, const Object::Data & data)
 	  : ObjectExecutable{file, data},
 	    dynamic{find_dynamic()},
 	    dynamic_symbols{find_dynamic_symbol_table()},

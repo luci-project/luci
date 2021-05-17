@@ -16,9 +16,6 @@ struct MemorySegment {
 		/*! \brief Object */
 		const Object & object;
 
-		/*! \brief Pointer to data */
-		const void * data;
-
 		/*! \brief start offset in file */
 		const uintptr_t offset;
 
@@ -39,7 +36,6 @@ struct MemorySegment {
 		/*! \brief mmap memory protection flags */
 		int protection;
 
-		/*! \brief file descriptor for shared memory */
 		int fd;
 
 		/*! \brief Mapped into memory */
@@ -68,7 +64,7 @@ struct MemorySegment {
 	} target;
 
 	MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base = 0)
-	  : source{object, segment.data(), segment.offset(), segment.size() },
+	  : source{object, segment.offset(), segment.size() },
 	    target{base, segment.virt_addr(), segment.virt_size(), PROT_NONE | (segment.readable() ? PROT_READ : 0) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), -1, false} {}
 
 	/*! \brief allocate in memory */

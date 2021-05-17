@@ -1,7 +1,6 @@
 #pragma once
 
 #include <optional>
-#include <ostream>
 
 #include <elf.hpp>
 
@@ -61,6 +60,3 @@ struct VersionedSymbol : Elf::Symbol {
 	mutable std::optional<uint32_t> _hash_value;
 	mutable std::optional<uint32_t> _gnu_hash_value;
 };
-
-std::ostream& operator<<(std::ostream& os, const VersionedSymbol & s);
-std::ostream& operator<<(std::ostream& os, const std::optional<VersionedSymbol> & s);

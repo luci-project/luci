@@ -7,6 +7,8 @@
 #include "loader.hpp"
 #include "generic.hpp"
 
+#include "output.hpp"
+
 bool MemorySegment::map() {
 	void * mem = nullptr;
 	const bool copy = source.object.file.loader.dynamic_update
@@ -36,7 +38,7 @@ bool MemorySegment::map() {
 
 	if (copy && source.size > 0) {
 		LOG_DEBUG << "Copy " << source.size << " Bytes from " << (void*)source.offset << " to "  << (void*)target.address();
-		::memcpy(reinterpret_cast<void*>(target.address()), source.data, source.size);
+		::memcpy(reinterpret_cast<void*>(target.address()), reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(source.object.data.ptr) + source.offset), source.size);
 	}
 
 	return true;

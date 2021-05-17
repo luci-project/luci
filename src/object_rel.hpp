@@ -3,7 +3,7 @@
 #include "object.hpp"
 
 struct ObjectRelocatable : public Object {
-	ObjectRelocatable(ObjectFile & file, const Object::Data & data) : Object{file, data} {}
+	ObjectRelocatable(ObjectIdentity & file, const Object::Data & data) : Object{file, data} {}
 
 	/*! \brief Relocate sections */
 	bool prepare() override;

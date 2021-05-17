@@ -10,8 +10,9 @@
 #include "object_rel.hpp"
 #include "generic.hpp"
 
-Object::Object(ObjectFile & file, const Data & data) : Elf(reinterpret_cast<uintptr_t>(data.ptr)), file(file), data(data) {
-	assert(file.path != nullptr);
+#include "output.hpp"
+
+Object::Object(ObjectIdentity & file, const Data & data) : Elf(reinterpret_cast<uintptr_t>(data.ptr)), file(file), data(data) {
 	assert(data.ptr != nullptr);
 }
 
@@ -28,10 +29,14 @@ Object::~Object() {
 				break;
 			}
 
-
 	// Unmap virt mem
 	for (auto & seg : memory_map)
 		seg.unmap();
+
+	errno = 0;
+	if (munmap(data.ptr, data.size) == -1) {
+		LOG_ERROR << "Unmapping data from " << *this << " failed: " << strerror(errno);
+	}
 
 	// close file descriptor
 	if (data.fd > 0)

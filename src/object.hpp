@@ -7,25 +7,32 @@
 #include <map>
 #include <optional>
 
+#include <climits>
+
 #include "elf.hpp"
 #include "bean.hpp"
 
-#include "object_file.hpp"
+#include "strptr.hpp"
+
+#include "object_identity.hpp"
 #include "versioned_symbol.hpp"
 #include "memory_segment.hpp"
 
 
 struct Object : public Elf {
 	/*! \brief Information about the object file (shared by all versions) */
-	ObjectFile & file;
+	ObjectIdentity & file;
 
 	/*! \brief Data (version specific) */
 	const struct Data {
-		/*! \brief File deskriptor */
-		int fd = -1;
+		/*! \brief last modification time */
+		struct timespec modification_time = { 0, 0 };
 
 		/*! \brief File size */
 		size_t size = 0;
+
+		/*! \brief File descriptor for this object */
+		int fd = -1;
 
 		/*! \brief Pointer to data */
 		void * ptr = nullptr;
@@ -43,10 +50,9 @@ struct Object : public Elf {
 	/*! \brief status flags */
 	bool is_prepared = false;
 	bool is_protected = false;
-	bool is_initialized = false;
 
 	/*! \brief Symbol dependencies to other objects */
-	std::vector<ObjectFile *> dependencies;
+	std::vector<ObjectIdentity *> dependencies;
 
 	/*! \brief Segments to be loaded in memory */
 	std::vector<MemorySegment> memory_map;
@@ -61,7 +67,7 @@ struct Object : public Elf {
 	Object * file_previous = nullptr;
 
 	/*! \brief create new object */
-	Object(ObjectFile & file, const Data & data);
+	Object(ObjectIdentity & file, const Data & data);
 
 	Object(const Object&) = delete;
 	Object& operator=(const Object&) = delete;
@@ -95,7 +101,7 @@ struct Object : public Elf {
 	/*! \brief Set protection flags in memory */
 	bool protect();
 
-	/*! \brief Initialisation (before execution) */
+	/*! \brief Initialisation method */
 	virtual bool initialize() { return true; };
 
 	/*! \brief Check if current object can patch a previous version */
@@ -112,3 +118,5 @@ struct Object : public Elf {
 		return !operator==(o);
 	}
 };
+
+std::ostream& operator<<(std::ostream& os, const Object & o);
