@@ -51,7 +51,7 @@ struct ObjectDynamic : public ObjectExecutable {
 					break;
 
 				case Elf::DT_PREINIT_ARRAYSZ:
-					init.func_prearray_size = reinterpret_cast<size_t>(dyn.value());
+					init.func_prearray_len = reinterpret_cast<size_t>(dyn.value() / sizeof(void*));
 					break;
 
 				case Elf::DT_INIT_ARRAY:
@@ -59,7 +59,7 @@ struct ObjectDynamic : public ObjectExecutable {
 					break;
 
 				case Elf::DT_INIT_ARRAYSZ:
-					init.func_array_size = reinterpret_cast<size_t>(dyn.value());
+					init.func_array_len = reinterpret_cast<size_t>(dyn.value() / sizeof(void*));
 					break;
 
 				case Elf::DT_FINI_ARRAY:
@@ -67,7 +67,7 @@ struct ObjectDynamic : public ObjectExecutable {
 					break;
 
 				case Elf::DT_FINI_ARRAYSZ:
-					fini.func_array_size = reinterpret_cast<size_t>(dyn.value());
+					fini.func_array_len = reinterpret_cast<size_t>(dyn.value() / sizeof(void*));
 					break;
 
 				default:
@@ -110,12 +110,12 @@ struct ObjectDynamic : public ObjectExecutable {
 		uintptr_t func = 0;
 		uintptr_t func_prearray = 0;
 		uintptr_t func_array = 0;
-		size_t func_prearray_size = 0;
-		size_t func_array_size = 0;
+		size_t func_prearray_len = 0;
+		size_t func_array_len = 0;
 
 		void run(const ObjectDynamic * o) const {
 			auto fpa = reinterpret_cast<void (**)()>(o->base + func_prearray);
-			for (size_t i = 0; i < func_prearray_size; ++i)
+			for (size_t i = 0; i < func_prearray_len; ++i)
 				(fpa[i])();
 
 			auto f = reinterpret_cast<void(*)()>(o->base + func);
@@ -123,7 +123,7 @@ struct ObjectDynamic : public ObjectExecutable {
 				f();
 
 			auto fa = reinterpret_cast<void (**)()>(o->base + func_array);
-			for (size_t i = 0; i < func_array_size; i++)
+			for (size_t i = 0; i < func_array_len; i++)
 				(fa[i])();
 		}
 	} init, fini;
