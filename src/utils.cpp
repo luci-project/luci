@@ -4,6 +4,9 @@
 
 #include "generic.hpp"
 
+
+extern char **environ;
+
 namespace Utils {
 
 std::vector<const char *> split(char * source, const char delimiter) {
@@ -44,6 +47,37 @@ std::vector<const char *> file_contents(const char * path) {
 		LOG_VERBOSE << "Mapped '" << path << "' (" << length << " bytes)";
 		return split(reinterpret_cast<char *>(addr), '\n');
 	}
+}
+
+char * env(const char * name, bool consume) {
+	for (char ** ep = environ; *ep != NULL; ep++) {
+		char * e = *ep;
+		const char * n = name;
+		while (*n == *e && *e != '\0') {
+			n++;
+			e++;
+		}
+		if (*e == '=' && *n == '\0') {
+			if (consume)
+				**ep = '\0';
+			return e + 1;
+		}
+	}
+	return nullptr;
+}
+
+Auxiliary aux(Auxiliary::type type) {
+	static int envc = -1;
+	if (envc == -1)
+		for (envc = 0; environ[envc] != nullptr; envc++) {}
+
+	// Read current auxiliary vectors
+	Auxiliary * auxv = reinterpret_cast<Auxiliary *>(environ + envc + 1);
+	for (int auxc = 0 ; auxv[auxc].a_type != Auxiliary::AT_NULL; auxc++)
+		if (auxv[auxc].a_type == type)
+			return auxv[auxc];
+
+	return {};
 }
 
 }  // namespace Utils

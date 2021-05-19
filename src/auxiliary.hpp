@@ -52,6 +52,12 @@ struct alignas(16) Auxiliary {
 		void * a_ptr;
 		void (*a_fcn) (void);
 	} a_un;
+
+	bool valid() const {
+		return a_type != AT_NULL;
+	}
+
+	Auxiliary(type t = AT_NULL, long int v = 0) : a_type(t), a_un({v}) {}
 } __attribute__((packed));
 
 static_assert(sizeof(Auxiliary) == 2 * sizeof(void*), "Auxiliary vector has wrong size!");

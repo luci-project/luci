@@ -4,7 +4,6 @@
 #include <cstring>
 #include <cassert>
 #include <sys/stat.h>
-#include <bits/auxv.h>
 #include <inttypes.h>
 #include <unistd.h>
 
@@ -24,25 +23,6 @@
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Appenders/RollingFileAppender.h>
-
-extern char **environ;
-
-static char * env(const char * name, bool consume = false) {
-	for (char ** ep = environ; *ep != NULL; ep++) {
-		char * e = *ep;
-		const char * n = name;
-		while (*n == *e && *e != '\0') {
-			n++;
-			e++;
-		}
-		if (*e == '=' && *n == '\0') {
-			if (consume)
-				**ep = '\0';
-			return e + 1;
-		}
-	}
-	return nullptr;
-}
 
 int main(int argc, char* argv[]) {
 	const int defaultLogLevel = plog::debug;
@@ -80,7 +60,7 @@ int main(int argc, char* argv[]) {
 		LOG_ERROR << std::endl << "Parsing Arguments failed -- run " << std::endl << "   " << argv[0] << " --help" << std::endl << "for more information!" << std::endl;
 		return EXIT_FAILURE;
 	} else if (args.showHelp) {
-		args.help(std::cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "[target args]");
+		args.help(std::cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "target args");
 		return EXIT_SUCCESS;
 	}
 
@@ -102,7 +82,7 @@ int main(int argc, char* argv[]) {
 		LOG_DEBUG << "Add '" << libpath << "' (from --library-path) to library search path...";
 		loader.library_path_runtime.push_back(libpath);
 	}
-	char * ld_library_path = env("LD_LIBRARY_PATH", true);
+	char * ld_library_path = Utils::env("LD_LIBRARY_PATH", true);
 	if (ld_library_path != nullptr && *ld_library_path != '\0') {
 		LOG_DEBUG << "Add '" << ld_library_path<< "' (from LD_LIBRARY_PATH) to library search path...";
 		loader.library_path_runtime = Utils::split(ld_library_path, ';');
@@ -117,7 +97,7 @@ int main(int argc, char* argv[]) {
 		LOG_DEBUG << "Loading '" << preload << "' (from --preload)...";
 		loader.library(preload);
 	}
-	char * preload = env("LD_PRELOAD", true);
+	char * preload = Utils::env("LD_PRELOAD", true);
 	if (preload != nullptr && *preload != '\0') {
 		LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)...";
 		for (auto & lib : Utils::split(preload, ';'))
@@ -128,7 +108,6 @@ int main(int argc, char* argv[]) {
 	if (args.has_positional()) {
 		ObjectIdentity * start = nullptr;
 		for (auto & bin : args.get_positional()) {
-			LOG_INFO << "Loading object " << bin;
 			ObjectIdentity * o = loader.open(bin);
 			if (o == nullptr) {
 				LOG_ERROR << "Failed loading " << bin;

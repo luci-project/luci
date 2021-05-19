@@ -41,43 +41,6 @@ bool ObjectDynamic::preload_libraries() {
 				rpath.emplace_back(dyn.string());
 				break;
 
-			case Elf::DT_PLTGOT:
-				global_offset_table = dyn.value();
-				LOG_DEBUG << "GOT of " << (void*)this << " is " << global_offset_table;
-				break;
-
-			case Elf::DT_INIT:
-				init.func = reinterpret_cast<void(*)()>(dyn.value());
-				break;
-
-			case Elf::DT_FINI:
-				fini.func = reinterpret_cast<void(*)()>(dyn.value());
-				break;
-
-			case Elf::DT_PREINIT_ARRAY:
-				init.func_prearray = reinterpret_cast<void (**)()>(dyn.value());
-				break;
-
-			case Elf::DT_PREINIT_ARRAYSZ:
-				init.func_prearray_size = reinterpret_cast<size_t>(dyn.value());
-				break;
-
-			case Elf::DT_INIT_ARRAY:
-				init.func_array = reinterpret_cast<void (**)()>(dyn.value());
-				break;
-
-			case Elf::DT_INIT_ARRAYSZ:
-				init.func_array_size = reinterpret_cast<size_t>(dyn.value());
-				break;
-
-			case Elf::DT_FINI_ARRAY:
-				fini.func_array = reinterpret_cast<void (**)()>(dyn.value());
-				break;
-
-			case Elf::DT_FINI_ARRAYSZ:
-				fini.func_array_size = reinterpret_cast<size_t>(dyn.value());
-				break;
-
 			default:
 				continue;
 		}
@@ -103,6 +66,7 @@ bool ObjectDynamic::prepare() {
 	for (auto & reloc : dynamic_relocations)
 		relocate(reloc);
 
+	LOG_INFO <<"Initreloc done";
 	// PLT relocations
 	if (global_offset_table != 0) {
 		auto got = reinterpret_cast<uintptr_t *>(base + global_offset_table);
@@ -119,7 +83,7 @@ bool ObjectDynamic::prepare() {
 			else
 				Relocator(reloc).increment_value(base, base);
 	}
-
+LOG_INFO <<"Prepare done";
 	return success;
 }
 
@@ -133,25 +97,25 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 	auto need_symbol_index = reloc.symbol_index();
 	if (need_symbol_index == 0) {
 		auto ptr = Relocator(reloc).fix(this->base, this->global_offset_table);
-		LOG_INFO << "Local relocation in dynamic object " << file.name << "...";
 		return reinterpret_cast<void*>(ptr);
-	} else {
+	} else /* TODO: if (!dynamic_symbols.ignored(need_symbol_index)) */ {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
-		assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
+		//assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
 		VersionedSymbol need_symbol(dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
 
 		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
 		if (symbol) {
 			LOG_INFO << "Relocating to " << symbol.value() << " in dynamic object " << file.name << "...";
 			relocations.emplace_back(reloc, symbol.value());
-			Relocator relocator(reloc);
-			return reinterpret_cast<void*>(relocator.fix(this->base, symbol.value(), symbol->object().base, this->global_offset_table));
+			return reinterpret_cast<void*>(Relocator(reloc).fix(this->base, symbol.value(), symbol->object().base, this->global_offset_table));
+		} else if (need_symbol.bind() == STB_WEAK) {
+			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "...";
 		} else {
-			LOG_ERROR << "Unable to resolve relocate symbol " << symbol << "...";
+			LOG_ERROR << "Unable to resolve symbol " << need_symbol << " for relocation...";
 			assert(false);
-			return nullptr;
 		}
 	}
+	return nullptr;
 }
 
 bool ObjectDynamic::patchable() const {

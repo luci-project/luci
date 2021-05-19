@@ -48,6 +48,10 @@ struct StrPtr {
 		return *this;
 	}
 
+	bool empty() const {
+		return str == nullptr || len == 0;
+	}
+
 	bool operator==(const StrPtr & other) const {
 		if (str == other.str)
 			return true;

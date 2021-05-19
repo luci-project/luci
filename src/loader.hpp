@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <string>
 #include <vector>
 #include <list>
@@ -33,7 +32,7 @@ struct Loader {
 	std::list<ObjectIdentity> lookup;
 
 	/*! \brief Constructor */
-	Loader(const char * self, bool dynamicUpdate = false);
+	Loader(const char * path, bool dynamicUpdate = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
@@ -44,6 +43,7 @@ struct Loader {
 	/*! \brief Load file */
 	ObjectIdentity * open(const char * filename, const char * directory, DL::Lmid_t ns = DL::LM_ID_BASE);
 	ObjectIdentity * open(const char * path, DL::Lmid_t ns = DL::LM_ID_BASE);
+	ObjectIdentity * open(void * ptr, bool prevent_updates, bool in_execution, const char * filepath = nullptr, DL::Lmid_t ns = DL::LM_ID_BASE);
 
 	/*! \brief prepare all loaded files for execution */
 	bool prepare();
@@ -83,4 +83,7 @@ struct Loader {
 
 	/*! \brief observer method */
 	void observer();
+
+	/*! \brief get new namespace */
+	DL::Lmid_t get_new_ns() const;
 };

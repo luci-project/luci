@@ -6,6 +6,7 @@
 #include "object_rel.hpp"
 #include "object_exec.hpp"
 
+#include "generic.hpp"
 struct ObjectDynamic : public ObjectExecutable {
 	ObjectDynamic(ObjectIdentity & file, const Object::Data & data)
 	  : ObjectExecutable{file, data},
@@ -18,6 +19,61 @@ struct ObjectDynamic : public ObjectExecutable {
 	{
 		assert(dynamic_relocations.empty() || reinterpret_cast<uintptr_t>(this->sections[dynamic_relocations[0].symtab].data()) == dynamic_symbols.address());
 		assert(dynamic_relocations_plt.empty() || reinterpret_cast<uintptr_t>(this->sections[dynamic_relocations_plt[0].symtab].data()) == dynamic_symbols.address());
+
+		for (auto &dyn: dynamic) {
+			switch (dyn.tag()) {
+				case Elf::DT_SONAME:
+				{
+					StrPtr soname(dyn.string());
+					if (soname != file.name) {
+						if (!file.name.empty()) {
+							LOG_WARNING << "Library file name (" << file.name << ") differs from soname (" << soname << ") -- using latter one!";
+						}
+						file.name = soname;
+					}
+					break;
+				}
+
+				case Elf::DT_PLTGOT:
+					global_offset_table = dyn.value();
+					break;
+
+				case Elf::DT_INIT:
+					init.func = dyn.value();
+					break;
+
+				case Elf::DT_FINI:
+					fini.func = dyn.value();
+					break;
+
+				case Elf::DT_PREINIT_ARRAY:
+					init.func_prearray = dyn.value();
+					break;
+
+				case Elf::DT_PREINIT_ARRAYSZ:
+					init.func_prearray_size = reinterpret_cast<size_t>(dyn.value());
+					break;
+
+				case Elf::DT_INIT_ARRAY:
+					init.func_array = dyn.value();
+					break;
+
+				case Elf::DT_INIT_ARRAYSZ:
+					init.func_array_size = reinterpret_cast<size_t>(dyn.value());
+					break;
+
+				case Elf::DT_FINI_ARRAY:
+					fini.func_array = dyn.value();
+					break;
+
+				case Elf::DT_FINI_ARRAYSZ:
+					fini.func_array_size = reinterpret_cast<size_t>(dyn.value());
+					break;
+
+				default:
+					continue;
+			}
+		}
 	}
 
 	void* dynamic_resolve(size_t index) const override;
@@ -39,7 +95,7 @@ struct ObjectDynamic : public ObjectExecutable {
 	void* relocate(const Elf::Relocation & reloc) const;
 
 	bool initialize() override {
-		init.run();
+		init.run(this);
 		return true;
 	};
 
@@ -51,24 +107,24 @@ struct ObjectDynamic : public ObjectExecutable {
 	Elf::List<Elf::VersionDefinition> version_definition;
 
 	struct {
-		void (*func)() = nullptr;
-		void (**func_prearray)() = nullptr;
-		void (**func_array)() = nullptr;
+		uintptr_t func = 0;
+		uintptr_t func_prearray = 0;
+		uintptr_t func_array = 0;
 		size_t func_prearray_size = 0;
 		size_t func_array_size = 0;
 
-		void run() const {
-			for (size_t i = 0; i < func_prearray_size; ++i) {
-				(*func_prearray[i])();
-			}
+		void run(const ObjectDynamic * o) const {
+			auto fpa = reinterpret_cast<void (**)()>(o->base + func_prearray);
+			for (size_t i = 0; i < func_prearray_size; ++i)
+				(fpa[i])();
 
-			if (func != nullptr) {
-				func();
-			}
+			auto f = reinterpret_cast<void(*)()>(o->base + func);
+			if (func != 0)
+				f();
 
-			for (size_t i = 0; i < func_array_size; i++) {
-				(*func_array[i])();
-			}
+			auto fa = reinterpret_cast<void (**)()>(o->base + func_array);
+			for (size_t i = 0; i < func_array_size; i++)
+				(fa[i])();
 		}
 	} init, fini;
 

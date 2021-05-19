@@ -236,12 +236,17 @@ struct ArgParser : Opts {
 					out << " --" << arg.name_long;
 				else
 					out << " -" << arg.name_short;
+				if (arg.name_arg != nullptr)
+					out << " " << arg.name_arg;
 				hasRequired = true;
 			} else {
 				if (arg.name_long != nullptr)
-					out << " [--" << arg.name_long << "]";
+					out << " [--" << arg.name_long;
 				else
-					out << " [-" << arg.name_short << "]";
+					out << " [-" << arg.name_short;
+				if (arg.name_arg != nullptr)
+					out << " " << arg.name_arg;
+				out << "]";
 				hasOptional = true;
 			}
 		}
