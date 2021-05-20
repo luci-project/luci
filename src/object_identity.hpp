@@ -6,6 +6,7 @@
 
 #include "dl.hpp"
 #include "strptr.hpp"
+#include "bufstream.hpp"
 
 struct Object;
 struct Loader;
@@ -64,4 +65,6 @@ struct ObjectIdentity {
 	bool initialize();
 };
 
-std::ostream& operator<<(std::ostream& os, const ObjectIdentity & o);
+static inline BufferStream& operator<<(BufferStream& bs, const ObjectIdentity & o) {
+	return bs << o.name << " (" << o.path << ")";
+}

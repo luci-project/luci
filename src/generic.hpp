@@ -2,6 +2,6 @@
 
 #include <cerrno>
 #include <cassert>
-#include <stdint.h>
+#include <cstdint>
 
-#include <plog/Log.h>
+#include "log.hpp"

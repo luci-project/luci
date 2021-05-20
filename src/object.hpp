@@ -13,6 +13,7 @@
 #include "bean.hpp"
 
 #include "strptr.hpp"
+#include "bufstream.hpp"
 
 #include "object_identity.hpp"
 #include "versioned_symbol.hpp"
@@ -119,4 +120,6 @@ struct Object : public Elf {
 	}
 };
 
-std::ostream& operator<<(std::ostream& os, const Object & o);
+static inline BufferStream& operator<<(BufferStream& bs, const Object & o) {
+	return bs << "[Object " << o.file << "]";
+}

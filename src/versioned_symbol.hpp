@@ -2,7 +2,8 @@
 
 #include <optional>
 
-#include <elf.hpp>
+#include "elf.hpp"
+#include "bufstream.hpp"
 
 struct Object;
 
@@ -60,3 +61,6 @@ struct VersionedSymbol : Elf::Symbol {
 	mutable std::optional<uint32_t> _hash_value;
 	mutable std::optional<uint32_t> _gnu_hash_value;
 };
+
+BufferStream& operator<<(BufferStream& bs, const VersionedSymbol & s);
+BufferStream& operator<<(BufferStream& bs, const std::optional<VersionedSymbol> & s);

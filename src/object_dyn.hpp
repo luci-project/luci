@@ -27,7 +27,7 @@ struct ObjectDynamic : public ObjectExecutable {
 					StrPtr soname(dyn.string());
 					if (soname != file.name) {
 						if (!file.name.empty()) {
-							LOG_WARNING << "Library file name (" << file.name << ") differs from soname (" << soname << ") -- using latter one!";
+							LOG_WARNING << "Library file name (" << file.name << ") differs from soname (" << soname << ") -- using latter one!" << endl;
 						}
 						file.name = soname;
 					}

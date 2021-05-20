@@ -15,17 +15,17 @@ Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(sta
 		struct rlimit l;
 		errno = 0;
 		if (getrlimit(RLIMIT_STACK, &l) == -1) {
-			LOG_ERROR << "Reading systems default stack limit failed: " << strerror(errno);
+			LOG_ERROR << "Reading systems default stack limit failed: " << strerror(errno) << endl;
 			exit(EXIT_FAILURE);
 		} else {
 			this->stack_size = reinterpret_cast<size_t>(l.rlim_cur);
-			LOG_INFO << "Current system stack size is " << this->stack_size << " bytes";
+			LOG_INFO << "Current system stack size is " << this->stack_size << " bytes" << endl;
 		}
 	}
 
 	// Allocate stack
 	if (this->stack_pointer == 0 && (this->stack_pointer = allocate_stack(this->stack_size)) == 0) {
-		LOG_ERROR << "Cannot create process without stack!";
+		LOG_ERROR << "Cannot create process without stack!" << endl;
 		exit(EXIT_FAILURE);
 	}
 
@@ -51,20 +51,21 @@ uintptr_t Process::allocate_stack(size_t stack_size) {
 	errno = 0;
 	void *stack = ::mmap(NULL, stack_size, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_STACK | MAP_ANONYMOUS, -1, 0);
 	if (stack == MAP_FAILED) {
-		LOG_ERROR << "Mapping Stack with " << stack_size << " Bytes failed: " << strerror(errno);
+		LOG_ERROR << "Mapping Stack with " << stack_size << " Bytes failed: " << strerror(errno) << endl;
 		return 0;
 	} else {
-		LOG_DEBUG << "Stack at " << stack << " with " << stack_size << std::endl;
+		LOG_DEBUG << "Stack at " << stack << " with " << stack_size << endl;
 		return reinterpret_cast<uintptr_t>(stack) + stack_size - sizeof(void*);
 	}
 }
 
 
 void Process::init(const std::vector<const char *> &arg) {
-	IF_PLOG(plog::info) {
-		std::ostringstream imploded;
-		std::copy(arg.begin(), arg.end(), std::ostream_iterator<std::string>(imploded, " "));
-		LOG_INFO << "Starting process with arguments: " << imploded.str();
+	if (LOG.visible(Log::INFO)) {
+		LOG_INFO << "Starting process with arguments:" << endl;
+		for (const char * a : arg)
+			LOG << ' ' << a;
+		LOG << endl;
 	}
 
 	// End marker
@@ -121,7 +122,7 @@ void Process::init(const std::vector<const char *> &arg) {
 }
 
 void Process::start(uintptr_t entry) {
-	LOG_INFO << "Starting process at " << (void*)entry << " (with sp = " << (void*)stack_pointer << ")";
+	LOG_INFO << "Starting process at " << (void*)entry << " (with sp = " << (void*)stack_pointer << ")" << endl;
 	asm (
 		"mov    %0,%%rsp;"
 		"mov    %1,%%rbx;"

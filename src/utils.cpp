@@ -1,6 +1,12 @@
 #include "utils.hpp"
 
+#include <cstring>
+#include <unistd.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 
 #include "generic.hpp"
 
@@ -26,13 +32,13 @@ std::vector<const char *> file_contents(const char * path) {
 	errno = 0;
 	int fd = ::open(path, O_RDONLY);
 	if (fd < 0) {
-		LOG_ERROR << "Reading file " << path << " failed: " << strerror(errno);
+		LOG_ERROR << "Reading file " << path << " failed: " << strerror(errno) << endl;
 		return {};
 	}
 
 	struct stat sb;
 	if (::fstat(fd, &sb) == -1) {
-		LOG_ERROR << "Stat file " << path << " failed: " << strerror(errno);
+		LOG_ERROR << "Stat file " << path << " failed: " << strerror(errno) << endl;
 		::close(fd);
 		return {};
 	}
@@ -41,10 +47,10 @@ std::vector<const char *> file_contents(const char * path) {
 	void * addr = ::mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	::close(fd);
 	if (addr == MAP_FAILED) {
-		LOG_ERROR << "Mmap file " << path << " failed: " << strerror(errno);
+		LOG_ERROR << "Mmap file " << path << " failed: " << strerror(errno) << endl;
 		return {};
 	} else {
-		LOG_VERBOSE << "Mapped '" << path << "' (" << length << " bytes)";
+		LOG_VERBOSE << "Mapped '" << path << "' (" << length << " bytes)" << endl;
 		return split(reinterpret_cast<char *>(addr), '\n');
 	}
 }

@@ -21,18 +21,19 @@ void * observer_kickoff(void * ptr) {
 Loader::Loader(const char * path, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {
 	errno = 0;
 	if (::pthread_mutex_init(&mutex, nullptr) != 0) {
-		LOG_ERROR << "Creating loader mutex failed: " << strerror(errno);
+		LOG_ERROR << "Creating loader mutex failed: " << strerror(errno) << endl;
 	}
 
 	if (dynamic_update) {
-		if ((inotifyfd = ::inotify_init1(IN_CLOEXEC)) == -1)
-			LOG_ERROR << "Initializing inotify failed: " << strerror(errno);
-		else if (::pthread_create(&observer_thread, nullptr, &observer_kickoff, this) != 0)
-			LOG_ERROR << "Creating background thread failed: " << strerror(errno);
-		else if (::pthread_detach(observer_thread) != 0)
-			LOG_ERROR << "Detaching background thread failed: " << strerror(errno);
-		else
+		if ((inotifyfd = ::inotify_init1(IN_CLOEXEC)) == -1) {
+			LOG_ERROR << "Initializing inotify failed: " << strerror(errno) << endl;
+		} else if (::pthread_create(&observer_thread, nullptr, &observer_kickoff, this) != 0) {
+			LOG_ERROR << "Creating background thread failed: " << strerror(errno) << endl;
+		} else if (::pthread_detach(observer_thread) != 0) {
+			LOG_ERROR << "Detaching background thread failed: " << strerror(errno) << endl;
+		} else {
 			LOG_INFO << "Created observer background thread";
+		}
 	}
 
 	// Add vDSO (if available)
@@ -48,13 +49,14 @@ Loader::Loader(const char * path, bool dynamicUpdate) : dynamic_update(dynamicUp
 
 Loader::~Loader() {
 	if (dynamic_update) {
-		if (close(inotifyfd) != 0)
-			LOG_ERROR << "Closing inotify failed: " << strerror(errno);
-		else
-			LOG_INFO << "Destroyed observer background thread";
+		if (close(inotifyfd) != 0) {
+			LOG_ERROR << "Closing inotify failed: " << strerror(errno) << endl;
+		} else {
+			LOG_INFO << "Destroyed observer background thread" << endl;
+		}
 	}
 	if (::pthread_mutex_destroy(&mutex) != 0) {
-		LOG_ERROR << "Destroying loader mutex failed: " << strerror(errno);
+		LOG_ERROR << "Destroying loader mutex failed: " << strerror(errno) << endl;
 	}
 
 	lookup.clear();
@@ -69,7 +71,7 @@ void Loader::observer() {
 		ssize_t len = read(inotifyfd, buf, sizeof(buf));
 
 		if (len == -1 && errno != EAGAIN) {
-			LOG_ERROR << "Reading file modifications failed: " << strerror(errno);
+			LOG_ERROR << "Reading file modifications failed: " << strerror(errno) << endl;
 			break;
 		} else if (len <= 0) {
 			break;
@@ -84,7 +86,7 @@ void Loader::observer() {
 			lock();
 			for (auto & object_file : lookup)
 				if (event->wd == object_file.wd) {
-					LOG_DEBUG << "Possible file modification in " << object_file.path;
+					LOG_DEBUG << "Possible file modification in " << object_file.path << endl;
 					assert((event->mask & IN_ISDIR) == 0);
 					if (object_file.open() != nullptr)
 						prepare();
@@ -93,7 +95,7 @@ void Loader::observer() {
 			unlock();
 		}
 	}
-	LOG_INFO << "Observer background thread ends.";
+	LOG_INFO << "Observer background thread ends." << endl;
 }
 
 
@@ -118,7 +120,7 @@ ObjectIdentity * Loader::library(const char * filename, const std::vector<const 
 			return lib;
 	}
 
-	LOG_ERROR << "Library '" << filename << "' cannot be found";
+	LOG_ERROR << "Library '" << filename << "' cannot be found" << endl;
 	return nullptr;
 }
 
@@ -139,12 +141,12 @@ ObjectIdentity * Loader::open(const char * filepath, DL::Lmid_t ns) {
 		if (ns == DL::LM_ID_NEWLN)
 			ns = get_new_ns();
 
-		LOG_DEBUG << "Loading " << filepath << "...";
+		LOG_DEBUG << "Loading " << filepath << "..." << endl;
 		ObjectIdentity & i = lookup.emplace_back(*this, filepath, ns);
 		if (i.open() != nullptr) {
 			return &i;
 		} else {
-			LOG_ERROR << "Unable to open " << filepath;
+			LOG_ERROR << "Unable to open " << filepath << endl;
 			lookup.pop_back();
 		}
 	}
@@ -155,7 +157,7 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool in_executio
 	if (ns == DL::LM_ID_NEWLN)
 		ns = get_new_ns();
 
-	LOG_DEBUG << "Loading from memory " << (void*)ptr << " (" << filepath << ")...";
+	LOG_DEBUG << "Loading from memory " << (void*)ptr << " (" << filepath << ")..." << endl;
 	ObjectIdentity & i = lookup.emplace_back(*this, filepath, ns);
 
 	if (prevent_updates) {
@@ -173,7 +175,7 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool in_executio
 		}
 		return &i;
 	} else {
-		LOG_ERROR << "Unable to open " << ptr;
+		LOG_ERROR << "Unable to open " << ptr << endl;
 		lookup.pop_back();
 	}
 	return nullptr;
@@ -189,7 +191,7 @@ DL::Lmid_t Loader::get_new_ns() const {
 
 bool Loader::prepare() {
 	// Relocate
-	LOG_DEBUG << "Relocate...";
+	LOG_DEBUG << "Relocate..." << endl;
 	for (auto & o : lookup)
 		if (o.current->is_prepared)
 			o.current->update();
@@ -199,7 +201,7 @@ bool Loader::prepare() {
 			return false;
 
 	// Protect
-	LOG_DEBUG << "Protect memory...";
+	LOG_DEBUG << "Protect memory..." << endl;
 	for (auto & o : lookup)
 		if (o.current->is_protected)
 			continue;
@@ -209,7 +211,7 @@ bool Loader::prepare() {
 			return false;
 
 	// Initialize (but not binary itself)
-	LOG_DEBUG << "Initialize...";
+	LOG_DEBUG << "Initialize..." << endl;
 	for (auto & o : lookup)
 		if (!o.initialize())
 			return false;
@@ -231,7 +233,7 @@ bool Loader::run(ObjectIdentity * file, std::vector<const char *> args, uintptr_
 
 	// Prepare libraries
 	if (!prepare()) {
-		LOG_ERROR << "Preparation for execution of " << file << " failed...";
+		LOG_ERROR << "Preparation for execution of " << file << " failed..." << endl;
 		file->flags.initialized = false;
 		return false;
 	}
@@ -247,7 +249,7 @@ bool Loader::run(ObjectIdentity * file, std::vector<const char *> args, uintptr_
 	p.init(args);
 
 	uintptr_t entry = start->header.entry();
-	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry);
+	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << endl;
 	p.start(start->base + entry);
 
 	return true;

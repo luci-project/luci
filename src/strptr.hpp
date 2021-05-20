@@ -1,8 +1,7 @@
 #pragma once
 
 #include <cstdint>
-
-#include <ostream>
+#include "bufstream.hpp"
 
 struct StrPtr {
 	const char * str;
@@ -67,3 +66,11 @@ struct StrPtr {
 		return !operator==(other);
 	}
 };
+
+static inline BufferStream& operator<<(BufferStream& bs, const StrPtr & s) {
+	if (s.str == nullptr)
+		bs << "(nullptr)";
+	else
+		bs << s.str;
+	return bs;
+}

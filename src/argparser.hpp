@@ -190,23 +190,24 @@ struct ArgParser : Opts {
 			// Check if parameter is unqiue
 			bool skip = false;
 			if (arg.name_short == '\0' && arg.name_long == nullptr) {
-				LOG_FATAL << "Parameter has neither short nor long name!";
+				LOG_FATAL << "Parameter has neither short nor long name!" << endl;
 				skip = true;
 			} else {
 				for (const auto & other : args)
 					if (arg.name_short != '\0' && arg.name_short == other.name_short) {
-						LOG_FATAL << "Parameter '-" << arg.name_short << "' is not unqiue!";
+						LOG_FATAL << "Parameter '-" << arg.name_short << "' is not unqiue!" << endl;
 						skip = true;
 						break;
 					} else if (arg.name_long != nullptr && other.name_long != nullptr && strcmp(arg.name_long, other.name_long) == 0) {
-						LOG_FATAL << "Parameter '--" << arg.name_long << "' is not unqiue!";
+						LOG_FATAL << "Parameter '--" << arg.name_long << "' is not unqiue!" << endl;
 						skip = true;
 						break;
 					} else if (arg.element == other.element) {
-						if (arg.name_long != nullptr)
-							LOG_FATAL << "Element of parameter '--" << arg.name_long << "' is not unqiue!";
-						else
-							LOG_FATAL << "Element of parameter '-" << arg.name_short << "' is not unqiue!";
+						if (arg.name_long != nullptr) {
+							LOG_FATAL << "Element of parameter '--" << arg.name_long << "' is not unqiue!" << endl;
+						} else {
+							LOG_FATAL << "Element of parameter '-" << arg.name_short << "' is not unqiue!" << endl;
+						}
 						skip = true;
 						break;
 					}
@@ -218,7 +219,7 @@ struct ArgParser : Opts {
 		}
 	}
 
-	ArgParser(const std::initializer_list<Parameter> & list) : ArgParser(list, [](const char * str) -> bool { if (str != nullptr && *str == '-') { LOG_ERROR << "Positional parameter '" << str << "' looks like its not meant to be positional!" ; return false; } else { return true; } }, [](const char *) -> bool { return true; }) {}
+	ArgParser(const std::initializer_list<Parameter> & list) : ArgParser(list, [](const char * str) -> bool { if (str != nullptr && *str == '-') { LOG_ERROR << "Positional parameter '" << str << "' looks like its not meant to be positional!" << endl; return false; } else { return true; } }, [](const char *) -> bool { return true; }) {}
 
 	~ArgParser() = default;
 
@@ -289,7 +290,7 @@ struct ArgParser : Opts {
 				if (validate_terminal(current)) {
 					terminal.push_back(current);
 				} else {
-					LOG_ERROR << "Terminal argument '" << current << "' is not valid!";
+					LOG_ERROR << "Terminal argument '" << current << "' is not valid!" << endl;
 					error = true;
 				}
 			} else if (current[0] == '-' && current[1] == '-' && current[2] == '\0') {
@@ -314,11 +315,11 @@ struct ArgParser : Opts {
 									if (set(arg, next)) {
 										return true;
 									} else {
-										LOG_ERROR << "Invalid value '" << next << "' for parameter " << current << "!";
+										LOG_ERROR << "Invalid value '" << next << "' for parameter " << current << "!" << endl;
 										return false;
 									}
 								} else {
-									LOG_ERROR << "Missing value for parameter " << current << "!";
+									LOG_ERROR << "Missing value for parameter " << current << "!" << endl;
 									return false;
 								}
 							}, arg.element);
@@ -326,7 +327,7 @@ struct ArgParser : Opts {
 						if (!valid) {
 							error = true;
 						} else if (arg.present && !visit([this](auto&& element) -> bool { return ArgElement::multiple(this->*element); }, arg.element)) {
-							LOG_ERROR << "Parameter " << current << " occured multiple times (= reassigned)!";
+							LOG_ERROR << "Parameter " << current << " occured multiple times (= reassigned)!" << endl;
 							error = true;
 						} else {
 							arg.present = true;
@@ -340,7 +341,7 @@ struct ArgParser : Opts {
 					if (validate_positional(current)) {
 						positional.push_back(current);
 					} else {
-						LOG_ERROR << "Positional argument '" << current << "' is not valid!";
+						LOG_ERROR << "Positional argument '" << current << "' is not valid!" << endl;
 						error = true;
 					}
 				}
@@ -349,10 +350,11 @@ struct ArgParser : Opts {
 
 		for (auto arg : args)
 			if (arg.required && !arg.present) {
-				if (arg.name_long != nullptr)
-					LOG_ERROR << "Parameter '--" << arg.name_long << "' is required!";
-				else
-					LOG_ERROR << "Parameter '-" << arg.name_short << "' is required!";
+				if (arg.name_long != nullptr) {
+					LOG_ERROR << "Parameter '--" << arg.name_long << "' is required!" << endl;
+				} else {
+					LOG_ERROR << "Parameter '-" << arg.name_short << "' is required!" << endl;
+				}
 				error = true;
 			}
 

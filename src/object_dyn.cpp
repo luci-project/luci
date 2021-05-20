@@ -49,7 +49,7 @@ bool ObjectDynamic::preload_libraries() {
 	for (auto & lib : libs) {
 		auto o = file.loader.library(lib, rpath, runpath);
 		if (o == nullptr) {
-			LOG_WARNING << "Unresolved dependency: " << lib;
+			LOG_WARNING << "Unresolved dependency: " << lib << endl;
 			success = false;
 		} else {
 			dependencies.push_back(o);
@@ -66,7 +66,6 @@ bool ObjectDynamic::prepare() {
 	for (auto & reloc : dynamic_relocations)
 		relocate(reloc);
 
-	LOG_INFO <<"Initreloc done";
 	// PLT relocations
 	if (global_offset_table != 0) {
 		auto got = reinterpret_cast<uintptr_t *>(base + global_offset_table);
@@ -83,7 +82,7 @@ bool ObjectDynamic::prepare() {
 			else
 				Relocator(reloc).increment_value(base, base);
 	}
-LOG_INFO <<"Prepare done";
+
 	return success;
 }
 
@@ -105,13 +104,13 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 
 		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
 		if (symbol) {
-			LOG_INFO << "Relocating to " << symbol.value() << " in dynamic object " << file.name << "...";
+			LOG_INFO << "Relocating to " << symbol.value() << " in dynamic object " << file.name << "..." << endl;
 			relocations.emplace_back(reloc, symbol.value());
 			return reinterpret_cast<void*>(Relocator(reloc).fix(this->base, symbol.value(), symbol->object().base, this->global_offset_table));
 		} else if (need_symbol.bind() == STB_WEAK) {
-			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "...";
+			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "..." << endl;
 		} else {
-			LOG_ERROR << "Unable to resolve symbol " << need_symbol << " for relocation...";
+			LOG_ERROR << "Unable to resolve symbol " << need_symbol << " for relocation..." << endl;
 			assert(false);
 		}
 	}
@@ -126,7 +125,7 @@ bool ObjectDynamic::patchable() const {
 		return false;
 
 	assert(file_previous->binary_hash && this->binary_hash);
-	LOG_INFO << "Checking if " << this->file.name << " can be patch previous version...";
+	LOG_INFO << "Checking if " << this->file.name << " can be patch previous version..." << endl;
 
 	// Check if all required (referenced) symbols to previous object still exist in the new version
 	for (const auto & object_file : file.loader.lookup)
@@ -135,9 +134,9 @@ bool ObjectDynamic::patchable() const {
 			for (const auto & relpair : obj->relocations)
 				if (&relpair.second.object() == file_previous) {
 					// TODO: Check if relocations are in some protected memory part
-					LOG_DEBUG << " - referenced symbol " << relpair.second.name();
+					LOG_DEBUG << " - referenced symbol " << relpair.second.name() << endl;
 					if (!resolve_symbol(relpair.second)) {
-						LOG_WARNING << "Required symbol " << relpair.second.name() << " not found in new version of " << this->file << ") -- not patching the library!";
+						LOG_WARNING << "Required symbol " << relpair.second.name() << " not found in new version of " << this->file << ") -- not patching the library!" << endl;
 						return false;
 					}
 			}
@@ -147,7 +146,7 @@ bool ObjectDynamic::patchable() const {
 		for (const auto & section : elf.sections)
 			if (section.type() == Elf::SHT_PROGBITS && section.allocate() && section.virt_addr() >= sym.address) {
 				if (section.writeable() && strcmp(section.name(), ".data") == 0) {
-					LOG_WARNING << "Data section changed in new version of " << this->file.name << " -- not patching the library!";
+					LOG_WARNING << "Data section changed in new version of " << this->file.name << " -- not patching the library!" << endl;
 					return false;
 				}
 			}

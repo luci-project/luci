@@ -35,7 +35,7 @@ Object::~Object() {
 
 	errno = 0;
 	if (munmap(data.ptr, data.size) == -1) {
-		LOG_ERROR << "Unmapping data from " << *this << " failed: " << strerror(errno);
+		LOG_ERROR << "Unmapping data from " << *this << " failed: " << strerror(errno) << endl;
 	}
 
 	// close file descriptor
@@ -72,7 +72,7 @@ bool Object::protect() {
 }
 
 void* Object::dynamic_resolve(size_t index) const {
-	LOG_ERROR << "Unable to resolve " << index << " -- Object " << file.path << " does not support dynamic loading!";
+	LOG_ERROR << "Unable to resolve " << index << " -- Object " << file.path << " does not support dynamic loading!" << endl;
 	assert(false);
 	return nullptr;
 }
