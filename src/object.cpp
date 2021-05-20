@@ -7,8 +7,6 @@
 #include "object_rel.hpp"
 #include "generic.hpp"
 
-#include "output.hpp"
-
 Object::Object(ObjectIdentity & file, const Data & data) : Elf(reinterpret_cast<uintptr_t>(data.ptr)), file(file), data(data) {
 	assert(data.ptr != nullptr);
 }

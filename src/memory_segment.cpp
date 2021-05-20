@@ -7,8 +7,6 @@
 #include "loader.hpp"
 #include "generic.hpp"
 
-#include "output.hpp"
-
 bool MemorySegment::map() {
 	void * mem = nullptr;
 	const bool copy = source.object.file.loader.dynamic_update

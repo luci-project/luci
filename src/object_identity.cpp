@@ -19,7 +19,6 @@
 #include "object_exec.hpp"
 #include "generic.hpp"
 
-#include "output.hpp"
 
 static bool supported(const Elf::Header * header) {
 	if (!header->valid()) {
@@ -49,7 +48,7 @@ static bool supported(const Elf::Header * header) {
 			break;
 #endif
 		default:
-			LOG_ERROR << "Unsupported machine!"  << endl;
+			LOG_ERROR << "Unsupported machine!" << endl;
 			return false;
 	}
 
@@ -118,7 +117,7 @@ Object * ObjectIdentity::open(void * ptr, bool preload) {
 		XXHash64 datahash(name.hash);  // Name hash as seed
 		datahash.add(data.ptr, data.size);
 		data.hash = datahash.hash();
-		LOG_DEBUG << "Elf " << *this << " has hash " << std::hex << data.hash << std::dec << endl;
+		LOG_DEBUG << "Elf " << *this << " has hash " << hex << data.hash << dec << endl;
 
 		// Check if already loaded (using hash)
 		for (Object * obj = current; obj != nullptr; obj = obj->file_previous)

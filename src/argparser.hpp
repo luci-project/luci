@@ -1,6 +1,5 @@
 #pragma once
 
-#include <functional>
 #include <variant>
 #include <vector>
 
@@ -10,6 +9,8 @@
 template <class Opts>
 struct ArgParser : Opts {
 	typedef std::variant<const char * Opts::*, int Opts::*, unsigned Opts::*, long long Opts::*, unsigned long long Opts::*, bool Opts::*, std::vector<const char *> Opts::*, std::vector<int> Opts::*, std::vector<unsigned> Opts::*, std::vector<long long> Opts::*, std::vector<unsigned long long> Opts::*> element_t;
+	typedef bool (*validate_t)(const char *);
+
 
 	using Parameter = struct {
 		const char name_short;
@@ -18,7 +19,7 @@ struct ArgParser : Opts {
 		element_t element;
 		bool required;
 		const char * help_text;
-		std::function<bool(const char *)> validate;
+		validate_t validate;
 		bool present;
 
 		bool matches(const char * name) {
@@ -87,7 +88,7 @@ struct ArgParser : Opts {
  private:
 	std::vector<Parameter> args;
 	std::vector<const char *> positional, terminal;
-	std::function<bool(const char *)> validate_positional, validate_terminal;
+	validate_t validate_positional, validate_terminal;
 
 	ArgParser() = default;
 	ArgParser(const ArgParser&) = delete;
@@ -97,12 +98,12 @@ struct ArgParser : Opts {
 
 	bool set(const Parameter & arg, const char * value) {
 		return visit([this, arg, value](auto&& element) -> bool {
-			return arg.validate && !arg.validate(value) ? false : Utils::parse(this->*element, value);
+			return arg.validate != nullptr && !arg.validate(value) ? false : Utils::parse(this->*element, value);
 		}, arg.element);
 	}
 
  public:
-	ArgParser(const std::initializer_list<Parameter> & list, std::function<bool(const char *)> validate_positional, std::function<bool(const char *)> validate_terminal) : validate_positional(validate_positional), validate_terminal(validate_terminal) {
+	ArgParser(const std::initializer_list<Parameter> & list, validate_t validate_positional = nullptr, validate_t validate_terminal = nullptr) : validate_positional(validate_positional), validate_terminal(validate_terminal) {
 		for (auto arg : list) {
 			// Check if parameter is unqiue
 			bool skip = false;
@@ -210,7 +211,7 @@ struct ArgParser : Opts {
 
 			if (terminator) {
 				// Terminal argument
-				if (validate_terminal(current)) {
+				if (validate_terminal == nullptr || validate_terminal(current)) {
 					terminal.push_back(current);
 				} else {
 					LOG_ERROR << "Terminal argument '" << current << "' is not valid!" << endl;
@@ -261,7 +262,7 @@ struct ArgParser : Opts {
 
 				// Positional argument
 				if (!found) {
-					if (validate_positional(current)) {
+					if (validate_positional == nullptr || validate_positional(current)) {
 						positional.push_back(current);
 					} else {
 						LOG_ERROR << "Positional argument '" << current << "' is not valid!" << endl;

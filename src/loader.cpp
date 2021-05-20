@@ -11,8 +11,6 @@
 #include "generic.hpp"
 #include "utils.hpp"
 
-#include "output.hpp"
-
 void * observer_kickoff(void * ptr) {
 	reinterpret_cast<Loader *>(ptr)->observer();
 	return nullptr;

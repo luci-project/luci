@@ -6,8 +6,6 @@
 #include "dl.hpp"
 #include "generic.hpp"
 
-#include "output.hpp"
-
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
 	// It is possible that multiple threads try to access an unresolved function, hence we have to use a mutex
 	file.loader.lock();
