@@ -17,12 +17,12 @@
 #include "loader.hpp"
 #include "object.hpp"
 #include "log.hpp"
+#include "ostream.hpp"
 
 int main(int argc, char* argv[]) {
 	struct Opts {
 		int loglevel{Log::DEBUG};
 		const char * logfile{};
-		int logsize{};
 		std::vector<const char *> libpath{};
 		const char * libpathconf{"libpath.conf"};
 		std::vector<const char *> preload{};
@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
 
 	auto args = ArgParser<Opts>({
 			/* short & long name,  argument, element            required, help text,  optional validation function */
-			{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug)", [](const std::string & str) -> bool { int level = std::stoi(str); return level >= Log::NONE && level <= Log::TRACE; }},
+			{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug)", [](const char * str) -> bool { int l = 0; return Utils::parse(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
 			{'f',  "logfile",      "FILE",  &Opts::logfile,       false, "Log to file" },
 			{'p',  "library-path", "DIR",   &Opts::libpath,       false, "Add library search path (this parameter may be used multiple times to specify additional directories)" },
 			{'c',  "library-conf", "FILE",  &Opts::libpathconf,   false, "library path configuration" },
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
 		LOG_ERROR << endl << "Parsing Arguments failed -- run " << endl << "   " << argv[0] << " --help" << endl << "for more information!" << endl;
 		return EXIT_FAILURE;
 	} else if (args.showHelp) {
-		//args.help(std::cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "target args");
+		args.help(cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "target args");
 		return EXIT_SUCCESS;
 	}
 

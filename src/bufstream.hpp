@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <vector>
 
 class BufferStream {
  protected:
@@ -41,6 +42,20 @@ class BufferStream {
 	 * (only for derived classes, has no effect in BufferStream)
 	 */
 	virtual void flush() {};
+
+	/*! \brief Write string (including all characters, even `\0`) into buffer
+	 * \param string pointer to string with at least `n` bytes
+	 * \param n number of bytes to copy from string into buffer
+	 * \return Reference to BufferStream os; allows operator chaining.
+	 */
+	BufferStream& write(const char* string, size_t size);
+
+	/*! \brief Write padding character multiple times into buffer
+	 * \param c padding character
+	 * \param n number of times the character should be written into buffer
+	 * \return Reference to BufferStream os; allows operator chaining.
+	 */
+	BufferStream& write(char c, size_t num);
 
 	/*! \brief Print a single character
 	 *
@@ -114,6 +129,21 @@ class BufferStream {
 	 *  \return Reference to BufferStream os; allows operator chaining.
 	 */
 	BufferStream& operator<<(BufferStream& (*f) (BufferStream&));
+
+
+	template<typename T>
+	BufferStream& operator<<(std::vector<T> & val) {
+		*this << "{ ";
+		bool p = false;
+		for (const auto & v : val) {
+			if (p)
+				*this << ", ";
+			else
+				p = true;
+			*this << v;
+		}
+		return *this << '}';
+	}
 };
 
 /*! \brief Enforces a buffer flush.

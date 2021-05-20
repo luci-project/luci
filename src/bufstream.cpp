@@ -9,6 +9,26 @@ const char * BufferStream::str() {
 	return bufptr;
 }
 
+BufferStream& BufferStream::write(const char* string, size_t n) {
+	for (size_t i = 0; i < n; i++)
+		if (pos + 1 < len) {
+			bufptr[pos++] = string[i];
+			if (pos + 1 == len)
+				flush();
+		}
+	return *this;
+}
+
+BufferStream& BufferStream::write(char c, size_t n) {
+	for (size_t i = 0; i < n; i++)
+		if (pos + 1 < len) {
+			bufptr[pos++] = c;
+			if (pos + 1 == len)
+				flush();
+		}
+	return *this;
+}
+
 // Print a single character (trivial)
 BufferStream& BufferStream::operator<<(char c) {
 	if (pos + 1 < len)

@@ -24,7 +24,7 @@ class OutputStream : public BufferStream {
 	virtual void flush() override {
 		size_t len = 0;
 		while (len < pos) {
-			ssize_t r = write(fd, buffer + len, pos - len);
+			ssize_t r = ::write(fd, buffer + len, pos - len);
 			if (r < 0)
 				break;
 			else

@@ -1,88 +1,15 @@
 #pragma once
 
 #include <functional>
-#include <string>
-#include <sstream>
-#include <ostream>
 #include <variant>
 #include <vector>
 
+#include "utils.hpp"
 #include "generic.hpp"
-
-namespace ArgElement {
-
-template<typename T>
-bool parse(T & element, const char * value) {
-	std::stringstream s;
-	s << value;
-	s >> element;
-	return s.eof();
-}
-
-template<>
-bool parse(const char * & element, const char * value) {
-	element = value;
-	return true;
-}
-
-template<>
-bool parse(bool & element, const char * value) {
-	element = (*value != '\0' && *value != '0');
-	return true;
-}
-
-template<typename T>
-bool parse(std::vector<T> & element, const char * value) {
-	T tmp;
-	parse<T>(tmp, value);
-	element.push_back(tmp);
-	return true;
-}
-
-template<typename T>
-std::string stringify(T & element) {
-	std::stringstream s;
-	s << element;
-	return s.str();
-}
-
-template<typename T>
-std::string stringify(std::vector<T> & element) {
-	std::stringstream s;
-	s << '{';
-	bool p = false;
-	for (const auto & e : element) {
-		if (p)
-			s << ',';
-		else
-			p = true;
-		s << e;
-	}
-	s << '}';
-	return s.str();
-}
-
-template<typename T>
-bool is_default(T & element) {
-	T x{};
-	return x == element;
-}
-
-template<typename T>
-bool multiple(T & element) {
-	return false;
-}
-
-template<typename T>
-bool multiple(std::vector<T> & element) {
-	return true;
-}
-
-}  // namespace ArgElement
 
 template <class Opts>
 struct ArgParser : Opts {
-	typedef std::variant<std::string Opts::*, const char * Opts::*, int Opts::*, bool Opts::*, std::vector<std::string> Opts::*, std::vector<const char *> Opts::*, std::vector<int> Opts::*> element_t;
+	typedef std::variant<const char * Opts::*, int Opts::*, unsigned Opts::*, long long Opts::*, unsigned long long Opts::*, bool Opts::*, std::vector<const char *> Opts::*, std::vector<int> Opts::*, std::vector<unsigned> Opts::*, std::vector<long long> Opts::*, std::vector<unsigned long long> Opts::*> element_t;
 
 	using Parameter = struct {
 		const char name_short;
@@ -100,11 +27,8 @@ struct ArgParser : Opts {
 			       || (name_long != nullptr && name[1] == '-' && strcmp(name + 2, name_long) == 0));
 		}
 
-		bool parse() {
-			return false;
-		}
-
-		void help(std::ostream & out, std::string def = {}, size_t max_len = 70) {
+		template<typename T>
+		void help(BufferStream & out, T* def = nullptr, size_t max_len = 70) {
 			size_t pos = 0;
 			auto text = [this, &out, max_len, &pos, &def](size_t len) -> bool {
 				size_t l = 0;
@@ -113,26 +37,26 @@ struct ArgParser : Opts {
 					pos++;
 				for (size_t i = 0; i < max_len; i++)
 					if (help_text[pos + i] == '\0') {
-						e = def.empty();
+						e = def == nullptr;
 						l = i;
 						break;
 					} else if (help_text[pos + i] == ' ') {
 						l = i;
 					}
-				const char space[] = "                        ";
+				size_t spacer = 25;
 				if (l > 0) {
-					if (len < sizeof(space))
-						out.write(space, sizeof(space) - len);
+					if (len < spacer)
+						out.write(' ', spacer - len);
 					out.write(help_text + pos, l);
 					pos += l;
-				} else if (!def.empty()) {
-					if (len < sizeof(space))
-						out.write(space, sizeof(space) - len);
-					out << "(default: " << def << ")" << std::endl;
-					def = "";
+				} else if (def != nullptr) {
+					if (len < spacer)
+						out.write(' ', spacer - len);
+					out << "(default: " << *def << ")" << endl;
+					def = nullptr;
 				}
 				if (l > 0 || len > 0)
-					out << std::endl;
+					out << endl;
 				return e;
 			};
 
@@ -156,7 +80,7 @@ struct ArgParser : Opts {
 			}
 			while (!text(0)) {}
 
-			out << std::endl;
+			out << endl;
 		}
 	};
 
@@ -173,16 +97,9 @@ struct ArgParser : Opts {
 
 	bool set(const Parameter & arg, const char * value) {
 		return visit([this, arg, value](auto&& element) -> bool {
-			return arg.validate && !arg.validate(value) ? false : ArgElement::parse(this->*element, value);
+			return arg.validate && !arg.validate(value) ? false : Utils::parse(this->*element, value);
 		}, arg.element);
 	}
-
-	std::string get(const Parameter & arg) {
-		return visit([this](auto&& element) -> std::string {
-			return ArgElement::stringify(this->*element);
-		}, arg.element);
-	}
-
 
  public:
 	ArgParser(const std::initializer_list<Parameter> & list, std::function<bool(const char *)> validate_positional, std::function<bool(const char *)> validate_terminal) : validate_positional(validate_positional), validate_terminal(validate_terminal) {
@@ -223,14 +140,16 @@ struct ArgParser : Opts {
 
 	~ArgParser() = default;
 
-	void help(std::ostream & out, const char * header, const char * file, const char * footer, const char * positional = nullptr, const char * terminal = nullptr) {
+	void help(BufferStream & out, const char * header, const char * file, const char * footer, const char * positional = nullptr, const char * terminal = nullptr) {
 		// Usage line
 		if (header != nullptr)
-			out << std::endl << header << std::endl;
-		out << std::endl << " Usage: " << std::endl << '\t' << file;
+			out << endl << header << endl;
+		out << endl << " Usage: " << endl << "    " << file;
 
 		bool hasRequired = false;
 		bool hasOptional = false;
+		size_t flen = 4 + strlen(file);
+		int i = 0;
 		for (auto arg : args) {
 			if (arg.required) {
 				if (arg.name_long != nullptr)
@@ -250,32 +169,36 @@ struct ArgParser : Opts {
 				out << "]";
 				hasOptional = true;
 			}
+			if (++i == 4) {
+				out << endl;
+				out.write(' ', flen);
+			}
 		}
 		if (positional != nullptr)
 			out << " " << positional;
 		if (terminal != nullptr)
 			out << " -- " << terminal;
-		out << std::endl;
+		out << endl;
 
 		// Parameter details
 		if (hasRequired) {
-			out << std::endl << " Required parameters:" << std::endl;
+			out << endl << " Required parameters:" << endl;
 			for (auto arg : args)
 				if (arg.required)
-					arg.help(out);
+					arg.help(out, (void**)nullptr);
 		}
 
 		if (hasOptional) {
-			out << std::endl << " Optional parameters:" << std::endl;
+			out << endl << " Optional parameters:" << endl;
 			for (auto arg : args)
 				if (!arg.required)
-					arg.help(out, visit([this](auto&& element) -> bool { return ArgElement::is_default(this->*element); }, arg.element) ? "" : get(arg));
+					visit([&arg, &out, this](auto&& element) { arg.help(out, Utils::is_default(this->*element) ? nullptr : &(this->*element)); }, arg.element);
 		}
 
 		if (footer != nullptr)
-			out << std::endl << footer << std::endl;
+			out << endl << footer << endl;
 
-		out << std::endl;
+		out << endl;
 	}
 
 	bool parse(int argc, char* argv[]) {
@@ -305,7 +228,7 @@ struct ArgParser : Opts {
 						bool valid;
 						if (std::holds_alternative<bool Opts::*>(arg.element)) {
 							valid = visit([this](auto&& element) -> bool {
-								return ArgElement::parse(this->*element, "1");
+								return Utils::parse(this->*element, "1");
 							}, arg.element);
 						} else {
 							const char * next = idx < argc - 1 ? argv[idx + 1] : nullptr;
@@ -326,7 +249,7 @@ struct ArgParser : Opts {
 						}
 						if (!valid) {
 							error = true;
-						} else if (arg.present && !visit([this](auto&& element) -> bool { return ArgElement::multiple(this->*element); }, arg.element)) {
+						} else if (arg.present && !visit([this](auto&& element) -> bool { return Utils::is_vector(this->*element); }, arg.element)) {
 							LOG_ERROR << "Parameter " << current << " occured multiple times (= reassigned)!" << endl;
 							error = true;
 						} else {
@@ -402,13 +325,6 @@ struct ArgParser : Opts {
 			if (element == arg.element)
 				return set(arg, value);
 		return false;
-	}
-
-	std::string get(element_t element) {
-		for (auto & arg : args)
-			if (element == arg.element)
-				return get(arg);
-		return "";
 	}
 
 	Opts get_all() {

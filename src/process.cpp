@@ -135,20 +135,20 @@ void Process::start(uintptr_t entry) {
 
 void Process::dump(int argc, const char **argv, const char ** envp) {
 	long * argcp  = reinterpret_cast<long*>(argv) - 1;
-	std::cout << argcp << ": argc = " << *argcp << std::endl;
+	cout << argcp << ": argc = " << *argcp << endl;
 
 	for (int i = 0 ; i < argc; i++)
-		std::cout << argv + i << ": argv[" << i << "] = " << (void*)argv[i] << " (" << argv[i] << ")" << std::endl;
-	std::cout << argv + argc << ": argv[" << argc << "] = " << (void*)argv[argc] << std::endl;
+		cout << argv + i << ": argv[" << i << "] = " << (void*)argv[i] << " (" << argv[i] << ")" << endl;
+	cout << argv + argc << ": argv[" << argc << "] = " << (void*)argv[argc] << endl;
 
 	int envc;
 	for (envc = 0 ; envp[envc] != NULL; envc++)
-		std::cout << envp + envc << ": envp[" << envc << "] = " << (void*)envp[envc] << " (" << envp[envc] << ")" << std::endl;
-	std::cout << envp + envc << ": envp[" << envc << "] = " << (void*)envp[envc] << std::endl;
+		cout << envp + envc << ": envp[" << envc << "] = " << (void*)envp[envc] << " (" << envp[envc] << ")" << endl;
+	cout << envp + envc << ": envp[" << envc << "] = " << (void*)envp[envc] << endl;
 
 	Auxiliary * auxv = reinterpret_cast<Auxiliary *>(envp + envc + 1);
 	int auxc;
 	for (auxc = 0 ; auxv[auxc].a_type != Auxiliary::AT_NULL; auxc++)
-		std::cout <<  auxv + auxc << ": auxv[" << auxc << "] = " <<  auxv[auxc].a_type << ": " << auxv[auxc].a_un.a_val << std::endl;
-	std::cout <<  auxv + auxc << ": auxv[" << auxc << "] = " <<  auxv[auxc].a_type << ": " << auxv[auxc].a_un.a_val << std::endl;
+		cout <<  auxv + auxc << ": auxv[" << auxc << "] = " <<  auxv[auxc].a_type << ": " << auxv[auxc].a_un.a_val << endl;
+	cout <<  auxv + auxc << ": auxv[" << auxc << "] = " <<  auxv[auxc].a_type << ": " << auxv[auxc].a_un.a_val << endl;
 }

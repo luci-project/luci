@@ -1,8 +1,5 @@
 #include "object.hpp"
 
-#include <fstream>
-#include <iostream>
-
 #include "auxiliary.hpp"
 #include "loader.hpp"
 #include "object_dyn.hpp"
