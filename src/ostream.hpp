@@ -3,18 +3,16 @@
 #include <cstddef>
 #include <unistd.h>
 
-#include "bufstream.hpp"
+#include "strstream.hpp"
 
 template<size_t BUFFERSZ>
-class OutputStream : public BufferStream {
+class OutputStream : public StringStream<BUFFERSZ> {
  protected:
-	char buffer[BUFFERSZ];
-
 	int fd;
 
  public:
 	/*! \brief Default constructor  */
-	explicit OutputStream(int fd) : BufferStream(buffer, BUFFERSZ), fd(fd) {}
+	explicit OutputStream(int fd) : fd(fd) {}
 
 	/*! \brief Destructor */
 	virtual ~OutputStream() {}
@@ -22,15 +20,15 @@ class OutputStream : public BufferStream {
 	/*! \brief Flush the buffer.
 	 */
 	virtual void flush() override {
-		size_t len = 0;
-		while (len < pos) {
-			ssize_t r = ::write(fd, buffer + len, pos - len);
+		size_t l = 0;
+		while (l < this->pos) {
+			ssize_t r = ::write(fd, this->bufptr + l, this->pos - l);
 			if (r < 0)
 				break;
 			else
-				len += r;
+				l += r;
 		}
-		pos = 0;
+		this->pos = 0;
 	}
 
 };

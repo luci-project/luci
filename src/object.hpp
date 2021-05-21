@@ -9,6 +9,7 @@
 #include <climits>
 
 #include "elf.hpp"
+#include "ostream.hpp"
 #include "bean.hpp"
 
 #include "strptr.hpp"

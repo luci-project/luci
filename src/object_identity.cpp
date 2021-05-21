@@ -136,11 +136,13 @@ Object * ObjectIdentity::open(void * ptr, bool preload) {
 		int dupfd = -1;
 		void * dupptr = nullptr;
 
+
+		StringStream<NAME_MAX + 1> memnamestr;
+		memnamestr << name.str << '.' << hex << data.hash;
+		const char * memname = memnamestr.str();
+
 		errno = 0;
-		char memname[NAME_MAX + 1];
-		if (snprintf(memname, NAME_MAX + 1, "%s.%lx", name.str, data.hash) < 0) {
-			LOG_ERROR << "Creating name for memory file " << name << " (hash " << data.hash << ") failed: " << strerror(errno) << endl;
-		} else if ((dupfd = memfd_create(memname, MFD_CLOEXEC | MFD_ALLOW_SEALING)) == -1) {
+		if ((dupfd = memfd_create(memname, MFD_CLOEXEC | MFD_ALLOW_SEALING)) == -1) {
 			LOG_ERROR << "Creating memory file " << memname << " failed: " << strerror(errno) << endl;
 		} else if (ftruncate(dupfd, data.size) == -1) {
 			LOG_ERROR << "Setting size of " << memname << " failed: " << strerror(errno) << endl;
@@ -284,11 +286,12 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns
 
 	// Create shared memory for data
 	errno = 0;
-	char shared_data[name.len + 6];
-	if (snprintf(shared_data, NAME_MAX + 1, "%s.DATA", name.str) < 0) {
-		LOG_ERROR << "Creating name for shared data memory file of " << name << " failed: " << strerror(errno) << endl;
-	} else if ((memfd = memfd_create(shared_data, MFD_CLOEXEC)) == -1) {
-		LOG_ERROR << "Creating memory file " << (const char *)(shared_data) << " failed: " << strerror(errno) << endl;
+	StringStream<NAME_MAX + 1> shdatastr;
+	shdatastr << name.str << ".DATA";
+	const char * shdata = shdatastr.str();
+
+	if ((memfd = memfd_create(shdata, MFD_CLOEXEC)) == -1) {
+		LOG_ERROR << "Creating memory file " << shdata << " failed: " << strerror(errno) << endl;
 	}
 }
 

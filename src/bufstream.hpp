@@ -3,7 +3,50 @@
 #include <cstddef>
 #include <vector>
 
+/*! \brief Sets the base for numbers
+ * Shortcut functions are `bin`, `oct`, `dec` and `hex`
+ */
+struct setbase {
+	unsigned base;
+	setbase(unsigned base) : base(base) {}
+};
+
+/*! \brief Sets the field width to be used on output operations.
+ * \note use zero to disable field width (no padding)
+ */
+struct setw {
+	size_t n;
+	setw(size_t n = 0) : n(n) {}
+};
+
+/*! \brief Sets the fill character
+ */
+struct setfill {
+	const char c;
+	setfill(char c) : c(c) {}
+};
+
+
+/*! \brief BufferStream class */
 class BufferStream {
+	/*! \brief Number system used for printing integral numbers (one of 2,
+	 *  8, 10, or 16)
+	 */
+	unsigned base;
+
+	/*! \brief Field width for next input */
+	size_t width;
+
+	/*! \brief Fill character */
+	char fill;
+
+	/*! \brief Helper to write a string with fill characters (if necessary) */
+	BufferStream& writefill(const char* string, size_t n);
+
+	/*! \brief Helper to write an unsigned number with fill characters (if necessary) */
+	BufferStream& writefill(unsigned long long ival, bool minus = false);
+
+
  protected:
 	/*! \brief Buffer */
 	char * bufptr;
@@ -14,21 +57,9 @@ class BufferStream {
 	/*! \brief Current position of buffer */
 	size_t pos;
 
- private:
-	friend BufferStream& bin(BufferStream& os);
-	friend BufferStream& oct(BufferStream& os);
-	friend BufferStream& dec(BufferStream& os);
-	friend BufferStream& hex(BufferStream& os);
-
-	/*! \brief Number system used for printing integral numbers (one of 2,
-	 *  8, 10, or 16)
-	 */
-	int base;
-
-
  public:
 	/*! \brief Default constructor. Initial number system is decimal. */
-	BufferStream(char * buffer, size_t len) : bufptr(buffer), len(len), pos(0), base(10) {
+	BufferStream(char * buffer, size_t len) : base(10), fill(' '), bufptr(buffer), len(len), pos(0) {
 		buffer[len - 1] = '\0';
 	}
 
@@ -69,7 +100,9 @@ class BufferStream {
 	 *  \param c Character to be printed
 	 *  \return Reference to BufferStream os; allows operator chaining.
 	 */
-	BufferStream& operator<<(unsigned char c);
+	BufferStream& operator<<(unsigned char c) {
+		return *this << static_cast<char>(c);
+	}
 
 	/*! \brief Printing a null-terminated string
 	 *
@@ -83,35 +116,56 @@ class BufferStream {
 	 *  \param b Boolean to be printed
 	 *  \return Reference to BufferStream os; allows operator chaining.
 	 */
-	BufferStream& operator<<(bool b);
+	BufferStream& operator<<(bool b) {
+		return b ? writefill("true", 4) : writefill("false", 5);
+	}
 
 	/*! \brief Print an integral number in radix base
 	 *
 	 *  \param ival Number to be printed
 	 *  \return Reference to BufferStream os; allows operator chaining.
 	 */
-	BufferStream& operator<<(short ival);
+	BufferStream& operator<<(short ival) {
+		return *this << static_cast<long long>(ival);
+	}
 
 	/// \copydoc BufferStream::operator<<(short)
-	BufferStream& operator<<(unsigned short ival);
+	BufferStream& operator<<(unsigned short ival) {
+		return *this << static_cast<unsigned long long>(ival);
+	}
 
 	/// \copydoc BufferStream::operator<<(short)
-	BufferStream& operator<<(int ival);
+	BufferStream& operator<<(int ival) {
+		return *this << static_cast<long long>(ival);
+	}
 
 	/// \copydoc BufferStream::operator<<(short)
-	BufferStream& operator<<(unsigned int ival);
+	BufferStream& operator<<(unsigned int ival) {
+		return *this << static_cast<unsigned long long>(ival);
+	}
 
 	/// \copydoc BufferStream::operator<<(short)
-	BufferStream& operator<<(long ival);
+	BufferStream& operator<<(long ival) {
+		return *this << static_cast<long long>(ival);
+	}
 
 	/// \copydoc BufferStream::operator<<(short)
-	BufferStream& operator<<(unsigned long ival);
+	BufferStream& operator<<(unsigned long ival) {
+		return *this << static_cast<unsigned long long>(ival);
+	}
 
 	/// \copydoc BufferStream::operator<<(short)
-	BufferStream& operator<<(long long ival);
+	BufferStream& operator<<(long long ival) {
+		if ((ival < 0) && (base == 10))
+			return writefill(static_cast<unsigned long long>(-ival), true);
+		else
+			return writefill(static_cast<unsigned long long>(ival), false);
+	}
 
 	/// \copydoc BufferStream::operator<<(short)
-	BufferStream& operator<<(unsigned long long ival);
+	BufferStream& operator<<(unsigned long long ival) {
+		return writefill(static_cast<unsigned long long>(ival), false);
+	}
 
 	/*! \brief Print a pointer as hexadecimal number
 	 *
@@ -120,17 +174,11 @@ class BufferStream {
 	 */
 	BufferStream& operator<<(const void* ptr);
 
-	/*! \brief Calls one of the manipulator functions.
+	/*! \brief Print contents of a vector
 	 *
-	 *  Method that calls the manipulator functions defined below, which
-	 *  allow modifying the stream's behavior by, for instance, changing the
-	 *  number system.
-	 *  \param f Manipulator function to be called
+	 *  \param val Vector to be printed
 	 *  \return Reference to BufferStream os; allows operator chaining.
 	 */
-	BufferStream& operator<<(BufferStream& (*f) (BufferStream&));
-
-
 	template<typename T>
 	BufferStream& operator<<(std::vector<T> & val) {
 		*this << "{ ";
@@ -144,41 +192,90 @@ class BufferStream {
 		}
 		return *this << '}';
 	}
+
+	/*! \brief Calls one of the manipulator functions.
+	 *
+	 *  Method that calls the manipulator functions defined below, which
+	 *  allow modifying the stream's behavior by, for instance, changing the
+	 *  number system.
+	 *  \param f Manipulator function to be called
+	 *  \return Reference to BufferStream os; allows operator chaining.
+	 */
+	BufferStream& operator<<(BufferStream& (*f) (BufferStream&)) {
+		return f(*this);
+	}
+
+	/*! \brief Base manipulator
+	 *  \param val Manipulator object to be used
+	 *  \return Reference to BufferStream os; allows operator chaining.
+	 */
+	BufferStream& operator<<(const setbase & val);
+
+	/*! \brief Field width manipulator
+	 *  \param val Manipulator object to be used
+	 *  \return Reference to BufferStream os; allows operator chaining.
+	 */
+	BufferStream& operator<<(const setw & val) {
+		this->width = val.n;
+		return *this;
+	}
+
+	/*! \brief Padding character manipulator
+	 *  \param val Manipulator object to be used
+	 *  \return Reference to BufferStream os; allows operator chaining.
+	 */
+	BufferStream& operator<<(const setfill & val) {
+		this->fill = val.c;
+		return *this;
+	}
+
 };
 
 /*! \brief Enforces a buffer flush.
  *  \param os Reference to stream to be flushed.
  *  \return Reference to BufferStream os; allows operator chaining.
  */
-BufferStream& flush(BufferStream& os);
-
+inline BufferStream& flush(BufferStream& os) {
+	os.flush();
+	return os;
+}
 
 /*! \brief Prints a newline character to the stream and issues a buffer flush.
  *  \param os Reference to stream to be modified.
  *  \return Reference to BufferStream os; allows operator chaining.
  */
-BufferStream& endl(BufferStream& os);
+inline BufferStream& endl(BufferStream& os) {
+		return os << '\n' << flush;
+}
 
 /*! \brief Print subsequent numbers in binary form.
  *  \param os Reference to stream to be modified.
  *  \return Reference to BufferStream os; allows operator chaining.
  */
-BufferStream& bin(BufferStream& os);
+inline BufferStream& bin(BufferStream& os) {
+	return os << setbase(2);
+}
 
 /*! \brief Print subsequent numbers in octal form.
  *  \param os Reference to stream to be modified.
  *  \return Reference to BufferStream os; allows operator chaining.
  */
-BufferStream& oct(BufferStream& os);
+inline BufferStream& oct(BufferStream& os) {
+	return os << setbase(8);
+}
 
 /*! \brief Print subsequent numbers in decimal form.
  *  \param os Reference to stream to be modified.
  *  \return Reference to BufferStream os; allows operator chaining.
  */
-BufferStream& dec(BufferStream& os);
+inline BufferStream& dec(BufferStream& os) {
+	return os << setbase(10);
+}
 
 /*! \brief Print subsequent numbers in hex form.
  *  \param os Reference to stream to be modified.
  *  \return Reference to BufferStream os; allows operator chaining.
  */
-BufferStream& hex(BufferStream& os);
+inline BufferStream& hex(BufferStream& os) {
+	return os << setbase(16);
+}
