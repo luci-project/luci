@@ -40,6 +40,15 @@ class BufferStream {
 	/*! \brief Fill character */
 	char fill;
 
+	/*! \brief Upper or lowercase hex character */
+	char hexchar;
+
+	/*! Print base prefix */
+	bool prefix;
+
+	/*! Show sign for numbers (base 10) */
+	enum { MINUS_ONLY, PLUS, SPACE } sign;
+
 	/*! \brief Helper to write a string with fill characters (if necessary) */
 	BufferStream& writefill(const char* string, size_t n);
 
@@ -59,7 +68,8 @@ class BufferStream {
 
  public:
 	/*! \brief Default constructor. Initial number system is decimal. */
-	BufferStream(char * buffer, size_t len) : base(10), fill(' '), bufptr(buffer), len(len), pos(0) {
+	BufferStream(char * buffer, size_t len) : bufptr(buffer), len(len), pos(0) {
+		reset();
 		buffer[len - 1] = '\0';
 	}
 
@@ -73,6 +83,16 @@ class BufferStream {
 	 * (only for derived classes, has no effect in BufferStream)
 	 */
 	virtual void flush() {};
+
+	/*! \brief Reset modifiers */
+	void reset() {
+		base = 10;
+		width = 0;
+		fill = ' ';
+		hexchar = 'a';
+		prefix = true;
+		sign = MINUS_ONLY;
+	}
 
 	/*! \brief Write string (including all characters, even `\0`) into buffer
 	 * \param string pointer to string with at least `n` bytes
@@ -229,6 +249,13 @@ class BufferStream {
 		return *this;
 	}
 
+	/*! \brief Write format string
+	 * \note Supports only a subset of printf format string
+	 * \param format Format string
+	 * \param args Arguments
+	 * \return Bytes written
+	 */
+	size_t format(const char * format, ...);
 };
 
 /*! \brief Enforces a buffer flush.
