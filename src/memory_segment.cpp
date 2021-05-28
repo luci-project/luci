@@ -1,11 +1,10 @@
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/mman.h>
-
 #include "memory_segment.hpp"
-#include "object.hpp"
+
+#include "libc/errno.hpp"
+#include "utils/log.hpp"
+
+#include "object/base.hpp"
 #include "loader.hpp"
-#include "generic.hpp"
 
 bool MemorySegment::map() {
 	void * mem = nullptr;

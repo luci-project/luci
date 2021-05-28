@@ -1,13 +1,11 @@
 #include "process.hpp"
 
-#include <cstring>
-#include <unistd.h>
-#include <sys/resource.h>
-#include <sys/mman.h>
+#include "libc/assert.hpp"
+#include "libc/unistd.hpp"
+#include "libc/string.hpp"
 
-#include <iterator>
+#include "utils/log.hpp"
 
-#include "generic.hpp"
 
 Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(stack_pointer), stack_size(stack_size) {
 	if (this->stack_size == 0) {

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <stdint.h>
-#include <sys/mman.h>
-
+#include "libc/assert.hpp"
+#include "libc/string.hpp"
+#include "libc/unistd.hpp"
 #include "elf.hpp"
 
 #include "page.hpp"

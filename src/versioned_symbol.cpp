@@ -1,7 +1,6 @@
 #include "versioned_symbol.hpp"
 
-#include "object.hpp"
-#include "generic.hpp"
+#include "object/base.hpp"
 
 VersionedSymbol::VersionedSymbol(const Elf::Symbol & sym, const char * version_name, bool version_weak)
  : Elf::Symbol(sym), version(version_name, version_weak) {

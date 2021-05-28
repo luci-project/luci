@@ -1,7 +1,6 @@
 #include "dl.hpp"
 
-#include "object.hpp"
-#include "generic.hpp"
+#include "object/base.hpp"
 
 extern "C" __attribute__((__used__)) void * dlresolve(const Object & o, size_t index) {
 	alignas(64) uint8_t buf[1024];

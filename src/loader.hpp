@@ -2,18 +2,17 @@
 
 #include <vector>
 #include <list>
-#include <unordered_map>
 #include <map>
 #include <optional>
 
 #include <pthread.h>
 
-#include "elf.hpp"
+#include "utils/mutex.hpp"
+
+#include "object/identity.hpp"
 
 #include "dl.hpp"
-#include "mutex.hpp"
 #include "versioned_symbol.hpp"
-#include "object_identity.hpp"
 
 struct Loader {
 	/*! \brief enable dynamic updates? */

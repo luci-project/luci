@@ -1,15 +1,15 @@
 #include "loader.hpp"
 
-#include <sys/inotify.h>
-
-#include <utility>
-
 #include "xxhash64.h"
 
+#include "libc/unistd.hpp"
+#include "libc/errno.hpp"
+#include "utils/auxiliary.hpp"
+#include "utils/file.hpp"
+#include "utils/log.hpp"
+
+#include "object/base.hpp"
 #include "process.hpp"
-#include "object.hpp"
-#include "generic.hpp"
-#include "utils.hpp"
 
 void * observer_kickoff(void * ptr) {
 	reinterpret_cast<Loader *>(ptr)->observer();
@@ -32,7 +32,7 @@ Loader::Loader(const char * path, bool dynamicUpdate) : dynamic_update(dynamicUp
 	}
 
 	// Add vDSO (if available)
-	auto vdso = Utils::aux(Auxiliary::AT_SYSINFO_EHDR);
+	auto vdso = Auxiliary::vector(Auxiliary::AT_SYSINFO_EHDR);
 	if (vdso.valid())
 		open(vdso.a_un.a_ptr, true, true);
 
@@ -129,7 +129,7 @@ ObjectIdentity * Loader::open(const char * filename, const char * directory, DL:
 
 ObjectIdentity * Loader::open(const char * filepath, DL::Lmid_t ns) {
 	// Does file contain a valid full path?
-	if (access(filepath, F_OK ) == 0) {
+	if (File::exists(filepath)) {
 		if (ns == DL::LM_ID_NEWLN)
 			ns = get_new_ns();
 

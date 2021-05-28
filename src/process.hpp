@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "auxiliary.hpp"
+#include "utils/auxiliary.hpp"
 
 class Process {
 	/*! \brief argument count

@@ -12,3 +12,5 @@ Implementation
 The standard libraries (neither libc nor libstdc++) are not used, as we need to take care of bootstrapping -- providing several caveats, just think of `errno` in conjunction with thread local storage (TLS)!
 A static libc build is not an option either, as it would contain its own TLS setup (which would interfer with our dynamic loading).
 Finally, we might include this in a kernel in the future (with has no standard libraries as well).
+
+For Linux, all required system call wrapper are embedded (copied from musl libc and glibc).

@@ -3,9 +3,10 @@
 #include <cstdarg>
 #include <capstone/capstone.h>
 
-#include "ostream.hpp"
-#include "bufstream.hpp"
-#include "alloc.hpp"
+#include "libc/alloc.hpp"
+
+#include "utils/stream/output.hpp"
+#include "utils/stream/buffer.hpp"
 
 int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 	return BufferStream(str, size).format(format, ap);

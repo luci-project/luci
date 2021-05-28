@@ -1,23 +1,22 @@
 // Copyright 2020, Bernhard Heinloth
 // SPDX-License-Identifier: AGPL-3.0-only
 
-#include <cstring>
-#include <cassert>
-#include <sys/stat.h>
-#include <inttypes.h>
-#include <unistd.h>
-
 #include <set>
 #include <map>
 #include <vector>
 #include <unordered_map>
 
-#include "argparser.hpp"
-#include "utils.hpp"
+#include "utils/parser/arguments.hpp"
+#include "utils/stream/output.hpp"
+#include "utils/auxiliary.hpp"
+#include "utils/environ.hpp"
+#include "utils/file.hpp"
+#include "utils/log.hpp"
+#include "utils/string.hpp"
+
+#include "object/base.hpp"
+
 #include "loader.hpp"
-#include "object.hpp"
-#include "log.hpp"
-#include "ostream.hpp"
 #include "init.hpp"
 
 int main(int argc, char* argv[]) {
@@ -36,9 +35,9 @@ int main(int argc, char* argv[]) {
 		bool showHelp{};
 	};
 
-	auto args = ArgParser<Opts>({
+	auto args = Parser::Arguments<Opts>({
 			/* short & long name,  argument, element            required, help text,  optional validation function */
-			{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug)", [](const char * str) -> bool { int l = 0; return Parse::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
+			{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug)", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
 			{'f',  "logfile",      "FILE",  &Opts::logfile,       false, "Log to file" },
 			{'p',  "library-path", "DIR",   &Opts::libpath,       false, "Add library search path (this parameter may be used multiple times to specify additional directories)" },
 			{'c',  "library-conf", "FILE",  &Opts::libpathconf,   false, "library path configuration" },
@@ -46,7 +45,7 @@ int main(int argc, char* argv[]) {
 			{'d',  "dynamic",      nullptr, &Opts::dynamicUpdate, false, "Enable dynamic updates" },
 			{'h',  "help",         nullptr, &Opts::showHelp,      false, "Show this help" }
 		},
-		[](const char * str) -> bool { return ::access(str, X_OK ) == 0; },
+		File::executable,
 		[](const char *) -> bool { return true; }
 	);
 
@@ -75,14 +74,14 @@ int main(int argc, char* argv[]) {
 		LOG_DEBUG << "Add '" << libpath << "' (from --library-path) to library search path..." << endl;
 		loader.library_path_runtime.push_back(libpath);
 	}
-	char * ld_library_path = Utils::env("LD_LIBRARY_PATH", true);
+	char * ld_library_path = Environ::variable("LD_LIBRARY_PATH", true);
 	if (ld_library_path != nullptr && *ld_library_path != '\0') {
 		LOG_DEBUG << "Add '" << ld_library_path<< "' (from LD_LIBRARY_PATH) to library search path..." << endl;
-		loader.library_path_runtime = Utils::split(ld_library_path, ';');
+		loader.library_path_runtime = String::split(ld_library_path, ';');
 	}
 
 	LOG_DEBUG << "Adding contents of '" << args.libpathconf << "' to library search path..." << endl;
-	loader.library_path_config = Utils::file_contents(args.libpathconf);
+	loader.library_path_config = File::contents(args.libpathconf);
 	LOG_DEBUG << "Config has " << loader.library_path_config.size() << " entries!" << endl;
 
 	// Preload Library
@@ -90,10 +89,10 @@ int main(int argc, char* argv[]) {
 		LOG_DEBUG << "Loading '" << preload << "' (from --preload)..." << endl;
 		loader.library(preload);
 	}
-	char * preload = Utils::env("LD_PRELOAD", true);
+	char * preload = Environ::variable("LD_PRELOAD", true);
 	if (preload != nullptr && *preload != '\0') {
 		LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)..." << endl;
-		for (auto & lib : Utils::split(preload, ';'))
+		for (auto & lib : String::split(preload, ';'))
 			loader.library(lib);
 	}
 

@@ -1,6 +1,6 @@
 VERBOSE = @
 
-INCLUDE = src elfo/include bean/include capstone/include xxhash plog/include
+INCLUDE = elfo/include bean/include capstone/include xxhash plog/include
 LIBCAPSTONE = capstone/libcapstone.a
 
 CXX = g++
@@ -10,10 +10,11 @@ CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -DVIRTUAL -DNOSTL -static-libgc
 BASEADDRESS = 0xbadc000
 
 BUILDDIR ?= .build
-CXX_SOURCES = $(wildcard src/*.cpp)
-CXX_OBJECTS = $(addprefix $(BUILDDIR)/,$(CXX_SOURCES:.cpp=.o))
-DEP_FILES = $(addprefix $(BUILDDIR)/,$(CXX_SOURCES:.cpp=.d) $(addsuffix .d,$(ASM_SOURCES)))
-CXXFLAGS += $(addprefix -I , $(INCLUDE))
+SOURCE_FOLDER = src
+CXX_SOURCES = $(shell find $(SOURCE_FOLDER)/ -name "*.cpp")
+CXX_OBJECTS = $(patsubst $(SOURCE_FOLDER)/%,$(BUILDDIR)/%,$(CXX_SOURCES:.cpp=.o))
+DEP_FILES = $(patsubst $(SOURCE_FOLDER)/%,$(BUILDDIR)/%,$(CXX_SOURCES:.cpp=.d))
+CXXFLAGS += $(addprefix -I , $(SOURCE_FOLDER) $(INCLUDE))
 LDFLAGS = -L . -lcapstone -Lcapstone -Wl,-Ttext-segment=$(BASEADDRESS)
 TARGET_BIN = luci
 LIBPATH_CONF = libpath.conf
@@ -24,12 +25,12 @@ all: $(TARGET_BIN) $(LIBPATH_CONF)
 $(TARGET_BIN): $(CXX_OBJECTS) $(LIBCAPSTONE)
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(CXX_OBJECTS) $(LDFLAGS)
 
-$(BUILDDIR)/%.d : %.cpp $(MAKEFILE_LIST)
+$(BUILDDIR)/%.d : $(SOURCE_FOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"
 	@mkdir -p $(@D)
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -MM -MT $(BUILDDIR)/$*.o -MF $@ $<
 
-$(BUILDDIR)/%.o : %.cpp $(MAKEFILE_LIST)
+$(BUILDDIR)/%.o : $(SOURCE_FOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "CXX		$<"
 	@mkdir -p $(@D)
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -c -o $@ $<

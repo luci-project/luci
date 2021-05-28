@@ -2,8 +2,10 @@
 
 #include <optional>
 
+#include "libc/assert.hpp"
+#include "libc/string.hpp"
 #include "elf.hpp"
-#include "bufstream.hpp"
+#include "utils/stream/buffer.hpp"
 
 struct Object;
 
