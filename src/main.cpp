@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
 
 	auto args = ArgParser<Opts>({
 			/* short & long name,  argument, element            required, help text,  optional validation function */
-			{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug)", [](const char * str) -> bool { int l = 0; return Utils::parse(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
+			{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug)", [](const char * str) -> bool { int l = 0; return Parse::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
 			{'f',  "logfile",      "FILE",  &Opts::logfile,       false, "Log to file" },
 			{'p',  "library-path", "DIR",   &Opts::libpath,       false, "Add library search path (this parameter may be used multiple times to specify additional directories)" },
 			{'c',  "library-conf", "FILE",  &Opts::libpathconf,   false, "library path configuration" },

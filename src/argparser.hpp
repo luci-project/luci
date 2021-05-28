@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "utils.hpp"
+#include "parse.hpp"
 #include "generic.hpp"
 
 template <class Opts>
@@ -35,101 +35,6 @@ struct ArgParser : Opts {
 			void * ptr;
 		} m;
 
-		static bool parse(unsigned long long & member, const char * value) {
-			for(member = 0; value != nullptr && *value != '\0'; value++)
-				if (*value >= '0' && *value <= '9') {
-					unsigned long long o = member;
-					member = member * 10 + *value - '0';
-					if (member < o)
-						return false;
-				} else if (*value != ' ' && *value != ',' && *value != '\'') {
-					return false;
-				}
-
-			return true;
-		}
-
-		static bool parse(long long & member, const char * value) {
-			if (value != nullptr) {
-				for (member = 1; *value != '\0'; value++)
-					if (*value == '-')  {
-						member = -1;
-					} else if (*value >= '0' && *value <= '9') {
-						break;
-					} else if (*value != ' ') {
-						return false;
-					}
-
-				unsigned long long v = 0;
-				bool r = parse(v, value);
-				member *= v;
-				return r;
-			} else {
-				member = 0;
-				return true;
-			}
-		}
-
-		static bool parse(unsigned long & var, const char * value) {
-			unsigned long long v = 0;
-			bool r = parse(v, value);
-			var = static_cast<unsigned long>(v);
-			return v > ULONG_MAX ? false : r ;
-		}
-
-		static bool parse(long & var, const char * value) {
-			long long v = 0;
-			bool r = parse(v, value);
-			var = static_cast<long>(v);
-			return v > LONG_MAX || v < LONG_MIN ? false : r ;
-		}
-
-		static bool parse(unsigned & member, const char * value) {
-			unsigned long long v = 0;
-			bool r = parse(v, value);
-			member = static_cast<unsigned>(v);
-			return v > UINT_MAX ? false : r ;
-		}
-
-		static bool parse(int & member, const char * value) {
-			long long v = 0;
-			bool r = parse(v, value);
-			member = static_cast<int>(v);
-			return v > INT_MAX || v < INT_MIN ? false : r ;
-		}
-
-		static bool parse(unsigned short & var, const char * value) {
-			unsigned long long v = 0;
-			bool r = parse(v, value);
-			var = static_cast<unsigned short>(v);
-			return v > USHRT_MAX ? false : r ;
-		}
-
-		static bool parse(short & var, const char * value) {
-			long long v = 0;
-			bool r = parse(v, value);
-			var = static_cast<short>(v);
-			return v > SHRT_MAX || v < SHRT_MIN ? false : r ;
-		}
-
-		static bool parse(bool & member, const char * value) {
-			member = (*value != '\0' && *value != '0');
-			return true;
-		}
-
-		static bool parse(const char * & member, const char * value) {
-			member = value;
-			return true;
-		}
-
-		template<typename T>
-		static bool parse(std::vector<T> & member, const char * value) {
-			T tmp;
-			bool r = parse(tmp, value);
-			member.push_back(tmp);
-			return r;
-		}
-
 	 public:
 		const bool is_vector;
 
@@ -159,24 +64,24 @@ struct ArgParser : Opts {
 
 		bool set(Opts * opts, const char * value) const {
 			switch (t) {
-				case M_STR:  return parse(opts->*(m.str), value);
-				case M_S:    return parse(opts->*(m.s), value);
-				case M_US:   return parse(opts->*(m.us), value);
-				case M_I:    return parse(opts->*(m.i), value);
-				case M_U:    return parse(opts->*(m.u), value);
-				case M_L:    return parse(opts->*(m.l), value);
-				case M_UL:   return parse(opts->*(m.ul), value);
-				case M_LL:   return parse(opts->*(m.ll), value);
-				case M_ULL:  return parse(opts->*(m.ull), value);
-				case M_B:    return parse(opts->*(m.b), value);
-				case M_VSTR: return parse(opts->*(m.vstr), value);
-				case M_VS:   return parse(opts->*(m.vs), value);
-				case M_VUS:  return parse(opts->*(m.vus), value);
-				case M_VI:   return parse(opts->*(m.vi), value);
-				case M_VU:   return parse(opts->*(m.vu), value);
-				case M_VL:   return parse(opts->*(m.vl), value);
-				case M_VUL:  return parse(opts->*(m.vul), value);
-				case M_VULL: return parse(opts->*(m.vull), value);
+				case M_STR:  return Parse::string(opts->*(m.str), value);
+				case M_S:    return Parse::string(opts->*(m.s), value);
+				case M_US:   return Parse::string(opts->*(m.us), value);
+				case M_I:    return Parse::string(opts->*(m.i), value);
+				case M_U:    return Parse::string(opts->*(m.u), value);
+				case M_L:    return Parse::string(opts->*(m.l), value);
+				case M_UL:   return Parse::string(opts->*(m.ul), value);
+				case M_LL:   return Parse::string(opts->*(m.ll), value);
+				case M_ULL:  return Parse::string(opts->*(m.ull), value);
+				case M_B:    return Parse::string(opts->*(m.b), value);
+				case M_VSTR: return Parse::string(opts->*(m.vstr), value);
+				case M_VS:   return Parse::string(opts->*(m.vs), value);
+				case M_VUS:  return Parse::string(opts->*(m.vus), value);
+				case M_VI:   return Parse::string(opts->*(m.vi), value);
+				case M_VU:   return Parse::string(opts->*(m.vu), value);
+				case M_VL:   return Parse::string(opts->*(m.vl), value);
+				case M_VUL:  return Parse::string(opts->*(m.vul), value);
+				case M_VULL: return Parse::string(opts->*(m.vull), value);
 				default:     return false;
 			}
 		}
