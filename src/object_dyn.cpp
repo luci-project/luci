@@ -8,9 +8,9 @@
 
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
 	// It is possible that multiple threads try to access an unresolved function, hence we have to use a mutex
-	file.loader.lock();
+	file.loader.mutex.lock();
 	auto r = relocate(dynamic_relocations_plt[index]);
-	file.loader.unlock();
+	file.loader.mutex.unlock();
 	return r;
 }
 

@@ -11,6 +11,7 @@
 #include "elf.hpp"
 
 #include "dl.hpp"
+#include "mutex.hpp"
 #include "versioned_symbol.hpp"
 #include "object_identity.hpp"
 
@@ -29,6 +30,9 @@ struct Loader {
 
 	/*! \brief List of all loaded objects (for symbol resolving) */
 	std::list<ObjectIdentity> lookup;
+
+	/*! \brief mutex*/
+	mutable Mutex mutex;
 
 	/*! \brief Constructor */
 	Loader(const char * path, bool dynamicUpdate = false);
@@ -57,22 +61,9 @@ struct Loader {
 	/*! \brief get next (page aligned) memory address */
 	uintptr_t next_address() const;
 
-	/*! \brief Aquire lock for accessing / modifing the data structures */
-	void lock() const {
-		pthread_mutex_lock(&mutex);
-	}
-
-	/*! \brief Unlock */
-	void unlock() const {
-		pthread_mutex_unlock(&mutex);
-	}
-
  private:
 	friend void * observer_kickoff(void * ptr);
 	friend struct ObjectIdentity;
-
-	/*! \brief mutex*/
-	mutable pthread_mutex_t mutex;
 
 	/*! \brief Descriptor for inotify */
 	int inotifyfd;

@@ -18,9 +18,6 @@ void * observer_kickoff(void * ptr) {
 
 Loader::Loader(const char * path, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {
 	errno = 0;
-	if (::pthread_mutex_init(&mutex, nullptr) != 0) {
-		LOG_ERROR << "Creating loader mutex failed: " << strerror(errno) << endl;
-	}
 
 	if (dynamic_update) {
 		if ((inotifyfd = ::inotify_init1(IN_CLOEXEC)) == -1) {
@@ -53,9 +50,6 @@ Loader::~Loader() {
 			LOG_INFO << "Destroyed observer background thread" << endl;
 		}
 	}
-	if (::pthread_mutex_destroy(&mutex) != 0) {
-		LOG_ERROR << "Destroying loader mutex failed: " << strerror(errno) << endl;
-	}
 
 	lookup.clear();
 }
@@ -81,7 +75,7 @@ void Loader::observer() {
 			ptr += sizeof(struct inotify_event) + event->len;
 
 			// Get Object
-			lock();
+			mutex.lock();
 			for (auto & object_file : lookup)
 				if (event->wd == object_file.wd) {
 					LOG_DEBUG << "Possible file modification in " << object_file.path << endl;
@@ -90,7 +84,7 @@ void Loader::observer() {
 						prepare();
 					break;
 				}
-			unlock();
+			mutex.unlock();
 		}
 	}
 	LOG_INFO << "Observer background thread ends." << endl;
