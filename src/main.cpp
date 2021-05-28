@@ -18,8 +18,14 @@
 #include "object.hpp"
 #include "log.hpp"
 #include "ostream.hpp"
+#include "init.hpp"
 
 int main(int argc, char* argv[]) {
+	// Initialize
+	if (!init())
+		return EXIT_FAILURE;
+
+	// Parse Arguments
 	struct Opts {
 		int loglevel{Log::DEBUG};
 		const char * logfile{};

@@ -5,7 +5,7 @@ LIBCAPSTONE = capstone/libcapstone.a
 
 CXX = g++
 #CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -Wall -static-libstdc++ -static-libgcc -static -Wno-comment -Og -g
-CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -DVIRTUAL -DNOSTL -Wall -Wno-comment -Og -g -pthread
+CXXFLAGS := -std=c++2a -fno-exceptions -fno-rtti -DVIRTUAL -DNOSTL -static-libgcc -Wall -Wno-nonnull-compare -Wno-comment -Og -g -pthread
 
 BASEADDRESS = 0xbadc000
 
@@ -40,7 +40,7 @@ $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
 $(LIBCAPSTONE):
 	@echo "BUILD		$<"
 	git submodule update --init
-	$(MAKE) CAPSTONE_DIET=yes CAPSTONE_ARCHS="x86" -C capstone -j 4
+	$(MAKE) CAPSTONE_USE_SYS_DYN_MEM=no CAPSTONE_DIET=yes CAPSTONE_ARCHS="x86" -C capstone -j 4
 
 clean:
 	@echo "RM		$(BUILDDIR)"
