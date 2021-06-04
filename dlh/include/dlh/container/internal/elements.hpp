@@ -20,6 +20,7 @@ class Elements {
 			} hash;
 			struct {
 				bool active;
+				int8_t balance;
 				uint32_t parent, left, right;
 			} tree;
 		};
