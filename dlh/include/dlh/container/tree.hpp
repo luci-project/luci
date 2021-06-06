@@ -28,21 +28,25 @@ class TreeSet : protected Elements<T> {
 		assert(r);
 	}
 
-/*
+
 	TreeSet(const Elements<T>& elements) : Elements<T>(elements) {
-		rehash();
+		for (size_t i = 1; i < Elements<T>::_next; i++)
+			if (Elements<T>::_node[i].tree.active)
+				insert(0, i, 0);
 	}
 
 	TreeSet(Elements<T>&& elements) : Elements<T>(move(elements)) {
-		rehash();
+		for (size_t i = 1; i < Elements<T>::_next; i++)
+			if (Elements<T>::_node[i].tree.active)
+				insert(0, i, 0);
 	}
-*/
+
 
 	/*! \brief Convert to balanced binary search tree
 	 * \return container Elements container
 	 */
-	template<typename C>
-	explicit TreeSet(const C& container) {
+	template<typename X>
+	explicit TreeSet(const X& container) {
 		for (const auto & c : container)
 			insert(c);
 	}
@@ -62,26 +66,27 @@ class TreeSet : protected Elements<T> {
 
 	 public:
 		Iterator& operator++() {
-			do {
-				i++;
-			} while (!ref._node[i].hash.active && i < ref._next);
-			return *this;
-		}
-
-		Iterator& operator--() {
-			do {
-				i--;
-			} while (!ref._node[i].hash.active && i > 1);
+			const uint32_t right = ref._node[i].tree.right;
+			if (right != 0) {
+				i = ref.min(right);
+			} else {
+				while(i != 0) {
+					const uint32_t old = i;
+					i = ref._node[old].tree.parent;
+					if (ref._node[i].tree.left == old)
+						break;
+				}
+			}
 			return *this;
 		}
 
 		T& operator*() {
-			assert(ref._node[i].hash.active);
+			assert(ref._node[i].tree.active);
 			return ref._node[i].data;
 		}
 
 		T* operator->() {
-			assert(ref._node[i].hash.active);
+			assert(ref._node[i].tree.active);
 			return &(ref._node[i].data);
 		}
 
@@ -102,7 +107,7 @@ class TreeSet : protected Elements<T> {
 		}
 
 		operator bool() const {
-			return i != ref._next;
+			return i != 0;
 		}
 	};
 
@@ -151,6 +156,41 @@ class TreeSet : protected Elements<T> {
 		}
 	}
 
+	/*! \brief Remove value from set
+	 * \param position iterator to element
+	 * \return removed value (if valid iterator)
+	 */
+	Optional<T> erase(const Iterator & position) {
+		assert(position.i >= 1);
+		if (position.i >= 1 && position.i < Elements<T>::_capacity && Elements<T>::_node[position.i].tree.active) {
+			auto & e = Elements<T>::_node[position.i].tree;
+
+			if (e.left != 0 && e.right != 0) {
+				uint32_t node = min(e.right);
+				erase(node);
+				replace_node(position.i, node, true);
+				e.active = false;
+			} else {
+				erase(position.i);
+			}
+
+			e.active = false;
+			Elements<T>::_count--;
+
+			return { Elements<T>::_node[position.i].data };
+		}
+		return {};
+	}
+
+	/*! \brief Remove value from set
+	 * \param value element to be removed
+	 * \return removed value (if found)
+	 */
+	Optional<T> erase(const T & value) {
+		return erase(find(value));
+	}
+
+
 	/*! \brief Get iterator to specific element
 	 * \param value element
 	 * \return iterator to element (if found) or `end()` (if not found)
@@ -193,19 +233,19 @@ class TreeSet : protected Elements<T> {
 		uint32_t i = _root;
 		while (i != 0) {
 			auto & e = Elements<T>::_node[i];
-			c = C.compare(e.data, value);
+			int c = C::compare(e.data, value);
 			if (c == 0) {
-				if (e.left != 0)
-					r = max(e.left);
+				if (e.tree.left != 0)
+					r = max(e.tree.left);
 				break;
 			} else if (c < 0) {
 				r = i;
-				i = e.right;
+				i = e.tree.right;
 			} else /* if (c > 0) */ {
-				i = e.left;
+				i = e.tree.left;
 			}
 		}
-		return { *this, r };
+		return Iterator(*this, r);
 	}
 
 	/*! \brief Get the greatest element in this set less than or equal to the given element
@@ -217,18 +257,18 @@ class TreeSet : protected Elements<T> {
 		uint32_t i = _root;
 		while (i != 0) {
 			auto & e = Elements<T>::_node[i];
-			c = C.compare(e.data, value);
+			int c = C::compare(e.data, value);
 			if (c == 0) {
 				r = i;
 				break;
 			} else if (c < 0) {
 				r = i;
-				i = e.right;
+				i = e.tree.right;
 			} else /* if (c > 0) */ {
-				i = e.left;
+				i = e.tree.left;
 			}
 		}
-		return { *this, r };
+		return Iterator(*this, r);
 	}
 
 	/*! \brief Get the smallest element in this set greater than or equal to the given element
@@ -240,18 +280,18 @@ class TreeSet : protected Elements<T> {
 		uint32_t i = _root;
 		while (i != 0) {
 			auto & e = Elements<T>::_node[i];
-			c = C.compare(e.data, value);
+			int c = C::compare(e.data, value);
 			if (c == 0) {
 				r = i;
 				break;
 			} else if (c < 0) {
-				i = e.right;
+				i = e.tree.right;
 			} else /* if (c > 0) */ {
 				r = i;
-				i = e.left;
+				i = e.tree.left;
 			}
 		}
-		return { *this, r };
+		return Iterator(*this, r);
 	}
 
 	/*! \brief Get the smallest element in this set greater than the given element
@@ -263,19 +303,19 @@ class TreeSet : protected Elements<T> {
 		uint32_t i = _root;
 		while (i != 0) {
 			auto & e = Elements<T>::_node[i];
-			c = C.compare(e.data, value);
+			int c = C::compare(e.data, value);
 			if (c == 0) {
-				if (e.right != 0)
-					r = min(e.right);
+				if (e.tree.right != 0)
+					r = min(e.tree.right);
 				break;
 			} else if (c < 0) {
-				i = e.right;
+				i = e.tree.right;
 			} else /* if (c > 0) */ {
 				r = i;
-				i = e.left;
+				i = e.tree.left;
 			}
 		}
-		return { *this, r };
+		return Iterator(*this, r);
 	}
 
 	/*! \brief Get the highest element in this set
@@ -292,95 +332,13 @@ class TreeSet : protected Elements<T> {
 	}
 
 
-	/*! \brief Remove value from set
-	 * \param position iterator to element
-	 * \return removed value (if valid iterator)
-	 */
-	Optional<T> erase(const Iterator & position) {
-		assert(position.i >= 1);
-		if (position.i >= 1 && position.i < Elements<T>::_capacity && Elements<T>::_node[position.i].tree.active) {
-			auto & e = Elements<T>::_node[position.i];
-			e.tree.active = false;
 
-			uint32_t child = 0
-			if (e.tree.left == 0)
-				child = e.tree.right;
-			else if (e.tree.right == 0)
-				child = e.tree.left;
-			else {
-				child = max(e.tree.left);
-
-				auto & c = Elements<T>::_node[child];
-				c.tree.right = e.tree.right;
-				Elements<T>::_node[e.tree.right].tree.parent = child;
-
-				c.tree.left = e.tree.left;
-				Elements<T>::_node[e.tree.left].tree.parent = child;
-
-				Elements<T>::_node[c.tree.parent].tree.right = 0;
-			}
-
-			Elements<T>::_node[child].tree.parent = e.parent;
-			auto & p = Elements<T>::_node[e.parent];
-			if (p.tree.right == position.i)
-				p.tree.right = child;
-			else if (p.tree.left == position.i)
-				p.tree.left = child;
-			else
-				assert(false);
-
-			// rebalance
-			uint32_t node = child;
-			uint32_t parent = e.parent;
-			while (parent != 0) {
-				auto & n = Elements<T>::_node[node];
-				auto & p = Elements<T>::_node[parent];
-				uint32_t grandparent = p.parent
-
-				if (p.right == node) {
-					if (p.balance < 0) {
-					 	p.balance = 0;
-						node = parent;
-					} else if (p.balance == 0) {
-						p.balance = 1;
-						break;
-					} else if (rotate(p.right, grandparent, true, node)) {
-						break;
-					}
-				} else {
-					assert(p.right == node);
-					if (p.balance > 0) {
-					 	p.balance = 0;
-						node = parent;
-					} else if (p.balance == 0) {
-						p.balance = -1;
-						break;
-					} else if (rotate(p.left, grandparent, false, node)) {
-						break;
-					}
-				}
-				parent = grandparent;
-			}
-
-			return { e.data };
-		}
-		return {};
-	}
-
-	/*! \brief Remove value from set
-	 * \param value element to be removed
-	 * \return removed value (if found)
-	 */
-	Optional<T> erase(const T & value) {
-		return erase(find(value));
-	}
-
-	ostream & dot(ostream & out) {
+	std::ostream & dot(std::ostream & out) {
 		out << "digraph TreeSet {\n";
 		for (size_t i = 1; i < Elements<T>::_next; i++) {
 			auto & e = Elements<T>::_node[i];
 			if (e.tree.active)
-				out << "	e" << i << "[label=\"<b>" << e.data << "</b>\" xlabel=\"" << e.tree.balance << (_root == i ? ", root" : "") << "\"];\n";
+				out << "	e" << i << "[label=\"" << e.data << "\" xlabel=\"" << (int)e.tree.balance << (_root == i ? ", root" : "") << "\"];\n";
 		}
 		out << '\n';
 		for (size_t i = 1; i < Elements<T>::_next; i++) {
@@ -437,21 +395,65 @@ class TreeSet : protected Elements<T> {
 	void clear() const {
 		Elements<T>::_next = 1;
 		Elements<T>::_count = 0;
+		_root = 0;
+	}
 
-		memset(_bucket, 0, sizeof(uint32_t) * _bucket_capacity);
-		memset(_bucket, 0, sizeof(Node) * Elements<T>::_capacity);
+#ifndef NDEBUG
+	void check() {
+		// Elements
+		assert(!Elements<T>::_node[0].tree.active);
+		uint32_t c = 0;
+		for (size_t i = 1; i <= Elements<T>::_next; i++)
+			if (Elements<T>::_node[i].tree.active)
+				c++;
+		assert(c == Elements<T>::_count);
+
+		// Order
+		auto i = begin();
+		if (i) {
+			c = 1;
+			auto s = *i;
+			for (++i; i != end(); ++i) {
+				assert(C::compare(s, *i) < 0);
+				s = *i;
+				c++;
+			}
+			assert(c == Elements<T>::_count);
+		}
+
+		// Balance
+		if (_root == 0) {
+			assert(Elements<T>::_count == 0);
+		} else {
+			assert(Elements<T>::_node[_root].tree.parent == 0);
+			check(_root, 0);
+		}
 	}
 
  private:
+	int check(uint32_t node, uint32_t parent) {
+		if (node == 0) {
+			return 0;
+		} else {
+			assert(Elements<T>::_node[node].tree.parent == parent);
+			auto & n = Elements<T>::_node[node].tree;
+			int l = check(n.left, node);
+			int r = check(n.right, node);
+			assert(r - l == (int)n.balance);
+			return 1 + (l > r ? l : r);
+		}
+	}
+#endif
 
+ private:
 	/*! \brief Get the lowest element in the subtree
 	 * \param i node definining the subtree
 	 * \return minimum value of the subtree
 	 */
 	inline uint32_t min(uint32_t i) {
 		if (i != 0)
-			while (Elements<T>::_node[i]->left != 0)
-				i = Elements<T>::_node[i]->left;
+			while (Elements<T>::_node[i].tree.left != 0)
+				i = Elements<T>::_node[i].tree.left;
 		return i;
 	}
 
@@ -462,8 +464,8 @@ class TreeSet : protected Elements<T> {
 	 */
 	inline uint32_t max(uint32_t i) {
 		if (i != 0)
-			while (Elements<T>::_node[i]->right != 0)
-				i = Elements<T>::_node[i]->right;
+			while (Elements<T>::_node[i].tree.right != 0)
+				i = Elements<T>::_node[i].tree.right;
 		return i;
 	}
 
@@ -479,6 +481,71 @@ class TreeSet : protected Elements<T> {
 		return end();
 	}
 
+	/*! \brief Check if set contains node
+	 * \param value Value to search
+	 * \param i root, will contain index of nearest node
+	 * \param c reference to last comparison result
+	 * \return true if found, false otherwise
+	 */
+	bool contains(const T& value, uint32_t & i, int & c) const {
+		if (i != 0)
+			while (true) {
+				auto & e = Elements<T>::_node[i];
+				c = C::compare(e.data, value);
+				if (c == 0) {
+					return true;
+				} else if (c < 0) {
+				 	if (e.tree.right != 0)
+						i = e.tree.right;
+					else
+						break;
+				} else /* if (c > 0) */ {
+				 	if (e.tree.left != 0)
+						i = e.tree.left;
+					else
+						break;
+				}
+			}
+
+		return false;
+	}
+
+	/*! \brief Check if set contains node
+	 * \param value Value to search
+	 * \param i root, will contain index of nearest node
+	 * \return true if found, false otherwise
+	 */
+	inline bool contains(const T& value, uint32_t & i) const {
+		int c;
+		return contains(value, i, c);
+	}
+
+	/*! \brief Reorder elements
+	 * \return `true` if element positions have changed
+	 */
+	bool reorder() {
+		if (Elements<T>::_count + 1 < Elements<T>::_next) {
+			size_t j = Elements<T>::_next - 1;
+			for (size_t i = 1; i <= Elements<T>::_count; i++) {
+				if (!Elements<T>::_node[i].tree.active) {
+					for (; !Elements<T>::_node[j].tree.active; --j)
+						assert(j > i);
+					Elements<T>::_node[i].data = move(Elements<T>::_node[j].data);
+
+					replace_node(j, i, true);
+
+					Elements<T>::_node[i].tree.active = true;
+					Elements<T>::_node[j].tree.active = false;
+				}
+			}
+			Elements<T>::_next = Elements<T>::_count + 1;
+			assert(j == Elements<T>::_next);
+			return true;
+		} else {
+			return false;
+		}
+	}
+
 	/*! \brief Insert helper
 	 * \param parent index of parent node or 0 if unknown (or root)
 	 * \param element index of element to insert
@@ -489,18 +556,19 @@ class TreeSet : protected Elements<T> {
 		auto & e = Elements<T>::_node[element];
 		if (_root == 0) {
 			assert(parent == 0);
-			assert(Elements<T>::_count == 1)
+			assert(Elements<T>::_count == 0);
 			_root = element;
 		} else {
+			auto & p = Elements<T>::_node[parent].tree;
 			if ((parent == 0 && contains(e.data, parent, c)) || c == 0) {
-				assert(Elements<T>::_node[parent].tree.active);
+				assert(p.active);
 				return Pair<Iterator,bool>(Iterator(*this, parent), false);
 			} else if (c < 0) {
-				assert(Elements<T>::_node[parent].tree.right == 0);
-				Elements<T>::_node[parent].tree.right = element;
+				assert(p.right == 0);
+				p.right = element;
 			} else /* if (c > 0) */ {
-				assert(Elements<T>::_node[parent].tree.left == 0);
-				Elements<T>::_node[parent].tree.left = element;
+				assert(p.left == 0);
+				p.left = element;
 			}
 		}
 		e.tree.active = true;
@@ -512,223 +580,218 @@ class TreeSet : protected Elements<T> {
 		// rebalance
 		uint32_t node = element;
 		while (parent != 0) {
-			auto & n = Elements<T>::_node[node];
-			auto & p = Elements<T>::_node[parent];
-
-			const int8_t b = p.right == node ? 1 : -1;
-			if (b * p.balance < 0) {
-			 	p.balance = 0;
-				break;
-			} else if (b * p.balance > 0) {
-				rotate(node, p.parent, p.right == node);
-				break;
+			assert(Elements<T>::_node[node].tree.parent == parent);
+			auto & p = Elements<T>::_node[parent].tree;
+			if (node == p.right) {
+				if (p.balance < 0) {
+				 	p.balance = 0;
+					break;
+				} else if (p.balance > 0) {
+					rotate(node, parent, true);
+					break;
+				} else {
+					p.balance = 1;
+				}
 			} else {
-				p.balance = b;
-				node = parent;
-				parent = p.parent;
+				assert(node == p.left);
+				if (p.balance > 0) {
+				 	p.balance = 0;
+					break;
+				} else if (p.balance < 0) {
+					rotate(node, parent, false);
+					break;
+				} else {
+					p.balance = -1;
+				}
 			}
+			node = parent;
+			parent = p.parent;
 		}
 
+		Elements<T>::_count++;
 		return Pair<Iterator,bool>(Iterator(*this, element), true);
 	}
 
-	/*! \brief Check if set contains node
-	 * \param value Value to search
-	 * \param i root, will contain index of nearest node
-	 * \param c reference to last comparison result
-	 * \return true if found, false otherwise
+	/*! \brief Remove node (with at most one child)
+	 * \note element is not marked as inactive, neither is the element count modified
+	 * \param element element to remove
 	 */
-	bool contains(const T& value, uint32_t & i, int & c = 0) const {
-		if (i != 0)
-			while (true) {
-				auto & e = Elements<T>::_node[i];
-				c = C.compare(e.data, value);
-				if (c == 0) {
-					return true;
-				} else if (c < 0) {
-				 	if (e.right != 0)
-						i = e.right;
-					else
-						break;
-				} else /* if (c > 0) */ {
-				 	if (e.left != 0)
-						i = e.left;
-					else
-						break;
+	void erase(uint32_t element) {
+		assert(element != 0);
+		auto & n = Elements<T>::_node[element].tree;
+		assert(n.left == 0 || n.right == 0);
+
+		// rebalance
+		uint32_t node = element;
+		uint32_t parent = n.parent;
+		while (parent != 0) {
+			auto & p = Elements<T>::_node[parent].tree;
+			uint32_t grandparent = p.parent;
+			if (p.left == node) {
+				if (p.balance < 0) {
+				 	p.balance = 0;
+				} else if (p.balance == 0) {
+					p.balance = 1;
+					break;
+				} else if (rotate(p.right, parent, true)) {
+					break;
+				}
+			} else {
+				assert(p.right == node);
+				if (p.balance > 0) {
+				 	p.balance = 0;
+				} else if (p.balance == 0) {
+					p.balance = -1;
+					break;
+				} else if (rotate(p.left, parent, false)) {
+					break;
 				}
 			}
-
-		return false;
-	}
-
-	/*! \brief Reorder elements
-	 * \return `true` if element positions have changed
-	 */
-	bool reorder() {
-		if (Elements<T>::_count + 1 < Elements<T>::_next) {
-			size_t j = Elements<T>::_next - 1;
-			for (size_t i = 1; i < Elements<T>::_next; i++) {
-				if (!Elements<T>::_node[i].tree.active) {
-					for (; !Elements<T>::_node[j].tree.active; --j)
-						assert(j > i);
-					Elements<T>::_node[i] = move(Elements<T>::_node[j]);
-
-					auto left =	Elements<T>::_node[i].tree.left;
-					if (left != 0) {
-						assert(Elements<T>::_node[left].tree.parent == j);
-						Elements<T>::_node[left].tree.parent = i;
-					}
-
-					auto right = Elements<T>::_node[i].tree.right;
-					if (right != 0) {
-						assert(Elements<T>::_node[right].tree.parent == j);
-						Elements<T>::_node[right].tree.parent = i;
-					}
-
-					auto parent = Elements<T>::_node[i].tree.parent;
-					if (parent == 0) {
-						assert(_root == j);
-						_root = i;
-					} else {
-						if (Elements<T>::_node[parent].tree.right == j)
-							Elements<T>::_node[parent].tree.right = i;
-						else if (Elements<T>::_node[parent].tree.left == j)
-							Elements<T>::_node[parent].tree.left = i;
-						else
-							assert(false);
-					}
-
-					Elements<T>::_node[j].tree.active = false;
-				}
-			}
-			assert(j <= Elements<T>::_count);
-			Elements<T>::_next = Elements<T>::_count + 1;
-			return true;
-		} else {
-			return false;
+			node = parent;
+			parent = grandparent;
 		}
+		assert(n.left == 0 || n.right == 0);
+		replace_node(element, n.left != 0 ? n.left : n.right, false);
 	}
-
 
 	/*! \brief Helper to perform rotation
 	 * \param node Node to rotate
-	 * \param grandparent nodes parents parent node
-	 * \param left `true` for left direction, `false` for right
 	 * \param parent reference which will contain the new subtree root node
+	 * \param left `true` for left direction, `false` for right
 	 * \return `true` if there was no height change
 	 */
-	bool rotate(const uint32_t node, const uint32_t grandparent, bool left, uint32_t & parent = 0) {
+	bool rotate(const uint32_t node, uint32_t & parent, bool left) {
 		assert(node != 0);
 		auto & n = Elements<T>::_node[node].tree;
 		assert(n.active);
-
-		uint8_t b = n.balance;
-		parent = (left && b < 0) || (!left && b > 0) ? rotate2(node, left) : rotate1(node, left);
 
 		assert(parent != 0);
 		auto & p = Elements<T>::_node[parent].tree;
 		assert(p.active);
 
-		if ((p.parent = grandparent) != 0) {
-			auto & g = Elements<T>::_node[grandparent].tree;
-			assert(g.active);
-			if (node == g.left) {
-				g.left = parent;
+		const uint32_t grandparent = p.parent;
+
+		const int8_t b = n.balance;
+		uint32_t subroot;
+
+		if (left ? (b >= 0) : (b <= 0)) {
+			// Simple rotation
+			if (left) {
+				// Rotate left
+				if ((p.right = n.left) != 0) {
+					assert(	Elements<T>::_node[p.right].tree.parent == node);
+					Elements<T>::_node[p.right].tree.parent = parent;
+				}
+				n.left = parent;
 			} else {
-				assert(node == g.right);
- 				g.right = parent;
+				// Rotate right
+				if ((p.left = n.right) != 0) {
+					assert(	Elements<T>::_node[p.left].tree.parent == node);
+					Elements<T>::_node[p.left].tree.parent = parent;
+				}
+				n.right = parent;
 			}
+			p.parent = node;
+
+			// Adjust balance
+			p.balance = n.balance == 0 ? (left ?  1 : -1) : 0;
+			n.balance = n.balance == 0 ? (left ? -1 :  1) : 0;
+
+			subroot = node;
 		} else {
-			_root = parent;
+			// Double rotation
+			subroot = left ? n.left : n.right;
+			assert(subroot != 0);
+			auto & s = Elements<T>::_node[subroot].tree;
+			assert(s.active);
+
+			if (left) {
+				// Rotate right and then left
+				if ((n.left = s.right) != 0)
+					Elements<T>::_node[n.left].tree.parent = node;
+				s.right = node;
+
+				if ((p.right = s.left) != 0)
+					Elements<T>::_node[p.right].tree.parent = parent;
+				s.left = parent;
+			} else {
+				// Rotate left and then right
+				if ((n.right = s.left) != 0)
+					Elements<T>::_node[n.right].tree.parent = node;
+				s.left = node;
+
+				if ((p.left = s.right) != 0)
+					Elements<T>::_node[p.left].tree.parent = parent;
+				s.right = parent;
+			}
+			p.parent = n.parent = subroot;
+
+			// Adjust balance
+			p.balance = s.balance > 0 ? (left ? -1 :  1) : 0 ;
+			n.balance = s.balance < 0 ? (left ?  1 : -1) : 0 ;
+			s.balance = 0;
 		}
+
+		replace_node(grandparent, parent, subroot, false);
+
+		parent = subroot;
 
 		return b == 0;
 	}
 
-	/*! \brief Perform simple rotation
-	 * \param node Node to rotate with parent
-	 * \param left `true` for left rotation, `false` for right
-	 * \return new subtree root node
+	/*! \brief Replace a node
+	 * \param parent the parent node (of target)
+	 * \param target the node to be replaced
+	 * \param replacement the node to replace target
+	 * \param include_children copy children (and balance)
 	 */
-	inline uint32_t rotate1(const uint32_t node, const bool left) {
-		assert(node != 0);
-		auto & n = Elements<T>::_node[node].tree;
-		assert(n.active);
-
-		const uint32_t parent = n.parent;
-		assert(parent != 0);
-		auto & p = Elements<T>::_node[parent];
-		assert(p.active);
-
-		if (left) {
-			// Rotate left
-			if ((p.right = n.left) != 0)
-				Elements<T>::_node[p.right].parent = parent;
-			n.left = parent;
+	void replace_node(uint32_t parent, uint32_t target, uint32_t replacement, bool include_children) {
+		if (parent == 0) {
+			assert(_root == target);
+			_root = replacement;
 		} else {
-			// Rotate right
-			if ((p.left = n.right) != 0)
-				Elements<T>::_node[p.left].parent = parent;
-			n.right = parent;
+			auto & p = Elements<T>::_node[parent].tree;
+			assert(p.active);
+			if (target == p.left)
+				p.left = replacement;
+			else if (target == p.right)
+ 				p.right = replacement;
+			else
+				assert(false);
 		}
-		p.parent = node;
 
-		// Adjust balance
-		n.balance = n.balance == 0 ? (left ? -1 :  1) : 0;
-		p.balance = n.balance == 0 ? (left ?  1 : -1) : 0;
+		if (replacement != 0) {
+			auto & r = Elements<T>::_node[replacement].tree;
+			r.parent = parent;
 
-		return node;
+			if (include_children) {
+				assert(target != 0);
+				auto & t = Elements<T>::_node[target].tree;
+
+				r.balance = t.balance;
+
+				if ((r.left = t.left) != 0) {
+					auto & p = Elements<T>::_node[r.left].tree.parent;
+					assert(p == target);
+					p = replacement;
+				}
+				if ((r.right = t.right) != 0) {
+					auto & p = Elements<T>::_node[r.right].tree.parent;
+					assert(p == target);
+					p = replacement;
+				}
+			}
+		}
 	}
 
-	/*! \brief Perform double rotation
-	 * \param node Node to rotate with child and parent
-	 * \param right_left `true` for right-left rotation, `false` for left-right
-	 * \return new subtree root node
+	/*! \brief Replace a node
+	 * \param target the node to be replaced
+	 * \param replacement the node to replace target
+	 * \param include_children copy children (and balance)
 	 */
-	inline uint32_t rotate2(const uint32_t node, const bool right_left) {
-		assert(node != 0);
-		auto & n = Elements<T>::_node[node].tree;
-		assert(n.active);
-
-		const uint32_t parent = n.parent;
-		assert(parent != 0);
-		auto & p = Elements<T>::_node[parent];
-		assert(p.active);
-
-		const uint32_t child = right_left ? n.left : n.right;
-		assert(child != 0);
-		auto & c = Elements<T>::_node[child];
-		assert(c.active);
-
-		if (right_left) {
-			// Rotate right and then left
-			if ((n.left = c.right) != 0)
-				Elements<T>::_node[n.left].parent = node;
-			c.right = node;
-
-			if ((p.right = c.left) != 0)
-				Elements<T>::_node[p.right].parent = parent;
-			c.left = parent;
-		} else {
-			// Rotate left and then right
-			if ((n.right = c.left) != 0)
-				Elements<T>::_node[n.right].parent = node;
-			c.left = node;
-
-			if ((p.left = c.right) != 0)
-				Elements<T>::_node[p.left].parent = parent;
-			c.right = parent;
-		}
-		n.parent = p.parent = child;
-
-		// Adjust balance
-		n.balance = c.balance > 0 ? (right_left ? -1 :  1) : 0 ;
-		p.balance = c.balance < 0 ? (right_left ?  1 : -1) : 0 ;
-		c.balance = 0;
-
-		return child;
+	inline void replace_node(uint32_t target, uint32_t replacement, bool include_children) {
+		replace_node(Elements<T>::_node[target].tree.parent, target, replacement, include_children);
 	}
-
 };
 
 /*

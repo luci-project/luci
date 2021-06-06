@@ -90,13 +90,6 @@ class HashSet : protected Elements<T> {
 			return *this;
 		}
 
-		Iterator& operator--() {
-			do {
-				i--;
-			} while (i > 1 && !ref._node[i].hash.active);
-			return *this;
-		}
-
 		T& operator*() & {
 			assert(ref._node[i].hash.active);
 			return ref._node[i].data;
