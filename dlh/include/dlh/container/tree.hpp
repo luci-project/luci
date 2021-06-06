@@ -12,6 +12,10 @@
 #include "pair.hpp"
 #include "optional.hpp"
 
+/*! \brief Tree set
+ * \tparam T type for container
+ * \tparam C structure with comparison functions (compare())
+ */
 template<typename T, typename C = Comparison>
 class TreeSet : protected Elements<T> {
  protected:
@@ -80,33 +84,33 @@ class TreeSet : protected Elements<T> {
 			return *this;
 		}
 
-		T& operator*() {
+		inline T& operator*() {
 			assert(ref._node[i].tree.active);
 			return ref._node[i].data;
 		}
 
-		T* operator->() {
+		inline T* operator->() {
 			assert(ref._node[i].tree.active);
 			return &(ref._node[i].data);
 		}
 
-		bool operator==(const Iterator& other) const {
+		inline bool operator==(const Iterator& other) const {
 			return &ref == &other.ref && i == other.i;
 		}
 
-		bool operator==(const T& other) const {
+		inline bool operator==(const T& other) const {
 			return ref.element[i].data == other;
 		}
 
-		bool operator!=(const Iterator& other) const {
+		inline bool operator!=(const Iterator& other) const {
 			return &ref != &other.ref || i != other.i;
 		}
 
-		bool operator!=(const T& other) const {
+		inline bool operator!=(const T& other) const {
 			return ref.element[i].data != other;
 		}
 
-		operator bool() const {
+		inline operator bool() const {
 			return i != 0;
 		}
 	};
@@ -118,11 +122,7 @@ class TreeSet : protected Elements<T> {
 	 */
 	template<typename... ARGS>
 	Pair<Iterator,bool> emplace(ARGS&&... args) {
-		// Increase capacity (if required)
-		if (Elements<T>::_next >= Elements<T>::_capacity) {
-			if (!resize(Elements<T>::_count * 2))
-				return { end(), false };
-		}
+		increase();
 
 		// Create local element
 		Elements<T>::_node[Elements<T>::_next].data = move(T(forward<ARGS>(args)...));
@@ -141,10 +141,7 @@ class TreeSet : protected Elements<T> {
 	 *         indicator (`second`) if element was created (`true`) or has already been in the set (`false`)
 	 */
 	Pair<Iterator,bool> insert(const T &value) {
-		// Increase capacity (if required)
-		if (Elements<T>::_next >= Elements<T>::_capacity)
-			if (!resize(Elements<T>::_count * 2))
-				return { end(), false };
+		increase();
 
 		int c = 0;
 		uint32_t i = _root;
@@ -161,8 +158,7 @@ class TreeSet : protected Elements<T> {
 	 * \return removed value (if valid iterator)
 	 */
 	Optional<T> erase(const Iterator & position) {
-		assert(position.i >= 1);
-		if (position.i >= 1 && position.i < Elements<T>::_capacity && Elements<T>::_node[position.i].tree.active) {
+		if (position.i >= 1 && position.i < Elements<T>::_next && Elements<T>::_node[position.i].tree.active) {
 			auto & e = Elements<T>::_node[position.i].tree;
 
 			if (e.left != 0 && e.right != 0) {
@@ -186,7 +182,7 @@ class TreeSet : protected Elements<T> {
 	 * \param value element to be removed
 	 * \return removed value (if found)
 	 */
-	Optional<T> erase(const T & value) {
+	inline Optional<T> erase(const T & value) {
 		return erase(find(value));
 	}
 
@@ -195,7 +191,7 @@ class TreeSet : protected Elements<T> {
 	 * \param value element
 	 * \return iterator to element (if found) or `end()` (if not found)
 	 */
-	Iterator find(const T& value) {
+	inline Iterator find(const T& value) {
 		uint32_t r = _root;
 		return contains(value, r) ? Iterator(*this, r) : end();
 	}
@@ -204,7 +200,7 @@ class TreeSet : protected Elements<T> {
 	 * \param value element
 	 * \return `true` if element is in set
 	 */
-	bool contains(const T& value) const {
+	inline bool contains(const T& value) const {
 		uint32_t r = _root;
 		return contains(value, r);
 	}
@@ -214,6 +210,11 @@ class TreeSet : protected Elements<T> {
 	 */
 	inline Iterator begin() {
 		return Iterator(*this, min(_root));
+	}
+
+	/*! \brief Iterator refering to the past-the-end element in this set */
+	inline Iterator end() {
+		return Iterator(*this, 0);
 	}
 
 	/*! \brief Get the lowest element in this set
@@ -324,14 +325,6 @@ class TreeSet : protected Elements<T> {
 	inline Iterator highest() {
 		return Iterator(*this, max(_root));
 	}
-
-
-	/*! \brief Iterator refering to the past-the-end element in this set */
-	inline Iterator end() {
-		return Iterator(*this, 0);
-	}
-
-
 
 	std::ostream & dot(std::ostream & out) {
 		out << "digraph TreeSet {\n";
@@ -469,18 +462,6 @@ class TreeSet : protected Elements<T> {
 		return i;
 	}
 
-	inline Iterator find(uint32_t * bucket, const T &value) {
-		// Find
-		for (size_t i = *bucket; i != 0; i = Elements<T>::_node[i].hash.next) {
-			assert(i < Elements<T>::_next);
-			assert(Elements<T>::_node[i].hash.active);
-			if (equal(Elements<T>::_node[i].data, value))
-				return Iterator(*this, i);
-		}
-		// End (not found)
-		return end();
-	}
-
 	/*! \brief Check if set contains node
 	 * \param value Value to search
 	 * \param i root, will contain index of nearest node
@@ -520,6 +501,19 @@ class TreeSet : protected Elements<T> {
 		return contains(value, i, c);
 	}
 
+	/*! \brief Increase capacity (by reordering or resizing) if required
+	 * \return `false` on error
+	 */
+	inline bool increase() {
+		if (Elements<T>::_next >= Elements<T>::_capacity) {
+			if (Elements<T>::_count * 2 <= Elements<T>::_capacity)
+				reorder();
+			else if (!resize(Elements<T>::_capacity * 2))
+				return false;
+		}
+		return true;
+	}
+
 	/*! \brief Reorder elements
 	 * \return `true` if element positions have changed
 	 */
@@ -538,8 +532,9 @@ class TreeSet : protected Elements<T> {
 					Elements<T>::_node[j].tree.active = false;
 				}
 			}
+
 			Elements<T>::_next = Elements<T>::_count + 1;
-			assert(j == Elements<T>::_next);
+			assert(j >= Elements<T>::_next);
 			return true;
 		} else {
 			return false;
@@ -727,8 +722,8 @@ class TreeSet : protected Elements<T> {
 			p.parent = n.parent = subroot;
 
 			// Adjust balance
-			p.balance = s.balance > 0 ? (left ? -1 :  1) : 0 ;
-			n.balance = s.balance < 0 ? (left ?  1 : -1) : 0 ;
+			(left ? p : n).balance = s.balance > 0 ? -1 : 0;
+			(left ? n : p).balance = s.balance < 0 ?  1 : 0;
 			s.balance = 0;
 		}
 
@@ -794,17 +789,23 @@ class TreeSet : protected Elements<T> {
 	}
 };
 
-/*
-template<typename K, typename V, typename H = Hash, size_t LOADPERCENT = 50>
-class HashMap : protected HashSet<KeyValue<K,V>, H, LOADPERCENT> {
-	using Base = HashSet<KeyValue<K,V>, H, LOADPERCENT>;
+
+/*! \brief Tree set
+ * \tparam K type for key
+ * \tparam V type for value
+ * \tparam C structure with comparison functions (compare())
+ */
+template<typename K, typename V, typename C = Comparison>
+class TreeMap : protected TreeSet<KeyValue<K,V>, C> {
+	using Base = TreeSet<KeyValue<K,V>, C>;
 
  public:
 	using typename Base::Iterator;
 	using typename Base::begin;
+	using typename Base::lowest;
+	using typename Base::highest;
 	using typename Base::end;
 	using typename Base::resize;
-	using typename Base::rehash;
 	using typename Base::empty;
 	using typename Base::size;
 	using typename Base::clear;
@@ -817,14 +818,6 @@ class HashMap : protected HashSet<KeyValue<K,V>, H, LOADPERCENT> {
 		return Base::insert(KeyValue<K,V>(move(key), move(value)));
 	}
 
-	inline Pair<Iterator,bool> insert(const Iterator & position, const K& key, const V& value) {
-		return Base::insert(position.i, KeyValue<K,V>(key, value));
-	}
-
-	inline Pair<Iterator,bool> insert(const Iterator & position, K&& key, V&& value) {
-		return Base::insert(position.i, KeyValue<K,V>(move(key), move(value)));
-	}
-
 	inline Iterator find(const K& key) {
 		return Base::find(KeyValue<K,V>(key));
 	}
@@ -833,32 +826,71 @@ class HashMap : protected HashSet<KeyValue<K,V>, H, LOADPERCENT> {
 		return Base::find(KeyValue<K,V>(move(key)));
 	}
 
-	Optional<V> erase(const Iterator & position) {
+	inline bool contains(const K& key) {
+		return Base::contains(KeyValue<K,V>(key));
+	}
+
+	inline bool contains(K&& key) {
+		return Base::contains(KeyValue<K,V>(move(key)));
+	}
+
+	inline Iterator lower(const K& key) {
+		return Base::lower(KeyValue<K,V>(key));
+	}
+
+	inline Iterator lower(K&& key) {
+		return Base::lower(KeyValue<K,V>(move(key)));
+	}
+
+	inline Iterator floor(const K& key) {
+		return Base::floor(KeyValue<K,V>(key));
+	}
+
+	inline Iterator floor(K&& key) {
+		return Base::floor(KeyValue<K,V>(move(key)));
+	}
+
+	inline Iterator ceil(const K& key) {
+		return Base::ceil(KeyValue<K,V>(key));
+	}
+
+	inline Iterator ceil(K&& key) {
+		return Base::ceil(KeyValue<K,V>(move(key)));
+	}
+
+	inline Iterator higher(const K& key) {
+		return Base::higher(KeyValue<K,V>(key));
+	}
+
+	inline Iterator higher(K&& key) {
+		return Base::higher(KeyValue<K,V>(move(key)));
+	}
+
+	inline Optional<V> erase(const Iterator & position) {
 		auto i = Base::erase(position);
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	Optional<V> erase(const K& key) {
+	inline Optional<V> erase(const K& key) {
 		auto i = Base::erase(KeyValue<K,V>(key));
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	Optional<V> at(const K& key) {
+	inline Optional<V> at(const K& key) {
 		auto i = Base::find(key);
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	Optional<V> at(K&& key) {
+	inline Optional<V> at(K&& key) {
 		auto i = Base::find(move(key));
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	V & operator[](const K& key) {
+	inline V & operator[](const K& key) {
 		return (*(Base::insert(key).first)).value;
 	}
 
-	V & operator[](K&& key) {
+	inline V & operator[](K&& key) {
 		return (*(Base::insert(move(key).first))).value;
 	}
 };
-*/
