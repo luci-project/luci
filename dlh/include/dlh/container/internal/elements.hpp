@@ -51,6 +51,10 @@ class Elements {
 		free(Elements<T>::_node);
 	}
 
+	/*! \brief Resize element slots to capacity
+	 * \param capacity the new capacity
+	 * \return `true` if resize was successful
+	 */
 	bool resize(uint32_t capacity) {
 		if (capacity != _capacity) {
 			void * ptr = realloc(_node, capacity * sizeof(Node));
