@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cassert>
+#include "../assert.hpp"
+#include "../string.hpp"
 #include <cstdlib>
 #include <cstring>
 
@@ -14,6 +15,7 @@
 #include <ostream>
 
 /*! \brief Hash set
+ * influenced by standard [template/cxx] librarys `unordered_set`
  * \tparam T type for container
  * \tparam C structure with comparison (`bool equal(const T&, const T&)`)
  *           and hash (`uint32_t hash(const T&)`) functions

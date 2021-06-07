@@ -12,7 +12,8 @@
 #include "pair.hpp"
 #include "optional.hpp"
 
-/*! \brief Tree set
+/*! \brief Tree set class
+ * influenced by standard [template/cxx] librarys `set`
  * \tparam T type for container
  * \tparam C structure with comparison functions (compare())
  */

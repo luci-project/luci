@@ -3,11 +3,13 @@
  */
 #pragma once
 
-#include "../utility.hpp"
+#include <dlh/types.hpp>
+#include <dlh/utility.hpp>
+#include <dlh/stream/buffer.hpp>
 
-/*! \brief vector class influenced by standard library
+/*! \brief Vector class influenced by standard [template/cxx] library
  */
-template<class T> class vector {
+template<class T> class Vector {
 	/*! \brief Array with entries
 	 * dynamically allocated / increased
 	 */
@@ -36,14 +38,14 @@ template<class T> class vector {
 	/*! \brief Constructor
 	 * \param invalid object for invalid returns
 	 */
-	explicit vector(T invalid = T()) : _element(nullptr), _size(0), _capacity(0), _invalid(invalid) {}
+	explicit Vector(T invalid = T()) : _element(nullptr), _size(0), _capacity(0), _invalid(invalid) {}
 
 	/*! \brief Constructor with initial _capacity
 	 * \param count number of initial values
 	 * \param init initial values
 	 * \param invalid object for invalid returns
 	 */
-	explicit vector(size_t count, T init, T invalid = T()) : _element(new T[count]), _size(count),
+	explicit Vector(size_t count, T init, T invalid = T()) : _element(new T[count]), _size(count),
 	                                                         _capacity(count), _invalid(invalid) {
 		for (size_t i = 0; i < count; ++i) {
 			_element[i] = init;
@@ -52,8 +54,8 @@ template<class T> class vector {
 
 	/*! \brief Copy constructor
 	 */
-	vector(const vector& other) : _element(new T[other._capacity]), _size(other._size),
-	                              _capacity(other._capacity), _invalid(other->_invalid) {
+	Vector(const Vector& other) : _element(new T[other._capacity]), _size(other._size),
+	                              _capacity(other._capacity), _invalid(other._invalid) {
 		for (size_t i = 0; i < _size; ++i) {
 			_element[i] = other._element[i];
 		}
@@ -61,7 +63,7 @@ template<class T> class vector {
 
 	/*! \brief Destructor
 	 */
-	~vector() {
+	~Vector() {
 		delete[] _element;
 	}
 
@@ -161,7 +163,7 @@ template<class T> class vector {
 	 * \param args Arguments to create the value
 	 */
 	template<typename... ARGS>
-	inline void emplace_back(ARGS&&... args)
+	inline void emplace_back(ARGS&&... args) {
 		if (_capacity == _size) {
 			expand();
 		}
@@ -174,14 +176,14 @@ template<class T> class vector {
 	 * \param value the value of the element to append
 	 */
 	inline void push_back(const T& value) {
-		emplace_back(v);
+		emplace_back(value);
 	}
 
 	/*! \brief Adds an element to the end
 	 * \param value the value of the element to append
 	 */
 	inline void push_back(T&& value) {
-		emplace_back(forward<T>(v));
+		emplace_back(forward<T>(value));
 	}
 
 	/*! \brief Creats element at the specified location
@@ -253,7 +255,7 @@ template<class T> class vector {
 	/*! \brief Assignment
 	 * \param other
 	 */
-	vector<T>& operator=(const vector<T>& other) {
+	Vector<T>& operator=(const Vector<T>& other) {
 		// No self assignment
 		if (this != &other) {
 			if (_capacity != 0) {
@@ -277,7 +279,7 @@ template<class T> class vector {
 	 * \param other vector
 	 * \return reference to vector
 	 */
-	vector<T> & operator+=(const vector<T>& other) {
+	Vector<T> & operator+=(const Vector<T>& other) {
 		reserve(_size + other._size);
 		for (size_t i = 0; i < other._size; ++i) {
 			push_back(i);
@@ -289,7 +291,7 @@ template<class T> class vector {
 	 * \param element element
 	 * \return reference to vector
 	 */
-	vector<T> & operator+=(const T& element) {
+	Vector<T> & operator+=(const T& element) {
 		push_back(element);
 		return *this;
 	}
@@ -298,8 +300,8 @@ template<class T> class vector {
 	 * \param other vector
 	 * \return new vector with all elements of this and other vector
 	 */
-	vector<T> operator+(const vector<T>& other) const {
-		vector<T> r = *this;
+	Vector<T> operator+(const Vector<T>& other) const {
+		Vector<T> r = *this;
 		r += other;
 		return r;
 	}
@@ -308,26 +310,26 @@ template<class T> class vector {
 	 * \param element element to Concatenate
 	 * \return new vector with all elements of this vector and element
 	 */
-	vector<T> operator+(const T& element) const {
-		vector<T> r = *this;
+	Vector<T> operator+(const T& element) const {
+		Vector<T> r = *this;
 		r += element;
 		return r;
 	}
 
-	/*! \brief vector iterator
+	/*! \brief Vector iterator
 	 */
-	class iterator {
+	class Iterator {
 		T* i;
 
 	 public:  //NOLINT
-		explicit iterator(T* p) : i(p) {}
+		explicit Iterator(T* p) : i(p) {}
 
-		iterator& operator++() {
+		Iterator& operator++() {
 			i++;
 			return *this;
 		}
 
-		iterator& operator--() {
+		Iterator& operator--() {
 			i--;
 			return *this;
 		}
@@ -336,20 +338,40 @@ template<class T> class vector {
 			return *i;
 		}
 
-		bool operator==(const vector<T>::iterator& other) const {
+		bool operator==(const Vector<T>::Iterator& other) const {
 			return *i == *other.i;
 		}
 
-		bool operator!=(const vector<T>::iterator& other) const {
+		bool operator!=(const Vector<T>::Iterator& other) const {
 			return *i != *other.i;
 		}
 	};
 
-	inline vector<T>::iterator begin() const {
-		return vector<T>::iterator(&_element[0]);
+	inline Vector<T>::Iterator begin() const {
+		return Vector<T>::Iterator(&_element[0]);
 	}
 
-	inline vector<T>::iterator end() const {
-		return vector<T>::iterator(&_element[_size]);
+	inline Vector<T>::Iterator end() const {
+		return Vector<T>::Iterator(&_element[_size]);
 	}
 };
+
+
+/*! \brief Print contents of a vector
+ *
+ *  \param bs Target Bufferstream
+ *  \param val Vector to be printed
+ *  \return Reference to BufferStream os; allows operator chaining.
+ */
+template<typename T>
+static inline BufferStream& operator<<(BufferStream& bs, Vector<T> & val) {
+	bs << "{ ";
+	bool p = false;
+	for (const auto & v : val) {
+		if (p)
+			bs << ", ";
+		p = true;
+		bs << v;
+	}
+	return bs << '}';
+}
