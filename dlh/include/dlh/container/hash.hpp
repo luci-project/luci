@@ -6,7 +6,6 @@
 
 #include "internal/comparison.hpp"
 #include "internal/elements.hpp"
-#include "internal/hasher.hpp"
 #include "internal/keyvalue.hpp"
 #include "../utility.hpp"
 #include "pair.hpp"
@@ -16,11 +15,11 @@
 
 /*! \brief Hash set
  * \tparam T type for container
- * \tparam H structure with hash functions (operator())
- * \tparam C structure with comparison functions (equal())
+ * \tparam C structure with comparison (`bool equal(const T&, const T&)`)
+ *           and hash (`uint32_t hash(const T&)`) functions
  * \tparam L percentage of hash buckets (compared to element capacity)
  */
-template<typename T, typename H = Hasher, typename C = Comparison, size_t L = 150>
+template<typename T, typename C = Comparison, size_t L = 150>
 class HashSet : protected Elements<T> {
  protected:
 	using typename Elements<T>::_capacity;
@@ -59,14 +58,16 @@ class HashSet : protected Elements<T> {
 	}
 
 	/*! \brief Convert to hash set
-	 * \return container Elements container
+	 * \param container Elements container
+	 * \param capacity_reserve additional space to reserve
 	 */
-	template<typename X>
-	explicit HashSet(const X& container) {
+	/*template<typename X>
+	explicit HashSet(const X& container, size_t capacity_reserve = 128) {
+		resize(container.size() + capacity_reserve);
 		for (const auto & c : container)
 			insert(c);
 	}
-
+*/
 	/*! \brief Destructor
 	 */
 	virtual ~HashSet() {
@@ -90,38 +91,38 @@ class HashSet : protected Elements<T> {
 			return *this;
 		}
 
-		T& operator*() & {
+		inline T& operator*() & {
 			assert(ref._node[i].hash.active);
 			return ref._node[i].data;
 		}
 
-		T&& operator*() && {
+		inline T&& operator*() && {
 			assert(ref._node[i].hash.active);
 			return move(ref._node[i].data);
 		}
 
-		T* operator->() {
+		inline T* operator->() {
 			assert(ref._node[i].hash.active);
 			return &(ref._node[i].data);
 		}
 
-		bool operator==(const Iterator& other) const {
+		inline bool operator==(const Iterator& other) const {
 			return &ref == &other.ref && i == other.i;
 		}
 
-		bool operator==(const T& other) const {
+		inline bool operator==(const T& other) const {
 			return ref.element[i].data == other;
 		}
 
-		bool operator!=(const Iterator& other) const {
+		inline bool operator!=(const Iterator& other) const {
 			return &ref != &other.ref || i != other.i;
 		}
 
-		bool operator!=(const T& other) const {
+		inline bool operator!=(const T& other) const {
 			return ref.element[i].data != other;
 		}
 
-		operator bool() const {
+		inline operator bool() const {
 			return i != ref._next;
 		}
 	};
@@ -150,16 +151,12 @@ class HashSet : protected Elements<T> {
 	 */
 	template<typename... ARGS>
 	Pair<Iterator,bool> emplace(ARGS&&... args) {
-		// Increase capacity (if required)
-		if (Elements<T>::_next >= Elements<T>::_capacity) {
-			if (!resize(Elements<T>::_count * 2))
-				return { end(), false };
-		}
+		increase();
 
 		// Create local element (not active yet!)
 		auto & next = Elements<T>::_node[Elements<T>::_next];
 		next.data = move(T(forward<ARGS>(args)...));
-		uint32_t * b = bucket(next.hash.temp = hash(next.data));
+		uint32_t * b = bucket(next.hash.temp = C::hash(next.data));
 
 		// Check if already in set
 		uint32_t i = find(b, next.data);
@@ -176,14 +173,10 @@ class HashSet : protected Elements<T> {
 	 *         indicator (`second`) if element was created (`true`) or has already been in the set (`false`)
 	 */
 	Pair<Iterator,bool> insert(const T &value) {
-		// Increase capacity (if required)
-		if (Elements<T>::_next >= Elements<T>::_capacity) {
-			if (!resize(Elements<T>::_count * 2))
-				return { end(), false };
-		}
+		increase();
 
 		// Get Bucket
-		uint32_t h = hash(value);
+		uint32_t h = C::hash(value);
 		uint32_t * b = bucket(h);
 
 		// Check if already in set
@@ -202,16 +195,16 @@ class HashSet : protected Elements<T> {
 	 * \param value element
 	 * \return iterator to element (if found) or `end()` (if not found)
 	 */
-	Iterator find(const T& value) {
-		return Iterator(*this, find(bucket(hash(value)), value));
+	inline Iterator find(const T& value) {
+		return Iterator(*this, find(bucket(C::hash(value)), value));
 	}
 
 	/*! \brief check if set contains element
 	 * \param value element
 	 * \return `true` if element is in set
 	 */
-	bool contains(const T& value) const {
-		return find(bucket(hash(value)), value) != Elements<T>::_next;
+	inline bool contains(const T& value) const {
+		return find(bucket(C::hash(value)), value) != Elements<T>::_next;
 	}
 
 	/*! \brief Remove value from set
@@ -230,24 +223,19 @@ class HashSet : protected Elements<T> {
 			auto next = e.hash.next;
 			auto prev = e.hash.prev;
 
+			if (next != 0) {
+				assert(Elements<T>::_node[next].hash.active);
+				assert(Elements<T>::_node[next].hash.prev == position.i);
+				Elements<T>::_node[next].hash.prev = prev;
+			}
+
 			if (*b == position.i) {
 				assert(prev == 0);
 				*b = next;
-				if (next != 0) {
-					assert(Elements<T>::_node[next].hash.prev == position.i);
-					Elements<T>::_node[next].hash.prev = 0;
-				}
-			} else {
-				if (next != 0) {
-					assert(Elements<T>::_node[next].hash.active);
-					assert(Elements<T>::_node[next].hash.prev == position.i);
-					Elements<T>::_node[next].hash.prev = prev;
-				}
-				if (prev != 0) {
-					assert(Elements<T>::_node[prev].hash.active);
-					assert(Elements<T>::_node[prev].hash.next == position.i);
-					Elements<T>::_node[prev].hash.next = next;
-				}
+			} else if (prev != 0) {
+				assert(Elements<T>::_node[prev].hash.active);
+				assert(Elements<T>::_node[prev].hash.next == position.i);
+				Elements<T>::_node[prev].hash.next = next;
 			}
 
 			Elements<T>::_count--;
@@ -262,20 +250,20 @@ class HashSet : protected Elements<T> {
 	 * \param value element to be removed
 	 * \return removed value (if found)
 	 */
-	Optional<T> erase(const T & value) {
+	inline Optional<T> erase(const T & value) {
 		return erase(find(value));
 	}
 
 	/*! \brief Recalculate hash values
 	 */
-	void rehash() {
-		bucketize(true);
+	inline void rehash() {
+		bucketize(false, true);
 	}
 
 	/*! \brief Reorganize Elements
 	 * Fill gaps emerged from erasing elments
 	 */
-	void reorganize() {
+	inline void reorganize() {
 		if (reorder())
 			bucketize();
 	}
@@ -290,6 +278,7 @@ class HashSet : protected Elements<T> {
 
 		// reorder node slots
 		bool need_bucketize = reorder();
+		bool buckets_zeroed = false;
 
 		bool s = capacity == Elements<T>::_capacity;
 		// Resize element container
@@ -304,13 +293,14 @@ class HashSet : protected Elements<T> {
 				free(_bucket);
 				_bucket = bucket_ptr;
 				_bucket_capacity = bucket_cap;
-				s = need_bucketize = true;
+				s = buckets_zeroed = need_bucketize = true;
 			}
+
 		}
 
 		// Bucketize (if either reordering or resizing of hash buckets was successful)
 		if (need_bucketize)
-			bucketize();
+			bucketize(buckets_zeroed);
 
 		return s;
 	}
@@ -348,7 +338,7 @@ class HashSet : protected Elements<T> {
 	}
 
 	/*! \brief Clear all elements in set */
-	void clear() const {
+	void clear() {
 		Elements<T>::_next = 1;
 		Elements<T>::_count = 0;
 
@@ -379,13 +369,17 @@ class HashSet : protected Elements<T> {
 	}
 
  private:
-	/*! \brief Calculate hash of value
-	 * \param value
-	 * \return hash of value
+	/*! \brief Increase capacity (by reordering or resizing) if required
+	 * \return `false` on error
 	 */
-	inline uint32_t hash(const T & value) const {
-		H h;
-		return h(value);
+	inline bool increase() {
+		if (Elements<T>::_next >= Elements<T>::_capacity) {
+			if (Elements<T>::_count * 2 <= Elements<T>::_capacity)
+				reorganize();
+			else if (!resize(Elements<T>::_capacity * 2))
+				return false;
+		}
+		return true;
 	}
 
 	/*! \brief Get bucket for hash value
@@ -402,17 +396,14 @@ class HashSet : protected Elements<T> {
 	bool reorder() {
 		if (Elements<T>::_count + 1 < Elements<T>::_next) {
 			size_t j = Elements<T>::_next - 1;
-			for (size_t i = 1; i < Elements<T>::_count; i++) {
+			for (size_t i = 1; i <= Elements<T>::_count; i++) {
 				if (!Elements<T>::_node[i].hash.active) {
 					for (; !Elements<T>::_node[j].hash.active; --j)
 						assert(j > i);
-					Elements<T>::_node[i].hash.active = true;
-					Elements<T>::_node[i].data = move(Elements<T>::_node[j].data);
+					Elements<T>::_node[i] = move(Elements<T>::_node[j]);
 					Elements<T>::_node[j--].hash.active = false;
 				}
 			}
-
-			assert(j == Elements<T>::_count);
 			Elements<T>::_next = Elements<T>::_count + 1;
 
 			return true;
@@ -423,15 +414,20 @@ class HashSet : protected Elements<T> {
 
 	/*! \brief Reorganize buckets
 	 * Required if bucket capacity has changed
+	 * \param is_zero are the bucket slots already zeroed?
 	 * \param rehash calculate hash value (replacing cached value)
 	 */
-	void bucketize(bool rehash = false) {
+	void bucketize(bool is_zero = false, bool rehash = false) {
+		if (!is_zero)
+			memset(_bucket, 0, _bucket_capacity * sizeof(uint32_t));
+
 		for (size_t i = 1; i <= Elements<T>::_count; i++) {
 			if (Elements<T>::_node[i].hash.active) {
 				if (rehash)
-					Elements<T>::_node[i].hash.temp = hash(Elements<T>::_node[i].data);
+					Elements<T>::_node[i].hash.temp = C::hash(Elements<T>::_node[i].data);
 
 				uint32_t * b = bucket(Elements<T>::_node[i].hash.temp);
+				assert(*b <= Elements<T>::_count);
 				Elements<T>::_node[i].hash.prev = 0;
 				if ((Elements<T>::_node[i].hash.next = *b) != 0) {
 					assert(Elements<T>::_node[*b].hash.active);
@@ -448,9 +444,10 @@ class HashSet : protected Elements<T> {
 	 * \param value the value we are looking for
 	 * \return index of target value or `Elements<T>::_next` if not found
 	 */
-	inline uint32_t find(uint32_t * bucket, const T &value) {
+	inline uint32_t find(uint32_t * bucket, const T &value) const {
 		// Find
-		for (size_t i = *bucket; i != 0; i = Elements<T>::_node[i].hash.next) {
+		for (uint32_t i = *bucket; i != 0; i = Elements<T>::_node[i].hash.next) {
+			assert(Elements<T>::_count < Elements<T>::_next);
 			assert(i < Elements<T>::_next);
 			assert(Elements<T>::_node[i].hash.active);
 			if (C::equal(Elements<T>::_node[i].data, value))
@@ -487,10 +484,16 @@ class HashSet : protected Elements<T> {
 
 };
 
-
-template<typename K, typename V, typename H = Hasher, typename C = Comparison, size_t L = 150>
-class HashMap : protected HashSet<KeyValue<K,V>, H, C, L> {
-	using Base = HashSet<KeyValue<K,V>, H, C, L>;
+/*! \brief Hash map
+ * \tparam K type for key
+ * \tparam V type for value
+ * \tparam C structure with comparison (`bool equal(const K&, const K&)`)
+ *           and hash (`uint32_t hash(const K&)`) functions
+ * \tparam L percentage of hash buckets (compared to element capacity)
+ */
+template<typename K, typename V, typename C = Comparison, size_t L = 150>
+class HashMap : protected HashSet<KeyValue<K,V>, C, L> {
+	using Base = HashSet<KeyValue<K,V>, C, L>;
 
  public:
 	using typename Base::Iterator;
@@ -522,36 +525,44 @@ class HashMap : protected HashSet<KeyValue<K,V>, H, C, L> {
 		return Base::find(KeyValue<K,V>(move(key)));
 	}
 
-	Optional<V> erase(const Iterator & position) {
+	inline bool contains(const K& key) {
+		return Base::contains(KeyValue<K,V>(key));
+	}
+
+	inline bool contains(K&& key) {
+		return Base::contains(KeyValue<K,V>(move(key)));
+	}
+
+	inline Optional<V> erase(const Iterator & position) {
 		auto i = Base::erase(position);
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	Optional<V> erase(const K& key) {
+	inline Optional<V> erase(const K& key) {
 		auto i = Base::erase(KeyValue<K,V>(key));
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	Optional<V> erase(K&& key) {
+	inline Optional<V> erase(K&& key) {
 		auto i = Base::erase(KeyValue<K,V>(move(key)));
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	Optional<V> at(const K& key) {
+	inline Optional<V> at(const K& key) {
 		auto i = Base::find(key);
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	Optional<V> at(K&& key) {
+	inline Optional<V> at(K&& key) {
 		auto i = Base::find(move(key));
 		return i ? Optional<V>(move(i.value().value)) : Optional<V>();
 	}
 
-	V & operator[](const K& key) {
+	inline V & operator[](const K& key) {
 		return (*(Base::insert(key).first)).value;
 	}
 
-	V & operator[](K&& key) {
+	inline V & operator[](K&& key) {
 		return (*(Base::insert(move(key).first))).value;
 	}
 };
