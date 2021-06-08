@@ -13,3 +13,6 @@
 [submodule "xxhash"]
 	path = xxhash
 	url = https://github.com/stbrumme/xxhash.git
+[submodule "dlh"]
+	path = dlh
+	url = git@gitlab.cs.fau.de:heinloth/dlh.git
