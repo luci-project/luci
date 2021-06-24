@@ -1,17 +1,14 @@
 #include "object/identity.hpp"
 
-#include <utility>
-
-#include <xxhash64.h>
-
-#include "libc/unistd.hpp"
+#include <dlh/utility.hpp>
+#include <dlh/unistd.hpp>
+#include <dlh/utils/log.hpp>
+#include <dlh/utils/xxhash.hpp>
 
 #include "object/base.hpp"
 #include "object/dynamic.hpp"
 #include "object/executable.hpp"
 #include "object/relocatable.hpp"
-
-#include "utils/log.hpp"
 
 #include "loader.hpp"
 

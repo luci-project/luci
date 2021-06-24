@@ -1,11 +1,11 @@
 #pragma once
 
-#include <optional>
+#include <dlh/container/optional.hpp>
+#include <dlh/stream/buffer.hpp>
+#include <dlh/assert.hpp>
+#include <dlh/string.hpp>
 
-#include "libc/assert.hpp"
-#include "libc/string.hpp"
-#include "elf.hpp"
-#include "utils/stream/buffer.hpp"
+#include <elfo/elf.hpp>
 
 struct Object;
 
@@ -60,9 +60,9 @@ struct VersionedSymbol : Elf::Symbol {
 	const Object & object() const;
 
  private:
-	mutable std::optional<uint32_t> _hash_value;
-	mutable std::optional<uint32_t> _gnu_hash_value;
+	mutable Optional<uint32_t> _hash_value;
+	mutable Optional<uint32_t> _gnu_hash_value;
 };
 
 BufferStream& operator<<(BufferStream& bs, const VersionedSymbol & s);
-BufferStream& operator<<(BufferStream& bs, const std::optional<VersionedSymbol> & s);
+BufferStream& operator<<(BufferStream& bs, const Optional<VersionedSymbol> & s);

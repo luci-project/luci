@@ -1,19 +1,21 @@
 #include "loader.hpp"
 
-#include "xxhash64.h"
+#include <dlh/unistd.hpp>
+#include <dlh/errno.hpp>
+#include <dlh/stream/output.hpp>
+#include <dlh/stream/buffer.hpp>
+#include <dlh/utils/auxiliary.hpp>
+#include <dlh/utils/xxhash.hpp>
+#include <dlh/utils/file.hpp>
+#include <dlh/utils/log.hpp>
 
-#include "libc/unistd.hpp"
-#include "libc/errno.hpp"
-#include "utils/auxiliary.hpp"
-#include "utils/file.hpp"
-#include "utils/log.hpp"
 
 #include "object/base.hpp"
 #include "process.hpp"
 
-void * observer_kickoff(void * ptr) {
+int observer_kickoff(void * ptr) {
 	reinterpret_cast<Loader *>(ptr)->observer();
-	return nullptr;
+	return 0;
 }
 
 Loader::Loader(const char * path, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {
@@ -22,10 +24,8 @@ Loader::Loader(const char * path, bool dynamicUpdate) : dynamic_update(dynamicUp
 	if (dynamic_update) {
 		if ((inotifyfd = ::inotify_init1(IN_CLOEXEC)) == -1) {
 			LOG_ERROR << "Initializing inotify failed: " << strerror(errno) << endl;
-		} else if (::pthread_create(&observer_thread, nullptr, &observer_kickoff, this) != 0) {
+		} else if (Thread::create(&observer_kickoff, this, true) == nullptr) {
 			LOG_ERROR << "Creating background thread failed: " << strerror(errno) << endl;
-		} else if (::pthread_detach(observer_thread) != 0) {
-			LOG_ERROR << "Detaching background thread failed: " << strerror(errno) << endl;
 		} else {
 			LOG_INFO << "Created observer background thread";
 		}
@@ -91,7 +91,7 @@ void Loader::observer() {
 }
 
 
-ObjectIdentity * Loader::library(const char * filename, const std::vector<const char *> & rpath, const std::vector<const char *> & runpath, DL::Lmid_t ns)  {
+ObjectIdentity * Loader::library(const char * filename, const Vector<const char *> & rpath, const Vector<const char *> & runpath, DL::Lmid_t ns)  {
 	StrPtr path(filename);
 	auto name = path.rchr('/');
 	if (ns != DL::LM_ID_NEWLN)
@@ -102,10 +102,11 @@ ObjectIdentity * Loader::library(const char * filename, const std::vector<const 
 	ObjectIdentity * lib;
 	// only file name provided - look for it in search paths
 	if (path == name) {
-		for (const std::vector<const char *> & path : { rpath, library_path_runtime, runpath, library_path_config, library_path_default })
+		for (const Vector<const char *> & path : { rpath, library_path_runtime, runpath, library_path_config, library_path_default }) {
 			for (auto & dir : path)
 				if ((lib = open(filename, dir, ns)) != nullptr)
 					return lib;
+		}
 	} else {
 		// Full path
 		if ((lib = open(filename, ns)) != 0)
@@ -134,9 +135,10 @@ ObjectIdentity * Loader::open(const char * filepath, DL::Lmid_t ns) {
 			ns = get_new_ns();
 
 		LOG_DEBUG << "Loading " << filepath << "..." << endl;
-		ObjectIdentity & i = lookup.emplace_back(*this, filepath, ns);
-		if (i.open() != nullptr) {
-			return &i;
+		auto i = lookup.emplace_back(*this, filepath, ns);
+		assert(i);
+		if (i->open() != nullptr) {
+			return i.operator->();
 		} else {
 			LOG_ERROR << "Unable to open " << filepath << endl;
 			lookup.pop_back();
@@ -150,22 +152,22 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool in_executio
 		ns = get_new_ns();
 
 	LOG_DEBUG << "Loading from memory " << (void*)ptr << " (" << filepath << ")..." << endl;
-	ObjectIdentity & i = lookup.emplace_back(*this, filepath, ns);
+	auto i = lookup.emplace_back(*this, filepath, ns);
 
 	if (prevent_updates) {
-		i.flags.updatable = 0;
-		i.flags.immutable_source = 1;
+		i->flags.updatable = 0;
+		i->flags.immutable_source = 1;
 	}
 
-	Object * o = i.open(ptr, !in_execution);
+	Object * o = i->open(ptr, !in_execution);
 	if (o != nullptr) {
 		if (in_execution) {
-			i.flags.initialized = 1;
+			i->flags.initialized = 1;
 			o->base = reinterpret_cast<uintptr_t>(ptr);
 			o->is_prepared = true;
 			o->is_protected = true;
 		}
-		return &i;
+		return i.operator->();
 	} else {
 		LOG_ERROR << "Unable to open " << ptr << endl;
 		lookup.pop_back();
@@ -184,13 +186,14 @@ DL::Lmid_t Loader::get_new_ns() const {
 bool Loader::prepare() {
 	// Relocate
 	LOG_DEBUG << "Relocate..." << endl;
-	for (auto & o : lookup)
+	for (auto & o : lookup) {
 		if (o.current->is_prepared)
 			o.current->update();
 		else if (o.current->prepare())
 			o.current->is_prepared = true;
 		else
 			return false;
+	}
 
 	// Protect
 	LOG_DEBUG << "Protect memory..." << endl;
@@ -211,7 +214,7 @@ bool Loader::prepare() {
 	return true;
 }
 
-bool Loader::run(ObjectIdentity * file, std::vector<const char *> args, uintptr_t stack_pointer, size_t stack_size) {
+bool Loader::run(ObjectIdentity * file, Vector<const char *> args, uintptr_t stack_pointer, size_t stack_size) {
 	assert(file != nullptr);
 	Object * start = file->current;
 	assert(start != nullptr);
@@ -237,7 +240,7 @@ bool Loader::run(ObjectIdentity * file, std::vector<const char *> args, uintptr_
 	p.aux[Auxiliary::AT_PHDR] = start->base + start->header.e_phoff;
 	p.aux[Auxiliary::AT_PHNUM] = start->header.e_phnum;
 
-	args.insert(args.begin(), 1, start->file.path.str);
+	args.push_front(start->file.path.str);
 	p.init(args);
 
 	uintptr_t entry = start->header.entry();
@@ -247,7 +250,7 @@ bool Loader::run(ObjectIdentity * file, std::vector<const char *> args, uintptr_
 	return true;
 }
 
-std::optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sym, DL::Lmid_t ns) const {
+Optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sym, DL::Lmid_t ns) const {
 	for (const auto & object_file : lookup)
 		if (object_file.ns == ns && object_file.current != nullptr) {
 			// Only compare to latest version
@@ -259,7 +262,7 @@ std::optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sy
 				return s;
 			}
 		}
-	return std::nullopt;
+	return { };
 }
 
 uintptr_t Loader::next_address() const {

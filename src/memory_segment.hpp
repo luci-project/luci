@@ -1,9 +1,10 @@
 #pragma once
 
-#include "libc/assert.hpp"
-#include "libc/string.hpp"
-#include "libc/unistd.hpp"
-#include "elf.hpp"
+#include <dlh/assert.hpp>
+#include <dlh/string.hpp>
+#include <dlh/unistd.hpp>
+
+#include <elfo/elf.hpp>
 
 #include "page.hpp"
 

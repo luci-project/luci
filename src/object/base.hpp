@@ -1,22 +1,18 @@
 #pragma once
 
-#include <utility>
-#include <vector>
-#include <unordered_map>
-#include <map>
-#include <optional>
+#include <dlh/assert.hpp>
+#include <dlh/string.hpp>
+#include <dlh/types.hpp>
+#include <dlh/utility.hpp>
+#include <dlh/container/vector.hpp>
+#include <dlh/container/pair.hpp>
+#include <dlh/container/optional.hpp>
+#include <dlh/stream/buffer.hpp>
+#include <dlh/stream/output.hpp>
+#include <dlh/utils/strptr.hpp>
 
-#include <climits>
-
-#include "libc/assert.hpp"
-#include "libc/string.hpp"
-
-#include "utils/stream/buffer.hpp"
-#include "utils/stream/output.hpp"
-#include "utils/strptr.hpp"
-
-#include "elf.hpp"
-#include "bean.hpp"
+#include <elfo/elf.hpp>
+#include <bean/bean.hpp>
 
 #include "object/identity.hpp"
 
@@ -57,16 +53,16 @@ struct Object : public Elf {
 	bool is_protected = false;
 
 	/*! \brief Symbol dependencies to other objects */
-	std::vector<ObjectIdentity *> dependencies;
+	Vector<ObjectIdentity *> dependencies;
 
 	/*! \brief Segments to be loaded in memory */
-	std::vector<MemorySegment> memory_map;
+	Vector<MemorySegment> memory_map;
 
 	/*! \brief Binary symbol hashes */
-	std::optional<Bean> binary_hash;
+	Optional<Bean> binary_hash;
 
 	/*! \brief Relocations to external symbols used in this object (cache) */
-	mutable std::vector<std::pair<Elf::Relocation, VersionedSymbol>> relocations;
+	mutable Vector<Pair<Elf::Relocation, VersionedSymbol>> relocations;
 
 	/*! \brief Pointer to previous version */
 	Object * file_previous = nullptr;
@@ -113,7 +109,10 @@ struct Object : public Elf {
 	virtual bool patchable() const { return false; };
 
 	/*! \brief Find (external visible) symbol in this object with same name and version */
-	virtual std::optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const { return std::nullopt; };
+	virtual Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const {
+		(void) sym;
+		return {};
+	};
 
 	bool operator==(const Object & o) const {
 		return this == &o;

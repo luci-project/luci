@@ -1,11 +1,9 @@
 #pragma once
 
-#include <limits.h>
-
-#include <vector>
-
-#include "utils/strptr.hpp"
-#include "utils/stream/buffer.hpp"
+#include <dlh/types.hpp>
+#include <dlh/container/vector.hpp>
+#include <dlh/utils/strptr.hpp>
+#include <dlh/stream/buffer.hpp>
 
 #include "dl.hpp"
 

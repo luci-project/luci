@@ -1,5 +1,7 @@
 #pragma once
 
+#include <dlh/types.hpp>
+
 // todo: query system for page size
 
 struct Page {

@@ -1,8 +1,7 @@
 #pragma once
 
-#include <vector>
-
-#include "utils/log.hpp"
+#include <dlh/container/vector.hpp>
+#include <dlh/utils/log.hpp>
 
 #include "object/relocatable.hpp"
 #include "object/executable.hpp"
@@ -93,7 +92,7 @@ struct ObjectDynamic : public ObjectExecutable {
 
 	bool patchable() const override;
 
-	std::optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const override;
+	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const override;
 
 	void* relocate(const Elf::Relocation & reloc) const;
 

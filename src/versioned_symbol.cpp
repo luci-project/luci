@@ -38,7 +38,7 @@ BufferStream& operator<<(BufferStream& bs, const VersionedSymbol & s) {
 	return bs << " (" << s.object().file.name << ")";
 }
 
-BufferStream& operator<<(BufferStream& bs, const std::optional<VersionedSymbol> & s) {
+BufferStream& operator<<(BufferStream& bs, const Optional<VersionedSymbol> & s) {
 	if (s)
 		bs << s.value();
 	else

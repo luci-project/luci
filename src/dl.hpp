@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
+#include <dlh/types.hpp>
 
 struct Object;
 

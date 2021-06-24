@@ -1,18 +1,17 @@
 // Copyright 2020, Bernhard Heinloth
 // SPDX-License-Identifier: AGPL-3.0-only
 
-#include <set>
-#include <map>
-#include <vector>
-#include <unordered_map>
-
-#include "utils/parser/arguments.hpp"
-#include "utils/stream/output.hpp"
-#include "utils/auxiliary.hpp"
-#include "utils/environ.hpp"
-#include "utils/file.hpp"
-#include "utils/log.hpp"
-#include "utils/string.hpp"
+#include <dlh/container/initializer_list.hpp>
+#include <dlh/container/vector.hpp>
+#include <dlh/container/tree.hpp>
+#include <dlh/container/hash.hpp>
+#include <dlh/stream/output.hpp>
+#include <dlh/parser/arguments.hpp>
+#include <dlh/utils/auxiliary.hpp>
+#include <dlh/utils/environ.hpp>
+#include <dlh/utils/string.hpp>
+#include <dlh/utils/file.hpp>
+#include <dlh/utils/log.hpp>
 
 #include "object/base.hpp"
 
@@ -28,9 +27,9 @@ int main(int argc, char* argv[]) {
 	struct Opts {
 		int loglevel{Log::DEBUG};
 		const char * logfile{};
-		std::vector<const char *> libpath{};
+		Vector<const char *> libpath{};
 		const char * libpathconf{"libpath.conf"};
-		std::vector<const char *> preload{};
+		Vector<const char *> preload{};
 		bool dynamicUpdate{};
 		bool showHelp{};
 	};
@@ -81,7 +80,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	LOG_DEBUG << "Adding contents of '" << args.libpathconf << "' to library search path..." << endl;
-	loader.library_path_config = File::contents(args.libpathconf);
+	loader.library_path_config += File::lines(args.libpathconf);
 	LOG_DEBUG << "Config has " << loader.library_path_config.size() << " entries!" << endl;
 
 	// Preload Library

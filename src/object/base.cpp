@@ -1,8 +1,8 @@
 #include "object/base.hpp"
 
-#include "libc/errno.hpp"
-#include "utils/auxiliary.hpp"
-#include "utils/log.hpp"
+#include <dlh/errno.hpp>
+#include <dlh/utils/auxiliary.hpp>
+#include <dlh/utils/log.hpp>
 
 #include "object/dynamic.hpp"
 #include "object/executable.hpp"

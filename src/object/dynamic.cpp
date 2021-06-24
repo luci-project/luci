@@ -1,8 +1,7 @@
 #include "object/dynamic.hpp"
 
-#include "elf_rel.hpp"
-
-#include "utils/log.hpp"
+#include <elfo/elf_rel.hpp>
+#include <dlh/utils/log.hpp>
 
 #include "loader.hpp"
 #include "dl.hpp"
@@ -25,7 +24,7 @@ bool ObjectDynamic::preload_libraries() {
 	bool success = true;
 
 	// load needed libaries
-	std::vector<const char *> libs, rpath, runpath;
+	Vector<const char *> libs, rpath, runpath;
 	for (auto &dyn: dynamic) {
 		switch (dyn.tag()) {
 			case Elf::DT_NEEDED:
@@ -59,6 +58,7 @@ bool ObjectDynamic::preload_libraries() {
 }
 
 bool ObjectDynamic::prepare() {
+	LOG_INFO << "Prepare... " << endl;
 	bool success = true;
 
 	// Perform initial relocations
@@ -154,7 +154,7 @@ bool ObjectDynamic::patchable() const {
 	return true;
 }
 
-std::optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const VersionedSymbol & sym) const {
+Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const VersionedSymbol & sym) const {
 	auto found = dynamic_symbols.index(sym.name(), sym.hash_value(), sym.gnu_hash_value(), version_index(sym.version));
 	if (found != Elf::STN_UNDEF) {
 		auto naked_sym = dynamic_symbols[found];
@@ -176,5 +176,5 @@ std::optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const VersionedSymb
 			return VersionedSymbol{naked_sym, version(symbol_version_index)};
 		}
 	}
-	return std::nullopt;
+	return {};
 }

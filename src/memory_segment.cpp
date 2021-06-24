@@ -1,7 +1,7 @@
 #include "memory_segment.hpp"
 
-#include "libc/errno.hpp"
-#include "utils/log.hpp"
+#include <dlh/errno.hpp>
+#include <dlh/utils/log.hpp>
 
 #include "object/base.hpp"
 #include "loader.hpp"
@@ -21,7 +21,7 @@ bool MemorySegment::map() {
 			::memset(mem, 0, target.page_size());
 	} else {
 		auto page_offset = target.address() % Page::SIZE;
-		assert(page_offset >= 0 && page_offset < Page::SIZE && source.offset >= page_offset);
+		assert(page_offset < Page::SIZE && source.offset >= page_offset);
 		LOG_DEBUG << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " from file " << source.object.file.path << " at " << (source.offset - page_offset) << "..." << endl;
 		errno = 0;
 		mem = ::mmap(reinterpret_cast<void*>(target.page_start()), target.page_size(), PROT_READ | PROT_WRITE, MAP_FIXED_NOREPLACE | MAP_PRIVATE, source.object.data.fd, source.offset - page_offset);

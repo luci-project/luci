@@ -1,12 +1,12 @@
 #include "init.hpp"
 
-#include <cstdarg>
+#include <dlh/alloc.hpp>
+#include <dlh/stdarg.hpp>
+#include <dlh/stream/output.hpp>
+#include <dlh/stream/buffer.hpp>
+
 #include <capstone/capstone.h>
 
-#include "libc/alloc.hpp"
-
-#include "utils/stream/output.hpp"
-#include "utils/stream/buffer.hpp"
 
 int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 	return BufferStream(str, size).format(format, ap);

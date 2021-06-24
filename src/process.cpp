@@ -1,10 +1,9 @@
 #include "process.hpp"
 
-#include "libc/assert.hpp"
-#include "libc/unistd.hpp"
-#include "libc/string.hpp"
-
-#include "utils/log.hpp"
+#include <dlh/assert.hpp>
+#include <dlh/unistd.hpp>
+#include <dlh/string.hpp>
+#include <dlh/utils/log.hpp>
 
 
 Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(stack_pointer), stack_size(stack_size) {
@@ -37,7 +36,7 @@ Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(sta
 	for (int auxc = 0 ; auxv[auxc].a_type != Auxiliary::AT_NULL; auxc++) {
 		Auxiliary::type t = auxv[auxc].a_type;
 		auto v = auxv[auxc].a_un.a_val;
-		aux.insert({ t, v });
+		aux.insert(t, v);
 	}
 
 	// Adjust
@@ -57,7 +56,7 @@ uintptr_t Process::allocate_stack(size_t stack_size) {
 }
 
 
-void Process::init(const std::vector<const char *> &arg) {
+void Process::init(const Vector<const char *> &arg) {
 	if (LOG.visible(Log::INFO)) {
 		LOG_INFO << "Starting process with arguments:" << endl;
 		for (const char * a : arg)
@@ -71,14 +70,14 @@ void Process::init(const std::vector<const char *> &arg) {
 	stack_pointer -= sizeof(void*);
 
 	// environment strings
-	std::vector<const char *> env_str;
+	Vector<const char *> env_str;
 	for (auto it = env.rbegin(); it != env.rend(); ++it) {
 		stack_pointer -= strlen(*it) + 1;
 		env_str.push_back(strcpy(reinterpret_cast<char *>(stack_pointer), *it));
 	}
 
 	// argument strings
-	std::vector<const char *> arg_str;
+	Vector<const char *> arg_str;
 	for (auto it = arg.rbegin(); it != arg.rend(); ++it) {
 		stack_pointer -= strlen(*it) + 1;
 		arg_str.push_back(strcpy(reinterpret_cast<char *>(stack_pointer), *it));
@@ -92,10 +91,10 @@ void Process::init(const std::vector<const char *> &arg) {
 	aux_addr--;
 	aux_addr->a_type = Auxiliary::AT_NULL;
 	aux_addr->a_un.a_val = 0;
-	for (auto it = aux.begin(); it != aux.end(); ++it) {
+	for (const auto & i : aux) {
 		aux_addr--;
-		aux_addr->a_type = it->first;
-		aux_addr->a_un.a_val = it->second;
+		aux_addr->a_type = i.key;
+		aux_addr->a_un.a_val = i.value;
 	}
 
 	const char ** ptr_addr = reinterpret_cast<const char**>(aux_addr);
