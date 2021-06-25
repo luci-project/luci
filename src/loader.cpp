@@ -54,10 +54,29 @@ Loader::~Loader() {
 	lookup.clear();
 }
 
+static void observer_signal(int signum) {
+	LOG_INFO << "Observer ends (Signal " << signum << ")" << endl;
+	exit(0);
+}
 
 void Loader::observer() {
-	char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+	// Set signal handler
+	errno = 0;
+	struct sigaction action;
+	memset(&action, 0, sizeof(struct sigaction));
+	action.sa_handler = observer_signal;
+	auto ret_sa = sigaction(SIGTERM, &action, NULL);
+	if (ret_sa == -1)
+		LOG_WARNING << "Unable to set observer signal handler: " << __errno_string(errno) << endl;
 
+	// Set death handler
+	errno = 0;
+	auto ret_pr = prctl(PR_SET_PDEATHSIG, SIGTERM);  // Stop with parent
+	if (ret_pr == -1)
+		LOG_WARNING << "Unable to set observer death signal: " << __errno_string(errno) << endl;
+
+	// Loop over inotify
+	char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
 	while (true) {
 		errno = 0;
 		ssize_t len = read(inotifyfd, buf, sizeof(buf));
