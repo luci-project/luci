@@ -3,10 +3,14 @@
 #include "object/base.hpp"
 
 extern "C" __attribute__((__used__)) void * dlresolve(const Object & o, size_t index) {
-	alignas(64) uint8_t buf[1024];
+#ifndef NO_FPU
+	alignas(64) uint8_t buf[4096];
 	asm volatile ("xsave (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
+#endif
 	auto r = o.dynamic_resolve(index);
+#ifndef NO_FPU
 	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
+#endif
 	return r;
 }
 

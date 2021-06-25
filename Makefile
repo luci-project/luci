@@ -7,8 +7,11 @@ INCLUDE := elfo bean
 
 CXX = g++
 
-CFLAGS ?= -Og -g
-CFLAGS += -ffunction-sections -fdata-sections
+CFLAGS ?= -Os -g
+CFLAGS += -ffunction-sections -fdata-sections -nostdlib
+ifdef NO_FPU
+CFLAGS += -mno-mmx -mno-sse -mgeneral-regs-only -DNO_FPU
+endif
 CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -fno-pic -mno-red-zone
 
 CXXFLAGS ?= -std=c++2a $(CFLAGS)

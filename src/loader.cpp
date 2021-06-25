@@ -102,11 +102,13 @@ ObjectIdentity * Loader::library(const char * filename, const Vector<const char 
 	ObjectIdentity * lib;
 	// only file name provided - look for it in search paths
 	if (path == name) {
-		for (const Vector<const char *> & path : { rpath, library_path_runtime, runpath, library_path_config, library_path_default }) {
+		for (const auto & path : { rpath, library_path_runtime, runpath, library_path_config, library_path_default }) {
 			for (auto & dir : path)
 				if ((lib = open(filename, dir, ns)) != nullptr)
 					return lib;
 		}
+
+
 	} else {
 		// Full path
 		if ((lib = open(filename, ns)) != 0)
