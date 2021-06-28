@@ -45,12 +45,21 @@ bool ObjectDynamic::preload_libraries() {
 	}
 
 	for (auto & lib : libs) {
-		auto o = file.loader.library(lib, rpath, runpath);
-		if (o == nullptr) {
-			LOG_WARNING << "Unresolved dependency: " << lib << endl;
-			success = false;
-		} else {
-			dependencies.push_back(o);
+		// Is lib excluded? TODO: Should be done with resolved path
+		bool skip = false;
+		for (const auto & ex : file.loader.library_exclude)
+			if (strcmp(ex, lib) == 0) {
+				LOG_WARNING << "Library '" << ex << "' will be skipped (exclude list)" << endl;
+				skip = true;
+			}
+		if (!skip) {
+			auto o = file.loader.library(lib, rpath, runpath);
+			if (o == nullptr) {
+				LOG_WARNING << "Unresolved dependency: " << lib << endl;
+				success = false;
+			} else {
+				dependencies.push_back(o);
+			}
 		}
 	}
 

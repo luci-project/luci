@@ -9,10 +9,11 @@ CXX = g++
 
 CFLAGS ?= -Os -g
 CFLAGS += -ffunction-sections -fdata-sections -nostdlib
+CFLAGS += -fno-jump-tables -fno-plt -fPIE
 ifdef NO_FPU
 CFLAGS += -mno-mmx -mno-sse -mgeneral-regs-only -DNO_FPU
 endif
-CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -fno-pic -mno-red-zone
+CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
 
 CXXFLAGS ?= -std=c++2a $(CFLAGS)
 CXXFLAGS += -I $(SRCFOLDER) $(foreach INC,$(LIBS) $(INCLUDE),-I $(INC)/include)
@@ -21,28 +22,35 @@ CXXFLAGS += -I dlh/legacy
 # Elfo ELF class should be virtual & reference to DLH
 CXXFLAGS += -DVIRTUAL -DUSE_DLH
 # Disable several CXX features
-CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit -no-pie
+CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit
 CXXFLAGS += -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
 CXXFLAGS += -static-libgcc
+CXXFLAGS += -fvisibility=hidden
 
-BUILDFLAGS_capstone := CFLAGS="$(CFLAGS) -Iinclude -DCAPSTONE_DIET -DCAPSTONE_X86_ATT_DISABLE -DCAPSTONE_HAS_X86" CAPSTONE_DIET=yes CAPSTONE_X86_ATT_DISABLE=yes CAPSTONE_ARCHS="x86" CAPSTONE_USE_SYS_DYN_MEM=yes CAPSTONE_STATIC=yes CAPSTONE_SHARED=no
+BUILDFLAGS_capstone := CFLAGS="$(CFLAGS) -Iinclude -DCAPSTONE_DIET -DCAPSTONE_X86_ATT_DISABLE -DCAPSTONE_HAS_X86" CAPSTONE_DIET=yes CAPSTONE_X86_ATT_DISABLE=yes CAPSTONE_ARCHS="x86" CAPSTONE_USE_SYS_DYN_MEM=yes CAPSTONE_STATIC=yes CAPSTONE_SHARED=yes
 
+# Default Base address
 BASEADDRESS = 0xbadc000
 
 SOURCES = $(shell find $(SRCFOLDER)/ -name "*.cpp")
 OBJECTS = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))
 DEPFILES = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.d))
-LDFLAGS = $(foreach LIB,$(LIBS),-L $(LIB)/ -l$(LIB)) -Wl,--gc-sections -Wl,-Ttext-segment=$(BASEADDRESS)
+VERSION_SCRIPT = luci.version
+EXPORT_SYMBOLS = $(shell cat $(VERSION_SCRIPT) | grep 'global:' | sed -e 's/global:\(.*\);/\1;/' | tr -d '\n;')
+LDFLAGS = --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
 TARGET_BIN = luci
 LIBPATH_CONF = libpath.conf
 
+# Helper
+SPACE = $(subst ,, )
+COMMA = ,
 
 all: $(TARGET_BIN) $(LIBPATH_CONF)
 
 $(TARGET_BIN): $(OBJECTS) | $(foreach LIB,$(LIBS),$(LIB)/lib$(LIB).a) $(BUILDDIR)
 	@echo "LD		$@"
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) $(foreach LIB,$(LIBS),-L $(LIB)/ -l$(LIB)) -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
 
 $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"
@@ -55,7 +63,7 @@ $(BUILDDIR)/%.o : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -c -o $@ $<
 
 define LIB_template =
-$(1)/lib$(1).a:
+$(1)/lib$(1).a: $(MAKEFILE_LIST)
 	@echo "BUILD		$$@"
 	@test -d $1 || git submodule update --init
 	$$(VERBOSE) $$(MAKE) $$(BUILDFLAGS_$(1)) -j4 -C $1 $$(notdir $$@)

@@ -265,6 +265,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns
 	if (path == nullptr) {
 		buffer[0] = '\0';
 	} else {
+		// We need the absolute path to the directory (GLIBC requirement...)
 		auto pathlen = strlen(path) + 1;
 		char tmp[pathlen];
 		::strncpy(tmp, path, pathlen);

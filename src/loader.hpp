@@ -25,6 +25,9 @@ struct Loader {
 	/*! \brief default library path default (by convention) */
 	Vector<const char *> library_path_default = { "/lib" , "/usr/lib" };
 
+	/*! \brief libraries to exclude */
+	Vector<const char *> library_exclude = { "ld-linux-x86-64.so.2" , "libdl.so.2" };
+
 	/*! \brief List of all loaded objects (for symbol resolving) */
 	ObjectIdentityList lookup;
 

@@ -18,7 +18,7 @@
 #include "loader.hpp"
 #include "init.hpp"
 
-int main(int argc, char* argv[]) {
+__attribute__ ((visibility ("default"))) int main(int argc, char* argv[]) {
 	// Initialize
 	if (!init())
 		return EXIT_FAILURE;

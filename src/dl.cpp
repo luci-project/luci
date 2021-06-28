@@ -60,18 +60,18 @@ _dlresolve:
 )");
 
 
-extern "C" int dlclose(void *) {
+extern "C" __attribute__ ((visibility("default"))) int dlclose(void *) {
 	return 0;
 }
 
-extern "C" char *dlerror(void) {
+extern "C" __attribute__ ((visibility("default"))) char *dlerror(void) {
 	return nullptr;
 }
 
-extern "C" void *dlopen(const char *, int) {
+extern "C" __attribute__ ((visibility("default"))) void *dlopen(const char *, int) {
 	return nullptr;
 }
-extern "C" void *dlsym(void *__restrict, const char *__restrict) {
+extern "C" __attribute__ ((visibility("default"))) void *dlsym(void *__restrict, const char *__restrict) {
 	return nullptr;
 }
 /*
