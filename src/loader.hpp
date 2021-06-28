@@ -26,7 +26,7 @@ struct Loader {
 	Vector<const char *> library_path_default = { "/lib" , "/usr/lib" };
 
 	/*! \brief List of all loaded objects (for symbol resolving) */
-	List<ObjectIdentity> lookup;
+	ObjectIdentityList lookup;
 
 	/*! \brief mutex*/
 	mutable Mutex mutex;

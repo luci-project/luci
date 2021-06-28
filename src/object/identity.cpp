@@ -1,8 +1,10 @@
 #include "object/identity.hpp"
 
-#include <dlh/utility.hpp>
+#include <dlh/string.hpp>
 #include <dlh/unistd.hpp>
+#include <dlh/utility.hpp>
 #include <dlh/utils/log.hpp>
+#include <dlh/utils/file.hpp>
 #include <dlh/utils/xxhash.hpp>
 
 #include "object/base.hpp"
@@ -237,10 +239,20 @@ Object * ObjectIdentity::open(void * ptr, bool preload) {
 		LOG_INFO << "Successfully opened " << path << " at " << (void*)o  << endl;
 	}
 
+	// Initialize GLIBC specific stuff (on first version only)
+	if (base == 0) {
+		base = o->base;
+		for (auto & section : o->sections)
+			if (section.type() == Elf::SHT_DYNAMIC) {
+				dynamic = base + section.virt_addr();
+				break;
+			}
+	}
+
 	return o;
 }
 
-ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns) : loader(loader), ns(ns) {
+ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns) : ns(ns), loader(loader) {
 	assert(ns != DL::LM_ID_NEWLN);
 
 	// Dynamic updates?
@@ -253,7 +265,26 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns
 	if (path == nullptr) {
 		buffer[0] = '\0';
 	} else {
-		::strncpy(buffer, path, PATH_MAX);
+		auto pathlen = strlen(path) + 1;
+		char tmp[pathlen];
+		::strncpy(tmp, path, pathlen);
+		auto tmpfilename = ::strrchr(tmp, '/');
+		size_t bufferlen;
+		bool success;
+		if (tmpfilename == nullptr) {
+			success = File::absolute(".", buffer, PATH_MAX, bufferlen);
+			tmpfilename = tmp;
+		} else {
+			*(tmpfilename++) = '\0';
+			success = File::absolute(tmp, buffer, PATH_MAX, bufferlen);
+		}
+		if (success) {
+			if (bufferlen > 0)
+				buffer[bufferlen++] = '/';
+			::strncpy(buffer + bufferlen, tmpfilename, PATH_MAX - bufferlen);
+		} else {
+			::strncpy(buffer, path, PATH_MAX);
+		}
 		this->path = StrPtr(buffer);
 		this->name = this->path.rchr('/');
 
@@ -275,6 +306,8 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns
 			}
 		}
 	}
+	// GLIBC related
+	filename = buffer;
 
 	// Create shared memory for data
 	errno = 0;
