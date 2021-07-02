@@ -1,8 +1,9 @@
 DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CC=gcc
-CFLAGS=-O2 -Wall -nostdlib -mcmodel=large -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables
-LDFLAGS=-nostdlib -mcmodel=large -ffreestanding -L. -Wl,-rpath=$(DIR)
-# -Wl,--dynamic-linker=$(realpath $(DIR)/../../luci)
+#CFLAGS=-O2 -Wall -nostdlib -mcmodel=large -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables
+#LDFLAGS=-nostdlib -mcmodel=large -ffreestanding -L. -Wl,-rpath=$(DIR)
+CFLAGS=-O2 -Wall -nostdlib -fno-exceptions
+LDFLAGS=-nostdlib -L. -ffreestanding  -Wl,-rpath=$(DIR) -Wl,--dynamic-linker=/opt/luci/test
 LIBS=sys util
 SOURCE=start.c hello.c
 OBJECTS=$(SOURCE:.c=.o)
