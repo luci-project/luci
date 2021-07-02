@@ -18,7 +18,7 @@ int observer_kickoff(void * ptr) {
 	return 0;
 }
 
-Loader::Loader(const char * path, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {
+Loader::Loader(void * luci_self, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {
 	errno = 0;
 
 	if (dynamic_update) {
@@ -34,12 +34,12 @@ Loader::Loader(const char * path, bool dynamicUpdate) : dynamic_update(dynamicUp
 	// Add vDSO (if available)
 	auto vdso = Auxiliary::vector(Auxiliary::AT_SYSINFO_EHDR);
 	if (vdso.valid())
-		open(vdso.a_un.a_ptr, true, true);
+		open(vdso.a_un.a_ptr, true, true, true, "linux-vdso.so.1");
 
-	// add self
-	//auto self = Utils::aux(Auxiliary::AT_BASE);
-	//if (self.valid())
-	//	open(self.a_un.a_ptr), true, true, path);
+
+	// add self as dynamic exec
+	assert(luci_self != nullptr);
+	open(luci_self, true, true, true, "luci.so", DL::LM_ID_BASE, Elf::ET_DYN);
 }
 
 Loader::~Loader() {
@@ -99,7 +99,7 @@ void Loader::observer() {
 				if (event->wd == object_file.wd) {
 					LOG_DEBUG << "Possible file modification in " << object_file.path << endl;
 					assert((event->mask & IN_ISDIR) == 0);
-					if (object_file.open() != nullptr)
+					if (object_file.load() != nullptr)
 						prepare();
 					break;
 				}
@@ -158,7 +158,7 @@ ObjectIdentity * Loader::open(const char * filepath, DL::Lmid_t ns) {
 		LOG_DEBUG << "Loading " << filepath << "..." << endl;
 		auto i = lookup.emplace_back(*this, filepath, ns);
 		assert(i);
-		if (i->open() != nullptr) {
+		if (i->load() != nullptr) {
 			return i.operator->();
 		} else {
 			LOG_ERROR << "Unable to open " << filepath << endl;
@@ -168,7 +168,7 @@ ObjectIdentity * Loader::open(const char * filepath, DL::Lmid_t ns) {
 	return nullptr;
 }
 
-ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool in_execution, const char * filepath, DL::Lmid_t ns) {
+ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath, DL::Lmid_t ns, Elf::ehdr_type type) {
 	if (ns == DL::LM_ID_NEWLN)
 		ns = get_new_ns();
 
@@ -180,13 +180,15 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool in_executio
 		i->flags.immutable_source = 1;
 	}
 
-	Object * o = i->open(ptr, !in_execution);
+	Object * o = i->load(ptr, !is_prepared, !is_mapped, type);
 	if (o != nullptr) {
-		if (in_execution) {
+		if (is_prepared) {
 			i->flags.initialized = 1;
-			o->base = reinterpret_cast<uintptr_t>(ptr);
 			o->is_prepared = true;
+		}
+		if (is_mapped) {
 			o->is_protected = true;
+			o->base = reinterpret_cast<uintptr_t>(ptr);
 		}
 		return i.operator->();
 	} else {
@@ -235,7 +237,7 @@ bool Loader::prepare() {
 	return true;
 }
 
-bool Loader::run(ObjectIdentity * file, Vector<const char *> args, uintptr_t stack_pointer, size_t stack_size) {
+bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer, size_t stack_size) {
 	assert(file != nullptr);
 	Object * start = file->current;
 	assert(start != nullptr);
@@ -261,12 +263,37 @@ bool Loader::run(ObjectIdentity * file, Vector<const char *> args, uintptr_t sta
 	p.aux[Auxiliary::AT_PHDR] = start->base + start->header.e_phoff;
 	p.aux[Auxiliary::AT_PHNUM] = start->header.e_phnum;
 
-	args.push_front(start->file.path.str);
 	p.init(args);
 
 	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << endl;
 	p.start(start->base + entry);
+
+	return true;
+}
+
+bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
+	assert(file != nullptr);
+	Object * start = file->current;
+	assert(start != nullptr);
+	assert(start->file_previous == nullptr);
+
+	if (start->memory_map.size() == 0)
+		return false;
+
+	// Executed binary will be initialized in _start automatically
+	file->flags.initialized = 1;
+
+	// Prepare libraries
+	if (!prepare()) {
+		LOG_ERROR << "Preparation for execution of " << file << " failed..." << endl;
+		file->flags.initialized = false;
+		return false;
+	}
+
+	uintptr_t entry = start->header.entry();
+	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << " (using existing stack at " << (void*) stack_pointer << ")"<< endl;
+	Process::start(start->base + entry, stack_pointer );
 
 	return true;
 }

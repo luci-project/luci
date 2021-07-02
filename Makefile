@@ -15,6 +15,11 @@ CFLAGS += -mno-mmx -mno-sse -mgeneral-regs-only -DNO_FPU
 endif
 CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
 
+# Default Base address
+BASEADDRESS = 0xbadc000
+# Default config file path
+LIBPATH_CONF = /opt/luci/libpath.conf
+
 CXXFLAGS ?= -std=c++2a $(CFLAGS)
 CXXFLAGS += -I $(SRCFOLDER) $(foreach INC,$(LIBS) $(INCLUDE),-I $(INC)/include)
 # Capstone includes depend on standard c includes
@@ -25,22 +30,19 @@ CXXFLAGS += -DVIRTUAL -DUSE_DLH
 CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit
 CXXFLAGS += -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
-CXXFLAGS += -static-libgcc
+CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS) -DLIBPATH_CONF=$(LIBPATH_CONF)
 CXXFLAGS += -fvisibility=hidden
 
 BUILDFLAGS_capstone := CFLAGS="$(CFLAGS) -Iinclude -DCAPSTONE_DIET -DCAPSTONE_X86_ATT_DISABLE -DCAPSTONE_HAS_X86" CAPSTONE_DIET=yes CAPSTONE_X86_ATT_DISABLE=yes CAPSTONE_ARCHS="x86" CAPSTONE_USE_SYS_DYN_MEM=yes CAPSTONE_STATIC=yes CAPSTONE_SHARED=yes
-
-# Default Base address
-BASEADDRESS = 0xbadc000
 
 SOURCES = $(shell find $(SRCFOLDER)/ -name "*.cpp")
 OBJECTS = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))
 DEPFILES = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.d))
 VERSION_SCRIPT = luci.version
 EXPORT_SYMBOLS = $(shell cat $(VERSION_SCRIPT) | grep 'global:' | sed -e 's/global:\(.*\);/\1;/' | tr -d '\n;')
-LDFLAGS = --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
+LDFLAGS = -pie -soname luci.so --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic -Bstatic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
 TARGET_BIN = luci
-LIBPATH_CONF = libpath.conf
+
 
 # Helper
 SPACE = $(subst ,, )

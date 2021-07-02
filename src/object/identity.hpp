@@ -7,8 +7,8 @@
 #include <dlh/stream/buffer.hpp>
 
 #include "dl.hpp"
+#include "object/base.hpp"
 
-struct Object;
 struct Loader;
 
 /*! \brief virtual object */
@@ -72,12 +72,13 @@ struct ObjectIdentity {
 	/*! \brief Load/get current version
 	 * \param ptr use memory mapped Elf instead of file located at path
 	 * \param preload preload and map object
+	 * \param type ELF type (`ET_NONE` to auto determine)
 	 * \return pointer to newly opened object (or nullptr on failure / if already loaded)
 	 */
-	Object * open(void * ptr = nullptr, bool preload = true);
+	Object * load(void * ptr = nullptr, bool preload = true, bool map = true, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief constructor */
-	ObjectIdentity(Loader & loader, const char * path = nullptr, DL::Lmid_t ns = DL::LM_ID_BASE);
+	ObjectIdentity(Loader & loader, const char * path = nullptr, DL::Lmid_t ns = DL::LM_ID_BASE, const char * altname = nullptr);
 	~ObjectIdentity();
 
  private:
@@ -86,6 +87,13 @@ struct ObjectIdentity {
 	int wd;
 	char buffer[PATH_MAX + 1];
 
+
+	/*! \brief create new object instance */
+	Object * create(Object::Data & data, bool preload, bool map, Elf::ehdr_type type);
+
+	/*! \brief Make memory copy of ELF */
+	bool memdup(Object::Data & data);
+
 	bool initialize();
 };
 
@@ -93,4 +101,7 @@ typedef List<ObjectIdentity, ObjectIdentity, &ObjectIdentity::next, &ObjectIdent
 
 static inline BufferStream& operator<<(BufferStream& bs, const ObjectIdentity & o) {
 	return bs << o.name << " (" << o.path << ")";
+}
+static inline BufferStream& operator<<(BufferStream& bs, const Object & o) {
+	return bs << "[Object " << o.file << "]";
 }

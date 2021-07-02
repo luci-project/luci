@@ -63,3 +63,5 @@ extern "C" int dlclose(void *);
 extern "C" char *dlerror(void);
 extern "C" void *dlopen(const char *, int);
 extern "C" void *dlsym(void *__restrict, const char *__restrict);
+
+extern "C" void _rtld_global();

@@ -25,7 +25,7 @@ bool ObjectDynamic::preload_libraries() {
 
 	// load needed libaries
 	Vector<const char *> libs, rpath, runpath;
-	for (auto &dyn: dynamic) {
+	for (auto &dyn: dynamic_table) {
 		switch (dyn.tag()) {
 			case Elf::DT_NEEDED:
 				libs.emplace_back(dyn.string());
@@ -67,7 +67,7 @@ bool ObjectDynamic::preload_libraries() {
 }
 
 bool ObjectDynamic::prepare() {
-	LOG_INFO << "Prepare... " << endl;
+	LOG_INFO << "Prepare " << *this << endl;
 	bool success = true;
 
 	// Perform initial relocations
@@ -83,7 +83,6 @@ bool ObjectDynamic::prepare() {
 		got[2] = reinterpret_cast<uintptr_t>(_dlresolve);
 
 		// Remainder for relocations
-		assert(this->section_by_virt_addr(global_offset_table).entries() >= dynamic_relocations_plt.count() + 3);
 		for (const auto & reloc : dynamic_relocations_plt)
 			if (file.flags.bind_now)
 				relocate(reloc);

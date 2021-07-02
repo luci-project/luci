@@ -35,7 +35,7 @@ struct Loader {
 	mutable Mutex mutex;
 
 	/*! \brief Constructor */
-	Loader(const char * path, bool dynamicUpdate = false);
+	Loader(void * self, bool dynamicUpdate = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
@@ -46,13 +46,14 @@ struct Loader {
 	/*! \brief Load file */
 	ObjectIdentity * open(const char * filename, const char * directory, DL::Lmid_t ns = DL::LM_ID_BASE);
 	ObjectIdentity * open(const char * path, DL::Lmid_t ns = DL::LM_ID_BASE);
-	ObjectIdentity * open(void * ptr, bool prevent_updates, bool in_execution, const char * filepath = nullptr, DL::Lmid_t ns = DL::LM_ID_BASE);
+	ObjectIdentity * open(void * ptr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath = nullptr, DL::Lmid_t ns = DL::LM_ID_BASE, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief prepare all loaded files for execution */
 	bool prepare();
 
 	/*! \brief Run */
-	bool run(ObjectIdentity * file, Vector<const char *> args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
+	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
+	bool run(ObjectIdentity * file, uintptr_t stack_pointer);
 
 	/*! \brief find Symbol with same name and version from other objects in same namespace
 	 */

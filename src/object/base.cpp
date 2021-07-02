@@ -4,6 +4,7 @@
 #include <dlh/utils/auxiliary.hpp>
 #include <dlh/utils/log.hpp>
 
+#include "object/identity.hpp"
 #include "object/dynamic.hpp"
 #include "object/executable.hpp"
 #include "object/relocatable.hpp"
@@ -42,6 +43,10 @@ Object::~Object() {
 		close(data.fd);
 
 	// TODO: unmap file.data?
+}
+
+bool Object::is_latest_version() const {
+	return this == file.current;
 }
 
 bool Object::memory_range(uintptr_t & start, uintptr_t & end) const {

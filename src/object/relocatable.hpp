@@ -1,5 +1,6 @@
 #pragma once
 
+#include "object/identity.hpp"
 #include "object/base.hpp"
 
 struct ObjectRelocatable : public Object {

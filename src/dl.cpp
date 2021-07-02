@@ -74,6 +74,8 @@ extern "C" __attribute__ ((visibility("default"))) void *dlopen(const char *, in
 extern "C" __attribute__ ((visibility("default"))) void *dlsym(void *__restrict, const char *__restrict) {
 	return nullptr;
 }
+
+extern "C" __attribute__ ((visibility("default")))  void _rtld_global() { }
 /*
 TODO:
 int    dlclose(void *);

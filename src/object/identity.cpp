@@ -50,8 +50,8 @@ static bool supported(const Elf::Header * header) {
 	return true;
 }
 
-Object * ObjectIdentity::open(void * ptr, bool preload) {
-	// Not updatable: Return current (first) version
+Object * ObjectIdentity::load(void * ptr, bool preload, bool map, Elf::ehdr_type type) {
+	// Not updatable: Allow only one (current) version
 	if (!flags.updatable && current != nullptr)
 		return nullptr;
 
@@ -96,7 +96,7 @@ Object * ObjectIdentity::open(void * ptr, bool preload) {
 
 	} else {
 		data.ptr = ptr;
-		data.size = Elf(ptr).size();
+		data.size = Elf(ptr).size(true);
 	}
 
 	// Check ELF
@@ -104,155 +104,20 @@ Object * ObjectIdentity::open(void * ptr, bool preload) {
 	if (data.size < sizeof(Elf::Header) || !supported(header)) {
 		LOG_ERROR << "Unsupported ELF header in " << *this << "!" << endl;
 		return nullptr;
-	}
-
-	// Hash file contents
-	if (flags.updatable) {
-		XXHash64 datahash(name.hash);  // Name hash as seed
-		datahash.add(data.ptr, data.size);
-		data.hash = datahash.hash();
-		LOG_DEBUG << "Elf " << *this << " has hash " << hex << data.hash << dec << endl;
-
-		// Check if already loaded (using hash)
-		for (Object * obj = current; obj != nullptr; obj = obj->file_previous)
-			if (obj->data.hash == data.hash && obj->data.size == data.size) {
-				LOG_INFO << "Already loaded " << name << " with same hash -- abort loading..." << endl;
-				if (ptr == nullptr) {
-					::munmap(data.ptr, data.size);
-					::close(data.fd);
-				}
-				return nullptr;
-			}
-	}
-
-	// Copy contents into memory (if changes on the underlying file are possible)
-	if (!flags.immutable_source) {
-		int dupfd = -1;
-		void * dupptr = nullptr;
-
-
-		StringStream<NAME_MAX + 1> memnamestr;
-		memnamestr << name.str << '.' << hex << data.hash;
-		const char * memname = memnamestr.str();
-
-		errno = 0;
-		if ((dupfd = memfd_create(memname, MFD_CLOEXEC | MFD_ALLOW_SEALING)) == -1) {
-			LOG_ERROR << "Creating memory file " << memname << " failed: " << strerror(errno) << endl;
-		} else if (ftruncate(dupfd, data.size) == -1) {
-			LOG_ERROR << "Setting size of " << memname << " failed: " << strerror(errno) << endl;
-			::close(dupfd);
-			dupfd = -1;
-		} else if ((dupptr = ::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_SHARED, dupfd, 0)) == MAP_FAILED) {
-			LOG_ERROR << "Mapping " << memname << " failed: " << strerror(errno) << endl;
-			::close(dupfd);
-			dupfd = -1;
-		} else if (::memcpy(dupptr, data.ptr, data.size) != dupptr) {
-			// this never happens
-			assert(false);
-		} else if (::mprotect(dupptr, data.size, PROT_READ) == -1) {
-			LOG_ERROR << "Protecting " << memname << " (read-only) failed: " << strerror(errno) << endl;
-			::close(dupfd);
-			::munmap(dupptr, data.size);
-			dupfd = -1;
-			dupptr = nullptr;
-		} else if (fcntl(dupfd, F_ADD_SEALS, F_SEAL_FUTURE_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL) == -1) {
-			LOG_ERROR << "Sealing " << memname << " (read-only) failed: " << strerror(errno) << endl;
-			::close(dupfd);
-			::munmap(dupptr, data.size);
-			dupfd = -1;
-			dupptr = nullptr;
-		} else {
-			LOG_INFO << "Created memory copy of " << *this << " in " << memname << endl;
-		}
-
-		// Clean up
-		if (ptr == nullptr && ::munmap(data.ptr, data.size) == -1) {
-			LOG_WARNING << "Unable to unmap file " << *this << ": " << strerror(errno) << endl;
-		} else if (data.fd != -1 && ::close(data.fd) == -1) {
-			LOG_WARNING << "Unable to close file " << *this << ": " << strerror(errno) << endl;
-		}
-
-		if (dupptr == nullptr) {
-			return nullptr;
-		} else {
-			data.fd = dupfd;
-			data.ptr = dupptr;
-			header = reinterpret_cast<const Elf::Header *>(dupptr);
-		}
+	} else if (type == Elf::ET_NONE) {
+		type = header->type();
 	}
 
 	// Create object
-	Object * o = nullptr;
-	switch (header->type()) {
-		case Elf::ET_EXEC:
-			o = new ObjectExecutable{*this, data};
-			break;
-		case Elf::ET_DYN:
-			o = new ObjectDynamic{*this, data};
-			break;
-		case Elf::ET_REL:
-			o = new ObjectRelocatable{*this, data};
-			break;
-		default:
-			LOG_ERROR << "Unsupported ELF type!" << endl;
-			return nullptr;
-	}
-	if (o == nullptr) {
-		LOG_ERROR << "unable to create object" << endl;
+	Object * o = create(data, preload, map, type);
+	if (o == nullptr && data.fd != -1) {
+		::munmap(data.ptr, data.size);
 		::close(data.fd);
-		return nullptr;
 	}
-	o->file_previous = current;
-
-	// If dynamic updates are enabled, calculate function hashes
-	if (flags.updatable) {
-		o->binary_hash.emplace(*o);
-		// if previous version exist, check if we can patch it
-		if (current != nullptr) {
-			assert(current->binary_hash && o->binary_hash);
-			if (!o->patchable()) {
-				LOG_ERROR << "Got new version of " << path << ", however, it is incompatible with previous data..." << endl;
-				delete o;
-				return nullptr;
-			}
-		}
-	}
-	// Add to list
-	current = o;
-
-	// perform preload and map memory
-	if (preload) {
-		if (!o->preload()) {
-			LOG_ERROR << "Loading of " << path << " failed (while preloading)..." << endl;
-			current = o->file_previous;
-			delete o;
-			return nullptr;
-		} else if (!o->map()) {
-			LOG_ERROR << "Loading of " << path << " failed (while mapping into memory)..." << endl;
-			current = o->file_previous;
-			delete o;
-			return nullptr;
-		} else {
-			LOG_INFO << "Successfully loaded " << path << " at " << (void*)o  << endl;
-		}
-	}else {
-		LOG_INFO << "Successfully opened " << path << " at " << (void*)o  << endl;
-	}
-
-	// Initialize GLIBC specific stuff (on first version only)
-	if (base == 0) {
-		base = o->base;
-		for (auto & section : o->sections)
-			if (section.type() == Elf::SHT_DYNAMIC) {
-				dynamic = base + section.virt_addr();
-				break;
-			}
-	}
-
 	return o;
 }
 
-ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns) : ns(ns), loader(loader) {
+ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns, const char * altname) : ns(ns), loader(loader), name(altname) {
 	assert(ns != DL::LM_ID_NEWLN);
 
 	// Dynamic updates?
@@ -287,7 +152,8 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns
 			::strncpy(buffer, path, PATH_MAX);
 		}
 		this->path = StrPtr(buffer);
-		this->name = this->path.rchr('/');
+		if (altname == nullptr)
+			this->name = this->path.rchr('/');
 
 		// Observe file?
 		if (flags.updatable) {
@@ -330,6 +196,150 @@ ObjectIdentity::~ObjectIdentity() {
 	// Delete all versions
 	while (current != nullptr) {
 		delete current;
+	}
+}
+
+
+Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf::ehdr_type type) {
+	// Hash file contents
+	if (flags.updatable) {
+		XXHash64 datahash(name.hash);  // Name hash as seed
+		datahash.add(data.ptr, data.size);
+		data.hash = datahash.hash();
+		LOG_DEBUG << "Elf " << *this << " has hash " << hex << data.hash << dec << endl;
+
+		// Check if already loaded (using hash)
+		for (Object * obj = current; obj != nullptr; obj = obj->file_previous)
+			if (obj->data.hash == data.hash && obj->data.size == data.size) {
+				LOG_INFO << "Already loaded " << name << " with same hash -- abort loading..." << endl;
+				return nullptr;
+			}
+	}
+
+	// Copy contents into memory (if changes on the underlying file are possible)
+	if (!flags.immutable_source && !memdup(data))
+		return nullptr;
+
+	// Create object
+	Object * o = nullptr;
+	switch (type) {
+		case Elf::ET_EXEC:
+			o = new ObjectExecutable{*this, data};
+			break;
+		case Elf::ET_DYN:
+			o = new ObjectDynamic{*this, data};
+			break;
+		case Elf::ET_REL:
+			o = new ObjectRelocatable{*this, data};
+			break;
+		default:
+			LOG_ERROR << "Unsupported ELF type!" << endl;
+			return nullptr;
+	}
+	if (o == nullptr) {
+		LOG_ERROR << "unable to create object" << endl;
+		return nullptr;
+	}
+	o->file_previous = current;
+
+	// If dynamic updates are enabled, calculate function hashes
+	if (flags.updatable) {
+		o->binary_hash.emplace(*o);
+		// if previous version exist, check if we can patch it
+		if (current != nullptr) {
+			assert(current->binary_hash && o->binary_hash);
+			if (!o->patchable()) {
+				LOG_ERROR << "Got new version of " << path << ", however, it is incompatible with previous data..." << endl;
+				delete o;
+				return nullptr;
+			}
+		}
+	}
+	// Add to list
+	current = o;
+
+	// perform preload and map memory
+
+	if (preload && !o->preload()) {
+		LOG_ERROR << "Loading of " << path << " failed (while preloading)..." << endl;
+		current = o->file_previous;
+		delete o;
+		return nullptr;
+	} else if (map && !o->map()) {
+		LOG_ERROR << "Loading of " << path << " failed (while mapping into memory)..." << endl;
+		current = o->file_previous;
+		delete o;
+		return nullptr;
+	} else {
+		LOG_INFO << "Successfully loaded " << path << " at " << (void*)o  << endl;
+	}
+
+	// Initialize GLIBC specific stuff (on first version only)
+	if (base == 0) {
+		base = o->base;
+		for (const auto & segment : o->segments)
+			if (segment.type() == Elf::PT_DYNAMIC) {
+				dynamic = base + segment.virt_addr();
+				break;
+			}
+	}
+
+	return o;
+}
+
+bool ObjectIdentity::memdup(Object::Data & data) {
+	int dupfd = -1;
+	void * dupptr = nullptr;
+
+	StringStream<NAME_MAX + 1> memnamestr;
+	memnamestr << name.str << '.' << hex << data.hash;
+	const char * memname = memnamestr.str();
+
+	errno = 0;
+	if ((dupfd = memfd_create(memname, MFD_CLOEXEC | MFD_ALLOW_SEALING)) == -1) {
+		LOG_ERROR << "Creating memory file " << memname << " failed: " << strerror(errno) << endl;
+	} else if (ftruncate(dupfd, data.size) == -1) {
+		LOG_ERROR << "Setting size of " << memname << " failed: " << strerror(errno) << endl;
+		::close(dupfd);
+		dupfd = -1;
+	} else if ((dupptr = ::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_SHARED, dupfd, 0)) == MAP_FAILED) {
+		LOG_ERROR << "Mapping " << memname << " failed: " << strerror(errno) << endl;
+		::close(dupfd);
+		dupfd = -1;
+	} else if (::memcpy(dupptr, data.ptr, data.size) != dupptr) {
+		// this never happens
+		assert(false);
+	} else if (::mprotect(dupptr, data.size, PROT_READ) == -1) {
+		LOG_ERROR << "Protecting " << memname << " (read-only) failed: " << strerror(errno) << endl;
+		::close(dupfd);
+		::munmap(dupptr, data.size);
+		dupfd = -1;
+		dupptr = nullptr;
+	} else if (fcntl(dupfd, F_ADD_SEALS, F_SEAL_FUTURE_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL) == -1) {
+		LOG_ERROR << "Sealing " << memname << " (read-only) failed: " << strerror(errno) << endl;
+		::close(dupfd);
+		::munmap(dupptr, data.size);
+		dupfd = -1;
+		dupptr = nullptr;
+	} else {
+		LOG_INFO << "Created memory copy of " << *this << " in " << memname << endl;
+	}
+
+	if (dupptr == nullptr) {
+		return false;
+	} else {
+		// Clean up
+		if (data.fd != -1) {
+			if (::munmap(data.ptr, data.size) == -1) {
+				LOG_WARNING << "Unable to unmap file " << *this << ": " << strerror(errno) << endl;
+			} else if (::close(data.fd) == -1) {
+				LOG_WARNING << "Unable to close file " << *this << ": " << strerror(errno) << endl;
+			}
+		}
+
+		data.fd = dupfd;
+		data.ptr = dupptr;
+		return true;
 	}
 }
 

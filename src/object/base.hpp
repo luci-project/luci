@@ -14,11 +14,10 @@
 #include <elfo/elf.hpp>
 #include <bean/bean.hpp>
 
-#include "object/identity.hpp"
-
 #include "versioned_symbol.hpp"
 #include "memory_segment.hpp"
 
+struct ObjectIdentity;
 
 struct Object : public Elf {
 	/*! \brief Information about the object file (shared by all versions) */
@@ -77,9 +76,7 @@ struct Object : public Elf {
 	virtual ~Object();
 
 	/*! check if this object is the current (latest) version */
-	bool is_latest_version() const {
-		return this == file.current;
-	}
+	bool is_latest_version() const;
 
 	/*! \brief virtual memory range used by this object */
 	bool memory_range(uintptr_t & start, uintptr_t & end) const;
@@ -122,7 +119,3 @@ struct Object : public Elf {
 		return !operator==(o);
 	}
 };
-
-static inline BufferStream& operator<<(BufferStream& bs, const Object & o) {
-	return bs << "[Object " << o.file << "]";
-}

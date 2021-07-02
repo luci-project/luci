@@ -66,6 +66,11 @@ class Process {
 	 */
 	void start(uintptr_t entry);
 
+	/*! \brief Start Process
+	 * \param entry Start address
+	 * \param stack_pointer Pointer to top of stack;
+	 */
+	static void start(uintptr_t entry, uintptr_t stack_pointer);
 
 	/*! \brief Dump environment
 	 * \param argc argument count
