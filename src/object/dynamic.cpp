@@ -4,13 +4,16 @@
 #include <dlh/utils/log.hpp>
 
 #include "loader.hpp"
-#include "dl.hpp"
+
+// Defined in compatibility/dl.cpp
+extern "C" void _dlresolve();
 
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
 	// It is possible that multiple threads try to access an unresolved function, hence we have to use a mutex
 	file.loader.mutex.lock();
 	auto r = relocate(dynamic_relocations_plt[index]);
 	file.loader.mutex.unlock();
+	LOG_INFO << *this << " PLT["<< index << "] = " << r << endl;
 	return r;
 }
 
@@ -111,7 +114,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 
 		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
 		if (symbol) {
-			LOG_INFO << "Relocating to " << symbol.value() << " in dynamic object " << file.name << "..." << endl;
+			LOG_INFO << "Relocating to " << (void*)(symbol->value())<< " = " << symbol.value() << " in dynamic object " << file.name << "..." << endl;
 			relocations.emplace_back(reloc, symbol.value());
 			return reinterpret_cast<void*>(Relocator(reloc).fix(this->base, symbol.value(), symbol->object().base, this->global_offset_table));
 		} else if (need_symbol.bind() == STB_WEAK) {
@@ -179,10 +182,15 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const VersionedSymbol & 
 				return file_previous->resolve_symbol(sym);
 		}
 */
-		if (naked_sym.bind() == Elf::STB_GLOBAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
+		if ((naked_sym.bind() == Elf::STB_GLOBAL || naked_sym.bind() == Elf::STB_WEAK) && naked_sym.visibility() == Elf::STV_DEFAULT) {
 			auto symbol_version_index = dynamic_symbols.version(found);
 			return VersionedSymbol{naked_sym, version(symbol_version_index)};
 		}
 	}
 	return {};
+}
+
+bool ObjectDynamic::initialize() {
+	dynamic_table.init(file.loader.argc, file.loader.argv, file.loader.envp, base);
+	return true;
 }

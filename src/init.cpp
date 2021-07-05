@@ -1,5 +1,7 @@
 #include "init.hpp"
 
+#include "compatibility/glibc.hpp"
+
 #include <dlh/alloc.hpp>
 #include <dlh/stdarg.hpp>
 #include <dlh/stream/output.hpp>
@@ -13,6 +15,8 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 }
 
 bool init() {
+	glibc_init();
+
 	// Capstone (used by Bean) without libc
 	cs_opt_mem setup = {
 		.malloc = malloc,

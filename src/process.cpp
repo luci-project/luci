@@ -58,7 +58,7 @@ uintptr_t Process::allocate_stack(size_t stack_size) {
 
 void Process::init(const Vector<const char *> &arg) {
 	if (LOG.visible(Log::INFO)) {
-		LOG_INFO << "Starting process with arguments:" << endl;
+		LOG_INFO << "Initialize process with arguments:" << endl;
 		for (const char * a : arg)
 			LOG << ' ' << a;
 		LOG << endl;

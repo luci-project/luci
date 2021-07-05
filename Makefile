@@ -7,7 +7,7 @@ INCLUDE := elfo bean
 
 CXX = g++
 
-CFLAGS ?= -Os -g
+CFLAGS ?= -Og -g
 CFLAGS += -ffunction-sections -fdata-sections -nostdlib
 CFLAGS += -fno-jump-tables -fno-plt -fPIE
 ifdef NO_FPU
@@ -35,13 +35,13 @@ CXXFLAGS += -fvisibility=hidden
 
 BUILDFLAGS_capstone := CFLAGS="$(CFLAGS) -Iinclude -DCAPSTONE_DIET -DCAPSTONE_X86_ATT_DISABLE -DCAPSTONE_HAS_X86" CAPSTONE_DIET=yes CAPSTONE_X86_ATT_DISABLE=yes CAPSTONE_ARCHS="x86" CAPSTONE_USE_SYS_DYN_MEM=yes CAPSTONE_STATIC=yes CAPSTONE_SHARED=yes
 
+TARGET_BIN = luci
 SOURCES = $(shell find $(SRCFOLDER)/ -name "*.cpp")
 OBJECTS = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))
 DEPFILES = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.d))
 VERSION_SCRIPT = luci.version
 EXPORT_SYMBOLS = $(shell cat $(VERSION_SCRIPT) | grep 'global:' | sed -e 's/global:\(.*\);/\1;/' | tr -d '\n;')
-LDFLAGS = -pie -soname luci.so --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic -Bstatic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
-TARGET_BIN = luci
+LDFLAGS = -pie -soname test --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic -Bstatic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
 
 
 # Helper

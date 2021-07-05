@@ -2,6 +2,8 @@
 
 #include <dlh/types.hpp>
 
+#include "object/identity.hpp"
+
 struct Object;
 
 namespace DL {
@@ -44,8 +46,10 @@ enum Info {
 
 
 typedef long int Lmid_t;
+static_assert(sizeof(Lmid_t) == sizeof(namespace_t), "Namespace has wrong type");
 const Lmid_t LM_ID_BASE = 0;
 const Lmid_t LM_ID_NEWLN = -1;
+static_assert(LM_ID_BASE == NAMESPACE_BASE && LM_ID_NEWLN == NAMESPACE_NEW, "Namespace constants have wrong value");
 
 struct link_map {
 	uintptr_t l_addr;  /* Difference between the address in the ELF file and the address in memory */
@@ -57,11 +61,7 @@ struct link_map {
 // TODO struct r_debug, struct r_debug * _dl_debug_initialize (ElfW(Addr) ldbase, Lmid_t ns)
 }
 
-extern "C" void _dlresolve();
-
 extern "C" int dlclose(void *);
 extern "C" char *dlerror(void);
 extern "C" void *dlopen(const char *, int);
 extern "C" void *dlsym(void *__restrict, const char *__restrict);
-
-extern "C" void _rtld_global();

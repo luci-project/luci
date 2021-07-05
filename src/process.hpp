@@ -5,6 +5,12 @@
 #include <dlh/utils/auxiliary.hpp>
 
 class Process {
+
+	/*! \brief allocate Stack
+	 */
+	uintptr_t allocate_stack(size_t stack_size);
+
+ public:
 	/*! \brief argument count
 	 */
 	int argc = 0;
@@ -17,11 +23,6 @@ class Process {
 	 */
 	const char ** envp = nullptr;
 
-	/*! \brief allocate Stack
-	 */
-	uintptr_t allocate_stack(size_t stack_size);
-
- public:
 	/*! \brief Environment variables
 	 */
 	Vector<const char *> env;

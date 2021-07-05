@@ -8,8 +8,6 @@
 #include <dlh/utils/thread.hpp>
 
 #include "object/identity.hpp"
-
-#include "dl.hpp"
 #include "versioned_symbol.hpp"
 
 struct Loader {
@@ -34,6 +32,11 @@ struct Loader {
 	/*! \brief mutex*/
 	mutable Mutex mutex;
 
+	/*! \brief start arguments & environment pointer*/
+	int argc = 0;
+	const char ** argv = nullptr;
+	const char ** envp = nullptr;
+
 	/*! \brief Constructor */
 	Loader(void * self, bool dynamicUpdate = false);
 
@@ -41,23 +44,20 @@ struct Loader {
 	~Loader();
 
 	/*! \brief Search & load libary */
-	ObjectIdentity * library(const char * file, const Vector<const char *> & rpath = {}, const Vector<const char *> & runpath = {}, DL::Lmid_t ns = DL::LM_ID_BASE);
+	ObjectIdentity * library(const char * file, const Vector<const char *> & rpath = {}, const Vector<const char *> & runpath = {}, namespace_t ns = NAMESPACE_BASE);
 
 	/*! \brief Load file */
-	ObjectIdentity * open(const char * filename, const char * directory, DL::Lmid_t ns = DL::LM_ID_BASE);
-	ObjectIdentity * open(const char * path, DL::Lmid_t ns = DL::LM_ID_BASE);
-	ObjectIdentity * open(void * ptr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath = nullptr, DL::Lmid_t ns = DL::LM_ID_BASE, Elf::ehdr_type type = Elf::ET_NONE);
-
-	/*! \brief prepare all loaded files for execution */
-	bool prepare();
+	ObjectIdentity * open(const char * filename, const char * directory, namespace_t ns = NAMESPACE_BASE);
+	ObjectIdentity * open(const char * path, namespace_t ns = NAMESPACE_BASE);
+	ObjectIdentity * open(void * ptr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief Run */
 	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
-	bool run(ObjectIdentity * file, uintptr_t stack_pointer);
+	bool run(ObjectIdentity * file, int argc, const char **argv, const char ** envp, uintptr_t stack_pointer);
 
 	/*! \brief find Symbol with same name and version from other objects in same namespace
 	 */
-	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym, DL::Lmid_t ns = DL::LM_ID_BASE) const;
+	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym, namespace_t ns = NAMESPACE_BASE) const;
 
 	/*! \brief get next (page aligned) memory address */
 	uintptr_t next_address() const;
@@ -66,12 +66,15 @@ struct Loader {
 	friend int observer_kickoff(void * ptr);
 	friend struct ObjectIdentity;
 
+	/*! \brief Next Namespace */
+	mutable namespace_t next_namespace;
+
 	/*! \brief Descriptor for inotify */
 	int inotifyfd;
 
 	/*! \brief observer method */
 	void observer();
 
-	/*! \brief get new namespace */
-	DL::Lmid_t get_new_ns() const;
+	/*! \brief prepare all loaded files for execution */
+	bool prepare();
 };

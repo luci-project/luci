@@ -4,7 +4,7 @@
 
 extern "C" __attribute__((__used__)) void * dlresolve(const Object & o, size_t index) {
 #ifndef NO_FPU
-	alignas(64) uint8_t buf[4096];
+	alignas(64) uint8_t buf[8192];
 	asm volatile ("xsave (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
 #endif
 	auto r = o.dynamic_resolve(index);
@@ -61,21 +61,24 @@ _dlresolve:
 
 
 extern "C" __attribute__ ((visibility("default"))) int dlclose(void *) {
+	assert(false);
 	return 0;
 }
 
 extern "C" __attribute__ ((visibility("default"))) char *dlerror(void) {
+	assert(false);
 	return nullptr;
 }
 
 extern "C" __attribute__ ((visibility("default"))) void *dlopen(const char *, int) {
+	assert(false);
 	return nullptr;
 }
 extern "C" __attribute__ ((visibility("default"))) void *dlsym(void *__restrict, const char *__restrict) {
+	assert(false);
 	return nullptr;
 }
 
-extern "C" __attribute__ ((visibility("default")))  void _rtld_global() { }
 /*
 TODO:
 int    dlclose(void *);

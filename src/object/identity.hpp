@@ -6,8 +6,11 @@
 #include <dlh/utils/strptr.hpp>
 #include <dlh/stream/buffer.hpp>
 
-#include "dl.hpp"
 #include "object/base.hpp"
+
+typedef long int namespace_t;
+const namespace_t NAMESPACE_BASE = 0;
+const namespace_t NAMESPACE_NEW = -1;
 
 struct Loader;
 
@@ -34,7 +37,7 @@ struct ObjectIdentity {
 	void * multiple_namespace = nullptr;
 
 	/*! \brief Namespace for object */
-	const DL::Lmid_t ns;
+	const namespace_t ns;
 
 	// TODO: Padding size
 	void * padding[100] = {};
@@ -78,7 +81,7 @@ struct ObjectIdentity {
 	Object * load(void * ptr = nullptr, bool preload = true, bool map = true, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief constructor */
-	ObjectIdentity(Loader & loader, const char * path = nullptr, DL::Lmid_t ns = DL::LM_ID_BASE, const char * altname = nullptr);
+	ObjectIdentity(Loader & loader, const char * path = nullptr, namespace_t ns = NAMESPACE_BASE, const char * altname = nullptr);
 	~ObjectIdentity();
 
  private:

@@ -9,7 +9,6 @@
 #include <dlh/utils/file.hpp>
 #include <dlh/utils/log.hpp>
 
-
 #include "object/base.hpp"
 #include "process.hpp"
 
@@ -18,7 +17,7 @@ int observer_kickoff(void * ptr) {
 	return 0;
 }
 
-Loader::Loader(void * luci_self, bool dynamicUpdate) : dynamic_update(dynamicUpdate) {
+Loader::Loader(void * luci_self, bool dynamicUpdate) : dynamic_update(dynamicUpdate), next_namespace(NAMESPACE_BASE + 1) {
 	errno = 0;
 
 	if (dynamic_update) {
@@ -39,7 +38,9 @@ Loader::Loader(void * luci_self, bool dynamicUpdate) : dynamic_update(dynamicUpd
 
 	// add self as dynamic exec
 	assert(luci_self != nullptr);
-	open(luci_self, true, true, true, "luci.so", DL::LM_ID_BASE, Elf::ET_DYN);
+	auto self = open(luci_self, true, true, true, "luci.so", NAMESPACE_BASE, Elf::ET_DYN);
+	LOG_INFO << "Self base is " << self->current->base << endl;
+	self->current->base = 0;
 }
 
 Loader::~Loader() {
@@ -110,10 +111,10 @@ void Loader::observer() {
 }
 
 
-ObjectIdentity * Loader::library(const char * filename, const Vector<const char *> & rpath, const Vector<const char *> & runpath, DL::Lmid_t ns)  {
+ObjectIdentity * Loader::library(const char * filename, const Vector<const char *> & rpath, const Vector<const char *> & runpath, namespace_t ns)  {
 	StrPtr path(filename);
 	auto name = path.rchr('/');
-	if (ns != DL::LM_ID_NEWLN)
+	if (ns != NAMESPACE_NEW)
 		for (auto & i : lookup)
 			if (ns == i.ns && name == i.name)
 				return &i;
@@ -138,7 +139,7 @@ ObjectIdentity * Loader::library(const char * filename, const Vector<const char 
 	return nullptr;
 }
 
-ObjectIdentity * Loader::open(const char * filename, const char * directory, DL::Lmid_t ns) {
+ObjectIdentity * Loader::open(const char * filename, const char * directory, namespace_t ns) {
 	auto filename_len = strlen(filename);
 	auto directory_len = strlen(directory);
 	char path[directory_len + filename_len + 2];
@@ -149,11 +150,11 @@ ObjectIdentity * Loader::open(const char * filename, const char * directory, DL:
 	return open(path, ns);
 }
 
-ObjectIdentity * Loader::open(const char * filepath, DL::Lmid_t ns) {
+ObjectIdentity * Loader::open(const char * filepath, namespace_t ns) {
 	// Does file contain a valid full path?
 	if (File::exists(filepath)) {
-		if (ns == DL::LM_ID_NEWLN)
-			ns = get_new_ns();
+		if (ns == NAMESPACE_NEW)
+			ns = next_namespace++;
 
 		LOG_DEBUG << "Loading " << filepath << "..." << endl;
 		auto i = lookup.emplace_back(*this, filepath, ns);
@@ -168,9 +169,9 @@ ObjectIdentity * Loader::open(const char * filepath, DL::Lmid_t ns) {
 	return nullptr;
 }
 
-ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath, DL::Lmid_t ns, Elf::ehdr_type type) {
-	if (ns == DL::LM_ID_NEWLN)
-		ns = get_new_ns();
+ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath, namespace_t ns, Elf::ehdr_type type) {
+	if (ns == NAMESPACE_NEW)
+		ns = next_namespace++;
 
 	LOG_DEBUG << "Loading from memory " << (void*)ptr << " (" << filepath << ")..." << endl;
 	auto i = lookup.emplace_back(*this, filepath, ns);
@@ -196,14 +197,6 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared
 		lookup.pop_back();
 	}
 	return nullptr;
-}
-
-DL::Lmid_t Loader::get_new_ns() const {
-	DL::Lmid_t ns = DL::LM_ID_BASE + 1;
-	for (const auto & i : lookup)
-		if (i.ns >= ns)
-			ns = i.ns + 1;
-	return ns;
 }
 
 bool Loader::prepare() {
@@ -249,13 +242,6 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	// Executed binary will be initialized in _start automatically
 	file->flags.initialized = 1;
 
-	// Prepare libraries
-	if (!prepare()) {
-		LOG_ERROR << "Preparation for execution of " << file << " failed..." << endl;
-		file->flags.initialized = false;
-		return false;
-	}
-
 	// Prepare execution
 	Process p(stack_pointer, stack_size);
 
@@ -264,6 +250,21 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	p.aux[Auxiliary::AT_PHNUM] = start->header.e_phnum;
 
 	p.init(args);
+	this->argc = p.argc;
+	this->argv = p.argv;
+	this->envp = p.envp;
+
+	// Binary has to be first in list
+	lookup.extract(file);
+	lookup.push_front(file);
+	file->filename = ""; // required by gdb
+
+	// Prepare libraries
+	if (!prepare()) {
+		LOG_ERROR << "Preparation for execution of " << file << " failed..." << endl;
+		file->flags.initialized = false;
+		return false;
+	}
 
 	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << endl;
@@ -272,7 +273,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	return true;
 }
 
-bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
+bool Loader::run(ObjectIdentity * file, int argc, const char **argv, const char ** envp, uintptr_t stack_pointer) {
 	assert(file != nullptr);
 	Object * start = file->current;
 	assert(start != nullptr);
@@ -284,6 +285,15 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	// Executed binary will be initialized in _start automatically
 	file->flags.initialized = 1;
 
+	this->argc = argc;
+	this->argv = argv;
+	this->envp = envp;
+
+	// Binary has to be first in list
+	lookup.extract(file);
+	lookup.push_front(file);
+	file->filename = ""; // required by gdb
+
 	// Prepare libraries
 	if (!prepare()) {
 		LOG_ERROR << "Preparation for execution of " << file << " failed..." << endl;
@@ -293,12 +303,13 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 
 	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << " (using existing stack at " << (void*) stack_pointer << ")"<< endl;
-	Process::start(start->base + entry, stack_pointer );
+	Process::start(start->base + entry, stack_pointer);
 
 	return true;
 }
 
-Optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sym, DL::Lmid_t ns) const {
+Optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sym, namespace_t ns) const {
+	Optional<VersionedSymbol> f = {};
 	for (const auto & object_file : lookup)
 		if (object_file.ns == ns && object_file.current != nullptr) {
 			// Only compare to latest version
@@ -307,10 +318,20 @@ Optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sym, DL
 			auto s = obj->resolve_symbol(sym);
 			if (s) {
 				assert(s->valid());
-				return s;
+				switch (s->bind()) {
+					case Elf::STB_GLOBAL:
+						return s;
+					case Elf::STB_WEAK:
+						if (!f)
+							f = s;
+						break;
+					default:
+						assert(false);
+						continue;
+				};
 			}
 		}
-	return { };
+	return f;
 }
 
 uintptr_t Loader::next_address() const {

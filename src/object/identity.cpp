@@ -117,8 +117,8 @@ Object * ObjectIdentity::load(void * ptr, bool preload, bool map, Elf::ehdr_type
 	return o;
 }
 
-ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, DL::Lmid_t ns, const char * altname) : ns(ns), loader(loader), name(altname) {
-	assert(ns != DL::LM_ID_NEWLN);
+ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t ns, const char * altname) : ns(ns), loader(loader), name(altname) {
+	assert(ns != NAMESPACE_NEW);
 
 	// Dynamic updates?
 	if (loader.dynamic_update)
