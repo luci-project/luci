@@ -10,8 +10,16 @@ const char * text[] = {
 
 const int delay = 3;
 
-int main() {
+int main(int argc, char **argv) {
 	println("Util example\n============");
+
+	print("[Started '");
+	for (int i = 0; i < argc; i++) {
+		if (i > 0)
+			print(" ");
+		print(argv[i]);
+	}
+	println("']");
 
 	const size_t num = sizeof(text)/sizeof(text[0]);
 
