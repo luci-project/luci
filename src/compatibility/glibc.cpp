@@ -218,8 +218,6 @@ void glibc_init() {
 	auto clktck = Auxiliary::vector(Auxiliary::AT_CLKTCK);
 	assert(clktck.a_type == Auxiliary::AT_CLKTCK);
 	rtld_global_ro._dl_clktck = clktck.value();
-
-	cerr << "CLKTCK = " << rtld_global_ro._dl_clktck << endl;
 }
 
 

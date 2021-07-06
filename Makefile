@@ -1,5 +1,7 @@
 VERBOSE = @
 
+TARGET_PATH = /opt/luci/ld-luci.so
+
 SRCFOLDER = src
 BUILDDIR ?= .build
 LIBS := capstone dlh
@@ -30,27 +32,31 @@ CXXFLAGS += -DVIRTUAL -DUSE_DLH
 CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit
 CXXFLAGS += -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
-CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS) -DLIBPATH_CONF=$(LIBPATH_CONF)
+CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS) -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
 CXXFLAGS += -fvisibility=hidden
 
 BUILDFLAGS_capstone := CFLAGS="$(CFLAGS) -Iinclude -DCAPSTONE_DIET -DCAPSTONE_X86_ATT_DISABLE -DCAPSTONE_HAS_X86" CAPSTONE_DIET=yes CAPSTONE_X86_ATT_DISABLE=yes CAPSTONE_ARCHS="x86" CAPSTONE_USE_SYS_DYN_MEM=yes CAPSTONE_STATIC=yes CAPSTONE_SHARED=yes
 
-TARGET_BIN = luci
+
 SOURCES = $(shell find $(SRCFOLDER)/ -name "*.cpp")
 OBJECTS = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))
 DEPFILES = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.d))
 VERSION_SCRIPT = luci.version
 EXPORT_SYMBOLS = $(shell cat $(VERSION_SCRIPT) | grep 'global:' | sed -e 's/global:\(.*\);/\1;/' | tr -d '\n;')
-LDFLAGS = -pie -soname test --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic -Bstatic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
+LDFLAGS = -pie -soname $(notdir $(TARGET_PATH)) --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic -Bstatic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
 
 
 # Helper
 SPACE = $(subst ,, )
 COMMA = ,
 
-all: $(TARGET_BIN) $(LIBPATH_CONF)
+all: $(TARGET_PATH) $(LIBPATH_CONF)
 
-$(TARGET_BIN): $(OBJECTS) | $(foreach LIB,$(LIBS),$(LIB)/lib$(LIB).a) $(BUILDDIR)
+$(TARGET_PATH): $(notdir $(TARGET_PATH))
+	@echo "CP		$@"
+	$(VERBOSE) cp $< $@
+
+$(notdir $(TARGET_PATH)): $(OBJECTS) | $(foreach LIB,$(LIBS),$(LIB)/lib$(LIB).a) $(BUILDDIR)
 	@echo "LD		$@"
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) $(foreach LIB,$(LIBS),-L $(LIB)/ -l$(LIB)) -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
 
@@ -88,7 +94,7 @@ clean::
 	$(VERBOSE) test -d $(BUILDDIR) && rmdir $(BUILDDIR) || true
 
 mrproper:: clean
-	$(VERBOSE) rm -f $(TARGET_BIN)
+	$(VERBOSE) rm -f $(notdir $(TARGET_PATH))
 
 $(BUILDDIR): ; @mkdir -p $@
 

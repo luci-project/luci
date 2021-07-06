@@ -13,7 +13,6 @@ void * ObjectDynamic::dynamic_resolve(size_t index) const {
 	file.loader.mutex.lock();
 	auto r = relocate(dynamic_relocations_plt[index]);
 	file.loader.mutex.unlock();
-	LOG_INFO << *this << " PLT["<< index << "] = " << r << endl;
 	return r;
 }
 

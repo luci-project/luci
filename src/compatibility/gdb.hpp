@@ -1,6 +1,9 @@
 #pragma once
 
-#include "object/identity.hpp"
+#include "loader.hpp"
 
-extern "C" void gdb_initialize(ObjectIdentity *main);
-extern "C" void gdb_notify();
+void gdb_initialize(const Loader & loader);
+void gdb_notify();
+static inline void gdb_breakpoint() {
+	asm volatile("int3" ::: "memory");
+}

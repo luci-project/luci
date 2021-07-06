@@ -29,6 +29,9 @@ struct Loader {
 	/*! \brief List of all loaded objects (for symbol resolving) */
 	ObjectIdentityList lookup;
 
+	/*! \brief loader object */
+	ObjectIdentity * self;
+
 	/*! \brief mutex*/
 	mutable Mutex mutex;
 
@@ -38,7 +41,7 @@ struct Loader {
 	const char ** envp = nullptr;
 
 	/*! \brief Constructor */
-	Loader(void * self, bool dynamicUpdate = false);
+	Loader(void * self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
@@ -53,7 +56,7 @@ struct Loader {
 
 	/*! \brief Run */
 	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
-	bool run(ObjectIdentity * file, int argc, const char **argv, const char ** envp, uintptr_t stack_pointer);
+	bool run(ObjectIdentity * file, uintptr_t stack_pointer);
 
 	/*! \brief find Symbol with same name and version from other objects in same namespace
 	 */
@@ -68,6 +71,7 @@ struct Loader {
 
 	/*! \brief Next Namespace */
 	mutable namespace_t next_namespace;
+
 
 	/*! \brief Descriptor for inotify */
 	int inotifyfd;

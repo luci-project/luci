@@ -10,6 +10,7 @@
 #include <dlh/utils/log.hpp>
 
 #include "object/base.hpp"
+#include "compatibility/gdb.hpp"
 #include "process.hpp"
 
 int observer_kickoff(void * ptr) {
@@ -17,7 +18,7 @@ int observer_kickoff(void * ptr) {
 	return 0;
 }
 
-Loader::Loader(void * luci_self, bool dynamicUpdate) : dynamic_update(dynamicUpdate), next_namespace(NAMESPACE_BASE + 1) {
+Loader::Loader(void * luci_self, const char * sopath, bool dynamicUpdate) : dynamic_update(dynamicUpdate), next_namespace(NAMESPACE_BASE + 1) {
 	errno = 0;
 
 	if (dynamic_update) {
@@ -35,11 +36,10 @@ Loader::Loader(void * luci_self, bool dynamicUpdate) : dynamic_update(dynamicUpd
 	if (vdso.valid())
 		open(vdso.a_un.a_ptr, true, true, true, "linux-vdso.so.1");
 
-
 	// add self as dynamic exec
 	assert(luci_self != nullptr);
-	auto self = open(luci_self, true, true, true, "luci.so", NAMESPACE_BASE, Elf::ET_DYN);
-	LOG_INFO << "Self base is " << self->current->base << endl;
+	self = open(luci_self, true, true, true, sopath, NAMESPACE_BASE, Elf::ET_DYN);
+	LOG_INFO << "Base of " << sopath << " is " << (void*)(self->current->base) << endl;
 	self->current->base = 0;
 }
 
@@ -189,7 +189,12 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared
 		}
 		if (is_mapped) {
 			o->is_protected = true;
-			o->base = reinterpret_cast<uintptr_t>(ptr);
+			i->base = o->base = reinterpret_cast<uintptr_t>(ptr);
+			for (const auto & segment : o->segments)
+				if (segment.type() == Elf::PT_DYNAMIC) {
+					i->dynamic = (reinterpret_cast<const Elf::Header *>(ptr)->type() != Elf::ET_EXEC ? i->base : 0) + segment.virt_addr();
+					break;
+				}
 		}
 		return i.operator->();
 	} else {
@@ -254,10 +259,13 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	this->argv = p.argv;
 	this->envp = p.envp;
 
+	for (const auto & x : lookup)
+		LOG_INFO << " - " << x.filename << endl;
+
 	// Binary has to be first in list
 	lookup.extract(file);
 	lookup.push_front(file);
-	file->filename = ""; // required by gdb
+	lookup.front().filename = ""; // required by gdb
 
 	// Prepare libraries
 	if (!prepare()) {
@@ -266,6 +274,8 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 		return false;
 	}
 
+	gdb_initialize(*this);
+
 	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << endl;
 	p.start(start->base + entry);
@@ -273,7 +283,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	return true;
 }
 
-bool Loader::run(ObjectIdentity * file, int argc, const char **argv, const char ** envp, uintptr_t stack_pointer) {
+bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	assert(file != nullptr);
 	Object * start = file->current;
 	assert(start != nullptr);
@@ -285,14 +295,14 @@ bool Loader::run(ObjectIdentity * file, int argc, const char **argv, const char 
 	// Executed binary will be initialized in _start automatically
 	file->flags.initialized = 1;
 
-	this->argc = argc;
-	this->argv = argv;
-	this->envp = envp;
+	this->argc = *reinterpret_cast<int *>(stack_pointer);;
+	this->argv = reinterpret_cast<const char **>(stack_pointer) + 1;
+	this->envp = this->argv + this->argc + 1;
 
 	// Binary has to be first in list
 	lookup.extract(file);
 	lookup.push_front(file);
-	file->filename = ""; // required by gdb
+	lookup.front().filename = ""; // required by gdb
 
 	// Prepare libraries
 	if (!prepare()) {
@@ -300,6 +310,8 @@ bool Loader::run(ObjectIdentity * file, int argc, const char **argv, const char 
 		file->flags.initialized = false;
 		return false;
 	}
+
+	gdb_initialize(*this);
 
 	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << " (using existing stack at " << (void*) stack_pointer << ")"<< endl;

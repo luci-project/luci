@@ -19,7 +19,10 @@
 #include "init.hpp"
 
 #ifndef LIBPATH_CONF
-#define LIBPATH_CONF libpath.conf
+#error Macro config LIBPATH_CONF missing
+#endif
+#ifndef SOPATH
+#error Macro config SOPATH missing
 #endif
 #define XSTR(var) #var
 #define STR(var) XSTR(var)
@@ -62,7 +65,7 @@ static void * base_from_phdr(void * phdr_ptr, long int entries = 1) {
 	return reinterpret_cast<void*>(base);
 }
 
-static Loader * setup(void * luci_base, struct Opts & opts) {
+static Loader * setup(void * luci_base, const char * luci_path, struct Opts & opts) {
 	// Logger
 	LOG_DEBUG << "Setting log level to " << opts.loglevel << endl;
 	LOG.set(static_cast<Log::Level>(opts.loglevel));
@@ -73,7 +76,7 @@ static Loader * setup(void * luci_base, struct Opts & opts) {
 	}
 
 	// New Loader
-	Loader * loader = new Loader(luci_base, opts.dynamicUpdate);
+	Loader * loader = new Loader(luci_base, luci_path, opts.dynamicUpdate);
 	assert(loader != nullptr);
 
 	// Library search path
@@ -109,7 +112,7 @@ static Loader * setup(void * luci_base, struct Opts & opts) {
 }
 
 static void * const baseaddress = reinterpret_cast<void *>(BASEADDRESS);
-__attribute__ ((visibility ("default"))) int main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
 	// We do no (implicit) self relocation, hence make sure it is already correct
 	assert(reinterpret_cast<uintptr_t>(&_DYNAMIC) - _GLOBAL_OFFSET_TABLE_[0] == 0);
 
@@ -147,7 +150,7 @@ __attribute__ ((visibility ("default"))) int main(int argc, char* argv[]) {
 		}
 
 		// Setup
-		Loader * loader = setup(base, args);
+		Loader * loader = setup(base, argv[0], args);
 
 		// Binary Arguments
 		if (args.has_positional()) {
@@ -181,7 +184,7 @@ __attribute__ ((visibility ("default"))) int main(int argc, char* argv[]) {
 
 		// Setup interpreter (luci)
 		void * luci_base = Auxiliary::vector(Auxiliary::AT_BASE).pointer();
-		Loader * loader = setup(luci_base == nullptr ? baseaddress : luci_base, opts);
+		Loader * loader = setup(luci_base == nullptr ? baseaddress : luci_base, STR(SOPATH), opts);
 
 		// Load target binary
 		const char * bin = reinterpret_cast<const char *>(Auxiliary::vector(Auxiliary::AT_EXECFN).pointer());
@@ -191,9 +194,9 @@ __attribute__ ((visibility ("default"))) int main(int argc, char* argv[]) {
 			return EXIT_FAILURE;
 		}
 
-		// TODO: Use initial luci stack (contents are the same anyways)
-		Vector<const char *> start_args = { bin };
-		if (!loader->run(start, start_args)) {
+		// Use initial luci stack (contents are the same anyways)
+		extern uintptr_t __dlh_stack_pointer;
+		if (!loader->run(start, __dlh_stack_pointer)) {
 			LOG_ERROR << "Start failed" << endl;
 			return EXIT_FAILURE;
 		}

@@ -216,6 +216,29 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 			}
 	}
 
+	/* TODO:
+	 * 1. Load file
+	 * 2. hash & bean (if required)
+	 * 3. Map (load or copy) to target memory if EXEC or DYN && current = 0
+	 * 4. Create object
+	 */
+
+	/*
+	// Temporary Elf object
+	Elf tmp(reinterpret_cast<uintptr_t>(data.ptr));
+	uintptr_t base = 0;
+	switch (type) {
+		case Elf::ET_DYN:
+			base = file.loader.next_address();
+			[[fallthrough]];
+		case Elf::ET_EXEC:
+			// load segments
+			for (const auto & segment : tmp.segments)
+				if (Elf::PT_LOAD == segment.type() && segment.virt_size() > 0)
+					memory_map.emplace_back(tmp, segment, base);
+
+	*/
+
 	// Copy contents into memory (if changes on the underlying file are possible)
 	if (!flags.immutable_source && !memdup(data))
 		return nullptr;
@@ -275,7 +298,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 	}
 
 	// Initialize GLIBC specific stuff (on first version only)
-	if (base == 0) {
+	if (current == o) {
 		base = o->base;
 		for (const auto & segment : o->segments)
 			if (segment.type() == Elf::PT_DYNAMIC) {
