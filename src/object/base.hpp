@@ -111,6 +111,13 @@ struct Object : public Elf {
 		return {};
 	};
 
+	/*! \brief Find (external visible) symbol in this object overlapping the given address */
+	virtual Optional<VersionedSymbol> resolve_symbol(uintptr_t addr) const {
+		(void) addr;
+		return {};
+	};
+
+
 	bool operator==(const Object & o) const {
 		return this == &o;
 	}

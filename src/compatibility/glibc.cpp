@@ -1,9 +1,14 @@
-#include "glibc.hpp"
+#include "compatibility/glibc.hpp"
 
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
+#include <dlh/unistd.hpp>
 #include <dlh/utils/log.hpp>
 #include <dlh/utils/auxiliary.hpp>
+
+#include "loader.hpp"
+#include "compatibility/patch.hpp"
+#include "compatibility/dl.hpp"
 
 __attribute__ ((visibility("default"))) int __libc_enable_secure = 0;
 
@@ -220,6 +225,30 @@ void glibc_init() {
 	rtld_global_ro._dl_clktck = clktck.value();
 }
 
+
+static void fix() {
+	LOG_WARNING << "FIX!" << endl;
+}
+
+static int _dl_addr_patch(void *address, DL::Info *info, void **mapp, __attribute__((unused)) const uintptr_t **symbolp) {
+	return dladdr1(address, info, mapp, DL::RTLD_DL_LINKMAP);
+}
+
+static Patch glibc_fixes[] = {
+	{ "_dl_addr", reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+	{ "__libc_dlopen_mode", reinterpret_cast<uintptr_t>(fix) },
+	{ "__libc_dlclose", reinterpret_cast<uintptr_t>(fix) },
+	{ "__libc_dlsym", reinterpret_cast<uintptr_t>(fix) }
+	//{ "__libc_dlvsym", fix }
+};
+
+bool glibc_patch(const Elf::SymbolTable & symtab, uintptr_t base) {
+	bool r = false;
+	for (const auto & glibc_fix : glibc_fixes)
+		if (glibc_fix.apply(symtab, base))
+			r = true;
+	return r;
+}
 
 #define CONFIG_RTLD_GLOBAL_SIZE 3992
 #define CONFIG_RTLD_GLOBAL_RO_SIZE 536

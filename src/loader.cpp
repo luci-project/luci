@@ -13,6 +13,8 @@
 #include "compatibility/gdb.hpp"
 #include "process.hpp"
 
+static Loader * _instance = nullptr;
+
 int observer_kickoff(void * ptr) {
 	reinterpret_cast<Loader *>(ptr)->observer();
 	return 0;
@@ -41,9 +43,14 @@ Loader::Loader(void * luci_self, const char * sopath, bool dynamicUpdate) : dyna
 	self = open(luci_self, true, true, true, sopath, NAMESPACE_BASE, Elf::ET_DYN);
 	LOG_INFO << "Base of " << sopath << " is " << (void*)(self->current->base) << endl;
 	self->current->base = 0;
+
+	// Assign current instance
+	_instance = this;
 }
 
 Loader::~Loader() {
+	_instance = nullptr;
+
 	if (dynamic_update) {
 		if (close(inotifyfd) != 0) {
 			LOG_ERROR << "Closing inotify failed: " << strerror(errno) << endl;
@@ -346,6 +353,23 @@ Optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sym, na
 	return f;
 }
 
+Optional<VersionedSymbol> Loader::resolve_symbol(uintptr_t addr, namespace_t ns) const {
+	auto o = resolve_object(addr, ns);
+	if (o != nullptr)
+		return o->resolve_symbol(addr);
+	return {};
+}
+
+Object * Loader::resolve_object(uintptr_t addr, namespace_t ns) const {
+	for (const auto & object_file : lookup)
+		if (object_file.ns == ns)
+			for (auto o = object_file.current; o != nullptr; o = o->file_previous)
+				for (const auto & mem : o->memory_map)
+					if (addr >= mem.target.address() && addr <= mem.target.address() + mem.target.size)
+						return o;
+	return nullptr;
+}
+
 uintptr_t Loader::next_address() const {
 	uintptr_t start = 0, end = 0, next = 0;
 	for (const auto & object_file : lookup)
@@ -358,4 +382,12 @@ uintptr_t Loader::next_address() const {
 		next = 0x500000;
 	}
 	return next;
+}
+
+Loader * Loader::instance() {
+	/* Callbacks like dladdr cannot determine the current instance theirself - hence we need this function.
+	   Currently, we only support a single instance & its dead simple,
+	   but maybe in the future we can use PID to match the correct one
+	*/
+	return _instance;
 }

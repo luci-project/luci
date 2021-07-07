@@ -11,9 +11,12 @@
 
 
 struct ObjectDynamic : public ObjectExecutable {
-	ObjectDynamic(ObjectIdentity & file, const Object::Data & data)
+	/*! \brief
+	 * \param mapped Mapped to virtual memory location specified in segments
+	 */
+	ObjectDynamic(ObjectIdentity & file, const Object::Data & data, bool mapped = false)
 	  : ObjectExecutable{file, data},
-	    dynamic_table{this->dynamic()},
+	    dynamic_table{this->dynamic(mapped)},
 	    dynamic_symbols{dynamic_table.get_symbol_table()},
 	    dynamic_relocations{dynamic_table.get_relocations()},
 	    dynamic_relocations_plt{dynamic_table.get_relocations_plt()},
@@ -49,6 +52,7 @@ struct ObjectDynamic : public ObjectExecutable {
 	bool patchable() const override;
 
 	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const override;
+	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr) const override;
 
 	void* relocate(const Elf::Relocation & reloc) const;
 

@@ -11,7 +11,7 @@ bool MemorySegment::map() {
 	const bool copy = source.object.file.loader.dynamic_update
 	               || source.object.data.fd < 0
 	               || (source.size > 0 && (source.offset % Page::SIZE) != (target.address() % Page::SIZE))
-				   || (target.protection & PROT_WRITE) != 0; // TODO: memfd
+	               || (target.protection & PROT_WRITE) != 0; // TODO: memfd
 	if (copy || source.size == 0) {
 		LOG_DEBUG << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " anonymous..." << endl;
 		errno = 0;

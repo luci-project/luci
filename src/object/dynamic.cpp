@@ -3,6 +3,7 @@
 #include <elfo/elf_rel.hpp>
 #include <dlh/utils/log.hpp>
 
+#include "compatibility/glibc.hpp"
 #include "loader.hpp"
 
 // Defined in compatibility/dl.cpp
@@ -71,6 +72,10 @@ bool ObjectDynamic::preload_libraries() {
 bool ObjectDynamic::prepare() {
 	LOG_INFO << "Prepare " << *this << endl;
 	bool success = true;
+
+	// Patch glibc
+	if (glibc_patch(dynamic_symbols, base))
+		LOG_INFO << "Applied GLIBC Patch at " << *this << endl;
 
 	// Perform initial relocations
 	for (auto & reloc : dynamic_relocations)
@@ -185,6 +190,16 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const VersionedSymbol & 
 			auto symbol_version_index = dynamic_symbols.version(found);
 			return VersionedSymbol{naked_sym, version(symbol_version_index)};
 		}
+	}
+	return {};
+}
+
+Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(uintptr_t addr) const {
+	if (addr > base) {
+		uintptr_t offset = addr - base;
+		for (const auto & sym : dynamic_symbols)
+			if (sym.section_index() != Elf::STN_UNDEF && offset >= sym.value() && offset <= sym.value() + sym.size())
+				return VersionedSymbol{sym, version(dynamic_symbols.version(dynamic_symbols.index(sym)))} ;
 	}
 	return {};
 }

@@ -58,12 +58,20 @@ struct Loader {
 	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
 	bool run(ObjectIdentity * file, uintptr_t stack_pointer);
 
-	/*! \brief find Symbol with same name and version from other objects in same namespace
-	 */
+	/*! \brief find Symbol with same name and version from other objects in same namespace */
 	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym, namespace_t ns = NAMESPACE_BASE) const;
+
+	/*! \brief find Symbol overlapping the given address in same namespace */
+	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr, namespace_t ns = NAMESPACE_BASE) const;
+
+	/*! \brief find Object overlapping the given address in same namespace */
+	Object * resolve_object(uintptr_t addr, namespace_t ns = NAMESPACE_BASE) const;
 
 	/*! \brief get next (page aligned) memory address */
 	uintptr_t next_address() const;
+
+	/*! \brief get instance for current process */
+	static Loader * instance();
 
  private:
 	friend int observer_kickoff(void * ptr);

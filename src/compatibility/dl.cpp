@@ -1,15 +1,21 @@
-#include "dl.hpp"
+#include "compatibility/dl.hpp"
 
+#include <dlh/utils/log.hpp>
+
+#include "compatibility/export.hpp"
 #include "object/base.hpp"
+#include "loader.hpp"
 
 extern "C" __attribute__((__used__)) void * dlresolve(const Object & o, size_t index) {
 #ifndef NO_FPU
-	alignas(64) uint8_t buf[8192];
-	asm volatile ("xsave (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
+	const uint32_t mask_low = 0xff;  // assume XSAVE & AVX, TODO: Use CPUID
+	const uint32_t mask_high = 0;
+	alignas(64) uint8_t buf[4096] = {};
+	asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );
 #endif
 	auto r = o.dynamic_resolve(index);
 #ifndef NO_FPU
-	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(7), "d"(0) : "memory" );
+	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );
 #endif
 	return r;
 }
@@ -59,22 +65,58 @@ _dlresolve:
 	jmp *%r11
 )");
 
+Loader * loader = nullptr;  // Temp. fix, defined in main()
 
-extern "C" __attribute__ ((visibility("default"))) int dlclose(void *) {
+EXPORT int dlclose(void *) {
 	assert(false);
 	return 0;
 }
 
-extern "C" __attribute__ ((visibility("default"))) char *dlerror(void) {
+EXPORT char *dlerror(void) {
 	assert(false);
 	return nullptr;
 }
 
-extern "C" __attribute__ ((visibility("default"))) void *dlopen(const char *, int) {
+EXPORT void *dlopen(const char *, int) {
 	assert(false);
 	return nullptr;
 }
-extern "C" __attribute__ ((visibility("default"))) void *dlsym(void *__restrict, const char *__restrict) {
+
+EXPORT int dladdr1(void *addr, DL::Info *info, void **extra_info, int flags) {
+	LOG_DEBUG << "dladdr: resolving " << addr << "..." << endl;
+	auto loader = Loader::instance();
+	assert(loader != nullptr);
+
+	auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
+	if (o == nullptr)
+		return 0;
+
+	LOG_DEBUG << "dladdr: " << addr << " is part of " << *o << endl;
+	assert(info != nullptr);
+	info->dli_fname = o->file.filename;
+	info->dli_fbase = o->base;
+	if (flags == DL::RTLD_DL_LINKMAP)
+		*extra_info = reinterpret_cast<void*>(&(o->file));
+	auto sym = o->resolve_symbol(reinterpret_cast<uintptr_t>(addr));
+	if (sym) {
+		LOG_DEBUG << "dladdr: " << addr << " belongs to " << sym << endl;
+		info->dli_sname = sym->name();
+		info->dli_saddr = o->base + sym->value();
+		if (flags == DL::RTLD_DL_SYMENT)
+			*extra_info = (void *)(sym->_data);
+	} else {
+		info->dli_sname = nullptr;
+		info->dli_saddr = 0;
+	}
+
+	return 1;
+}
+
+EXPORT int dladdr(void *addr, DL::Info *info) {
+	return dladdr1(addr, info, 0, 0);
+}
+
+EXPORT void *dlsym(void *__restrict, const char *__restrict) {
 	assert(false);
 	return nullptr;
 }

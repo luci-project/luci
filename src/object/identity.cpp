@@ -250,7 +250,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 			o = new ObjectExecutable{*this, data};
 			break;
 		case Elf::ET_DYN:
-			o = new ObjectDynamic{*this, data};
+			o = new ObjectDynamic{*this, data, !map};
 			break;
 		case Elf::ET_REL:
 			o = new ObjectRelocatable{*this, data};

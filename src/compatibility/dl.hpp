@@ -4,7 +4,6 @@
 
 #include "object/identity.hpp"
 
-struct Object;
 
 namespace DL {
 
@@ -13,7 +12,7 @@ enum : uintptr_t {
 	RTLD_DEFAULT = 0
 };
 
-enum Info {
+enum : int {
 	/* Treat ARG as `lmid_t *'; store namespace ID for HANDLE there.  */
 	RTLD_DI_LMID = 1,
 	/* Treat ARG as `struct link_map **';
@@ -44,6 +43,20 @@ enum Info {
 	RTLD_DI_MAX = 10
 };
 
+enum : int {
+	/* Matching symbol table entry (const ElfNN_Sym *).  */
+	RTLD_DL_SYMENT = 1,
+
+	/* The object containing the address (struct link_map *).  */
+	RTLD_DL_LINKMAP = 2
+};
+
+struct Info {
+	const char *dli_fname;
+	uintptr_t dli_fbase;
+	const char *dli_sname;
+	uintptr_t dli_saddr;
+};
 
 typedef long int Lmid_t;
 static_assert(sizeof(Lmid_t) == sizeof(namespace_t), "Namespace has wrong type");
@@ -58,10 +71,11 @@ struct link_map {
 	struct link_map *l_next, *l_prev; /* Chain of loaded objects */
 };
 
-// TODO struct r_debug, struct r_debug * _dl_debug_initialize (ElfW(Addr) ldbase, Lmid_t ns)
 }
 
 extern "C" int dlclose(void *);
 extern "C" char *dlerror(void);
 extern "C" void *dlopen(const char *, int);
 extern "C" void *dlsym(void *__restrict, const char *__restrict);
+extern "C" int dladdr(void *addr, DL::Info *info);
+extern "C" int dladdr1(void *addr, DL::Info *info, void **extra_info, int flags);
