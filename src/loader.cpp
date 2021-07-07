@@ -327,14 +327,21 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	return true;
 }
 
-Optional<VersionedSymbol> Loader::resolve_symbol(const VersionedSymbol & sym, namespace_t ns) const {
+Optional<VersionedSymbol> Loader::resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version, namespace_t ns, const ObjectIdentity * after) const {
 	Optional<VersionedSymbol> f = {};
 	for (const auto & object_file : lookup)
 		if (object_file.ns == ns && object_file.current != nullptr) {
+			// Skip objects
+			if (after != nullptr) {
+				if (after == &object_file)
+					after = nullptr;
+				continue;
+			}
+
 			// Only compare to latest version
 			auto obj = object_file.current;
 			assert(obj != nullptr);
-			auto s = obj->resolve_symbol(sym);
+			auto s = obj->resolve_symbol(name, hash, gnu_hash, version);
 			if (s) {
 				assert(s->valid());
 				switch (s->bind()) {
@@ -382,6 +389,14 @@ uintptr_t Loader::next_address() const {
 		next = 0x500000;
 	}
 	return next;
+}
+
+
+bool Loader::is_loaded(const ObjectIdentity * ptr) const {
+	for (const auto & object_file : lookup)
+		if (ptr == &object_file)
+			return true;
+	return false;
 }
 
 Loader * Loader::instance() {

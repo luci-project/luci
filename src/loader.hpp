@@ -59,7 +59,13 @@ struct Loader {
 	bool run(ObjectIdentity * file, uintptr_t stack_pointer);
 
 	/*! \brief find Symbol with same name and version from other objects in same namespace */
-	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym, namespace_t ns = NAMESPACE_BASE) const;
+	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * after = nullptr) const {
+		return resolve_symbol(sym.name(), sym.hash_value(), sym.gnu_hash_value(), sym.version, ns, after);
+	}
+	Optional<VersionedSymbol> resolve_symbol(const char * name, const char * version = nullptr, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * after = nullptr) const {
+		return resolve_symbol(name, ELF_Def::hash(name), ELF_Def::gnuhash(name), VersionedSymbol::Version(version), ns, after);
+	}
+	Optional<VersionedSymbol> resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * after = nullptr) const;
 
 	/*! \brief find Symbol overlapping the given address in same namespace */
 	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr, namespace_t ns = NAMESPACE_BASE) const;
@@ -69,6 +75,9 @@ struct Loader {
 
 	/*! \brief get next (page aligned) memory address */
 	uintptr_t next_address() const;
+
+	/*! \brief check if object is already loaded */
+	bool is_loaded(const ObjectIdentity * ptr) const;
 
 	/*! \brief get instance for current process */
 	static Loader * instance();

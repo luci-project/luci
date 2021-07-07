@@ -114,7 +114,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 	} else /* TODO: if (!dynamic_symbols.ignored(need_symbol_index)) */ {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
 		//assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
-		VersionedSymbol need_symbol(dynamic_symbols[need_symbol_index], version(need_symbol_version_index));
+		VersionedSymbol need_symbol(dynamic_symbols[need_symbol_index], get_version(need_symbol_version_index));
 
 		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
 		if (symbol) {
@@ -169,8 +169,9 @@ bool ObjectDynamic::patchable() const {
 	return true;
 }
 
-Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const VersionedSymbol & sym) const {
-	auto found = dynamic_symbols.index(sym.name(), sym.hash_value(), sym.gnu_hash_value(), version_index(sym.version));
+
+Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version) const {
+	auto found = dynamic_symbols.index(name, hash, gnu_hash, version_index(version));
 	if (found != Elf::STN_UNDEF) {
 		auto naked_sym = dynamic_symbols[found];
 /*
@@ -188,7 +189,7 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const VersionedSymbol & 
 */
 		if ((naked_sym.bind() == Elf::STB_GLOBAL || naked_sym.bind() == Elf::STB_WEAK) && naked_sym.visibility() == Elf::STV_DEFAULT) {
 			auto symbol_version_index = dynamic_symbols.version(found);
-			return VersionedSymbol{naked_sym, version(symbol_version_index)};
+			return VersionedSymbol{naked_sym, get_version(symbol_version_index)};
 		}
 	}
 	return {};
@@ -199,7 +200,7 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(uintptr_t addr) const {
 		uintptr_t offset = addr - base;
 		for (const auto & sym : dynamic_symbols)
 			if (sym.section_index() != Elf::STN_UNDEF && offset >= sym.value() && offset <= sym.value() + sym.size())
-				return VersionedSymbol{sym, version(dynamic_symbols.version(dynamic_symbols.index(sym)))} ;
+				return VersionedSymbol{sym, get_version(dynamic_symbols.version(dynamic_symbols.index(sym)))} ;
 	}
 	return {};
 }

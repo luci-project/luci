@@ -40,6 +40,8 @@ struct ObjectDynamic : public ObjectExecutable {
 	void* dynamic_resolve(size_t index) const override;
 
  protected:
+	using ObjectExecutable::resolve_symbol;
+
 	bool preload() override;
 
 	/*! \brief load required libaries */
@@ -51,7 +53,7 @@ struct ObjectDynamic : public ObjectExecutable {
 
 	bool patchable() const override;
 
-	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const override;
+	Optional<VersionedSymbol> resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version) const override;
 	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr) const override;
 
 	void* relocate(const Elf::Relocation & reloc) const;
@@ -89,7 +91,7 @@ struct ObjectDynamic : public ObjectExecutable {
 		return Elf::VER_NDX_GLOBAL;
 	}
 
-	VersionedSymbol::Version version(uint16_t index) const {
+	VersionedSymbol::Version get_version(uint16_t index) const {
 		if (index == Elf::VER_NDX_GLOBAL)
 			return VersionedSymbol::Version{true};
 

@@ -226,20 +226,16 @@ void glibc_init() {
 }
 
 
-static void fix() {
-	LOG_WARNING << "FIX!" << endl;
-}
-
 static int _dl_addr_patch(void *address, DL::Info *info, void **mapp, __attribute__((unused)) const uintptr_t **symbolp) {
 	return dladdr1(address, info, mapp, DL::RTLD_DL_LINKMAP);
 }
 
 static Patch glibc_fixes[] = {
 	{ "_dl_addr", reinterpret_cast<uintptr_t>(_dl_addr_patch) },
-	{ "__libc_dlopen_mode", reinterpret_cast<uintptr_t>(fix) },
-	{ "__libc_dlclose", reinterpret_cast<uintptr_t>(fix) },
-	{ "__libc_dlsym", reinterpret_cast<uintptr_t>(fix) }
-	//{ "__libc_dlvsym", fix }
+	{ "__libc_dlopen_mode", reinterpret_cast<uintptr_t>(dlopen) },
+	{ "__libc_dlclose", reinterpret_cast<uintptr_t>(dlclose) },
+	{ "__libc_dlsym", reinterpret_cast<uintptr_t>(dlsym) },
+	{ "__libc_dlvsym", reinterpret_cast<uintptr_t>(dlvsym) }
 };
 
 bool glibc_patch(const Elf::SymbolTable & symtab, uintptr_t base) {

@@ -106,8 +106,17 @@ struct Object : public Elf {
 	virtual bool patchable() const { return false; };
 
 	/*! \brief Find (external visible) symbol in this object with same name and version */
-	virtual Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const {
-		(void) sym;
+	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const {
+		return resolve_symbol(sym.name(), sym.hash_value(), sym.gnu_hash_value(), sym.version);
+	}
+	Optional<VersionedSymbol> resolve_symbol(const char * name, const char * version = nullptr) const {
+		return resolve_symbol(name, ELF_Def::hash(name), ELF_Def::gnuhash(name), VersionedSymbol::Version(version));
+	}
+	virtual Optional<VersionedSymbol> resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version) const {
+		(void) name;
+		(void) hash;
+		(void) gnu_hash;
+		(void) version;
 		return {};
 	};
 
