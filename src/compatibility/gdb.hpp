@@ -2,8 +2,10 @@
 
 #include "loader.hpp"
 
-void gdb_initialize(const Loader & loader);
-void gdb_notify();
-static inline void gdb_breakpoint() {
+namespace GDB {
+void init(const Loader & loader);
+void notify();
+static inline void breakpoint() {
 	asm volatile("int3" ::: "memory");
 }
+}  // namespace GDB

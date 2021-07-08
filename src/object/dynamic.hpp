@@ -72,7 +72,7 @@ struct ObjectDynamic : public ObjectExecutable {
 
 	uint16_t version_index(const VersionedSymbol::Version & version) const {
 		if (!version.valid) {
-			return Elf::VER_NDX_LOCAL;
+			//return Elf::VER_NDX_LOCAL;
 		} else if (version.name != nullptr) {
 			for (auto & v : version_needed)
 				for (auto & aux : v.auxiliary())

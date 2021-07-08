@@ -11,6 +11,7 @@
 
 #include "object/base.hpp"
 #include "compatibility/gdb.hpp"
+#include "compatibility/glibc.hpp"
 #include "process.hpp"
 
 static Loader * _instance = nullptr;
@@ -212,6 +213,9 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared
 }
 
 bool Loader::prepare() {
+	// Init GLIBC
+	GLIBC::init_start();
+
 	// Relocate
 	LOG_DEBUG << "Relocate..." << endl;
 	for (auto & o : lookup) {
@@ -233,11 +237,22 @@ bool Loader::prepare() {
 		else
 			return false;
 
+	// Initialize TLS
+	main_thread = tls.allocate(nullptr, true);
+	tls.dtv_setup(main_thread);  // TODO: DLH currently modifies TLS in init
+
+	// Initialize GDB
+	GDB::init(*this);
+	GDB::notify();
+
 	// Initialize (but not binary itself)
 	LOG_DEBUG << "Initialize..." << endl;
 	for (auto & o : lookup)
 		if (!o.initialize())
 			return false;
+
+	// End of init GLIBC
+	GLIBC::init_end();
 
 	return true;
 }
@@ -281,8 +296,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 		return false;
 	}
 
-	gdb_initialize(*this);
-
+	// Start
 	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << endl;
 	p.start(start->base + entry);
@@ -318,8 +332,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 		return false;
 	}
 
-	gdb_initialize(*this);
-
+	// Start
 	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << " (using existing stack at " << (void*) stack_pointer << ")"<< endl;
 	Process::start(start->base + entry, stack_pointer);

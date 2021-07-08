@@ -178,7 +178,7 @@ EXPORT int dladdr(void *addr, DL::Info *info) {
 	return dladdr1(addr, info, 0, 0);
 }
 
-static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, const char *__restrict version, void * caller) {
+void *_dlvsym(void *__restrict handle, const char *__restrict symbol, const char *__restrict version, void * caller) {
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -213,20 +213,18 @@ EXPORT void *dlvsym(void *__restrict handle, const char *__restrict symbol, cons
 	return _dlvsym(handle, symbol, version, __builtin_extract_return_addr(__builtin_return_address(0)));
 }
 
+/*** Additional methods used by glibc ***/
+EXPORT ObjectIdentity *_dl_find_dso_for_object(uintptr_t addr) {
+	auto loader = Loader::instance();
+	assert(loader != nullptr);
 
-/*
-TODO:
-int    dlclose(void *);
-char  *dlerror(void);
-void  *dlopen(const char *, int);
-void  *dlsym(void *__restrict, const char *__restrict);
+	auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
+	if (o != nullptr)
+		return &(o->file);
+	return nullptr;
+}
 
-typedef struct {
-	const char *dli_fname;
-	void *dli_fbase;
-	const char *dli_sname;
-	void *dli_saddr;
-} Dl_info;
-int dladdr(const void *, Dl_info *);
-int dlinfo(void *, int, void *);
-*/
+EXPORT int _dl_make_stack_executable(__attribute__((unused)) void **stack_endp) {
+	LOG_WARNING << "Method to make stack executable not implemented!" << endl;
+	return 0;
+}

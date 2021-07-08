@@ -69,6 +69,9 @@ struct ObjectIdentity {
 	/*! \brief Shared memory (for .data and .bss) */
 	int memfd = -1;
 
+	/*! \brief TLS/DTV module id (0 = none)*/
+	long int module_id = 0;
+
 	/*! \brief Current (latest) version of the object */
 	Object * current = nullptr;
 

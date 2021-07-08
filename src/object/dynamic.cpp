@@ -74,7 +74,7 @@ bool ObjectDynamic::prepare() {
 	bool success = true;
 
 	// Patch glibc
-	if (glibc_patch(dynamic_symbols, base))
+	if (GLIBC::patch(dynamic_symbols, base))
 		LOG_INFO << "Applied GLIBC Patch at " << *this << endl;
 
 	// Perform initial relocations
@@ -118,7 +118,6 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 
 		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
 		if (symbol) {
-			LOG_INFO << "Relocating to " << (void*)(symbol->value())<< " = " << symbol.value() << " in dynamic object " << file.name << "..." << endl;
 			relocations.emplace_back(reloc, symbol.value());
 			return reinterpret_cast<void*>(Relocator(reloc).fix(this->base, symbol.value(), symbol->object().base, this->global_offset_table));
 		} else if (need_symbol.bind() == STB_WEAK) {
@@ -140,6 +139,8 @@ bool ObjectDynamic::patchable() const {
 
 	assert(file_previous->binary_hash && this->binary_hash);
 	LOG_INFO << "Checking if " << this->file.name << " can be patch previous version..." << endl;
+
+	// TODO: Check if TLS data size has changed
 
 	// Check if all required (referenced) symbols to previous object still exist in the new version
 	for (const auto & object_file : file.loader.lookup)

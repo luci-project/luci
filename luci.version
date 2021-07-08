@@ -1,5 +1,5 @@
 GLIBC_PRIVATE {
-	global: __get_cpu_features; _dl_signal_exception; _dl_signal_exception; _dl_get_tls_static_info; _dl_catch_exception; _dl_catch_error; _dl_allocate_tls; _dl_deallocate_tls; _dl_find_dso_for_object; _dl_exception_create; _dl_argv; _dl_exception_create_form; __tunable_get_val;_dl_exception_free; _dl_signal_error; _dl_debug_state; _rtld_global; _dl_make_stack_executable; _dl_allocate_tls_init; _rtld_global_ro; __libc_enable_secure; _dl_rtld_di_serinfo; _dlfcn_hook; __libdl_freeres;
+	global: __get_cpu_features; _dl_signal_exception; _dl_signal_exception; _dl_get_tls_static_info; _dl_catch_exception; _dl_catch_error; _dl_allocate_tls; _dl_deallocate_tls; _dl_find_dso_for_object; _dl_exception_create; _dl_argv; _dl_exception_create_form; __tunable_get_val;_dl_exception_free; _dl_signal_error; _dl_debug_state; _rtld_global; _dl_make_stack_executable; _dl_allocate_tls_init; _rtld_global_ro; __libc_enable_secure; _dl_rtld_di_serinfo; _dlfcn_hook; __libdl_freeres; _dl_starting_up;
 	local: *;
 };
 

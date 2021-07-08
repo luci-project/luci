@@ -12,6 +12,13 @@
 
 __attribute__ ((visibility("default"))) int __libc_enable_secure = 0;
 
+
+int dl_starting_up = 0;
+extern __attribute__ ((alias("dl_starting_up"), visibility("default"))) int _dl_starting_up;
+
+void *libc_stack_end = nullptr;
+extern __attribute__ ((alias("libc_stack_end"), visibility("default"))) void * _libc_stack_end;
+
 // see https://github.com/jtracey/drow-loader/blob/master/glibc.c
 
 char rtld_global[3992];
@@ -218,7 +225,8 @@ extern __attribute__((alias("rtld_global_ro"), visibility("default"))) struct rt
 __attribute__ ((visibility("default"))) char **_dl_argv = nullptr;
 
 
-void glibc_init() {
+namespace GLIBC {
+void init_start() {
 	rtld_global_ro._dl_pagesize = 4096;
 	auto clktck = Auxiliary::vector(Auxiliary::AT_CLKTCK);
 	assert(clktck.a_type == Auxiliary::AT_CLKTCK);
@@ -230,7 +238,7 @@ static int _dl_addr_patch(void *address, DL::Info *info, void **mapp, __attribut
 	return dladdr1(address, info, mapp, DL::RTLD_DL_LINKMAP);
 }
 
-static Patch glibc_fixes[] = {
+static Patch fixes[] = {
 	{ "_dl_addr", reinterpret_cast<uintptr_t>(_dl_addr_patch) },
 	{ "__libc_dlopen_mode", reinterpret_cast<uintptr_t>(dlopen) },
 	{ "__libc_dlclose", reinterpret_cast<uintptr_t>(dlclose) },
@@ -238,13 +246,23 @@ static Patch glibc_fixes[] = {
 	{ "__libc_dlvsym", reinterpret_cast<uintptr_t>(dlvsym) }
 };
 
-bool glibc_patch(const Elf::SymbolTable & symtab, uintptr_t base) {
+bool patch(const Elf::SymbolTable & symtab, uintptr_t base) {
 	bool r = false;
-	for (const auto & glibc_fix : glibc_fixes)
-		if (glibc_fix.apply(symtab, base))
+	for (const auto & fix : fixes)
+		if (fix.apply(symtab, base))
 			r = true;
 	return r;
 }
+
+void init_end() {
+	dl_starting_up = 1;
+}
+
+void stack_end(void * ptr) {
+	libc_stack_end = ptr;
+}
+
+}  // namespace GLIBC
 
 #define CONFIG_RTLD_GLOBAL_SIZE 3992
 #define CONFIG_RTLD_GLOBAL_RO_SIZE 536

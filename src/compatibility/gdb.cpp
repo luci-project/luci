@@ -32,15 +32,16 @@ struct r_debug {
 } _r_debug;
 
 
+namespace GDB {
 
-void gdb_notify() {
+void notify() {
 	asm volatile ("nop" ::: "memory");
 }
 
-void gdb_initialize(const Loader & loader) {
+void init(const Loader & loader) {
 	_r_debug.r_version = 1;
 	_r_debug.r_map = &loader.lookup.front();
-	_r_debug.r_brk = gdb_notify;
+	_r_debug.r_brk = notify;
 	_r_debug.r_state = r_debug::RT_CONSISTENT;
 	_r_debug.r_ldbase = loader.self->base;
 	assert(_r_debug.r_map != nullptr);
@@ -55,3 +56,4 @@ void gdb_initialize(const Loader & loader) {
 	}
 	LOG_WARNING << "GDB debug structure not assigned" << endl;
 }
+}  // namespace GDB

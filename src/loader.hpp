@@ -9,6 +9,7 @@
 
 #include "object/identity.hpp"
 #include "versioned_symbol.hpp"
+#include "tls.hpp"
 
 struct Loader {
 	/*! \brief enable dynamic updates? */
@@ -32,8 +33,11 @@ struct Loader {
 	/*! \brief loader object */
 	ObjectIdentity * self;
 
-	/*! \brief mutex*/
+	/*! \brief mutex */
 	mutable Mutex mutex;
+
+	/*! \brief thread local storage */
+	TLS tls;
 
 	/*! \brief start arguments & environment pointer*/
 	int argc = 0;
@@ -89,6 +93,8 @@ struct Loader {
 	/*! \brief Next Namespace */
 	mutable namespace_t next_namespace;
 
+	/*! \brief Main thread (for TLS) */
+	Thread * main_thread = nullptr;
 
 	/*! \brief Descriptor for inotify */
 	int inotifyfd;
