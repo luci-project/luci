@@ -70,7 +70,10 @@ struct ObjectIdentity {
 	int memfd = -1;
 
 	/*! \brief TLS/DTV module id (0 = none)*/
-	long int module_id = 0;
+	size_t tls_module_id = 0;
+
+	/*! \brief TLS offset (from thread pointer / %fs), 0 for dynamic (non-initial/static) TLS */
+	intptr_t tls_offset = 0;
 
 	/*! \brief Current (latest) version of the object */
 	Object * current = nullptr;

@@ -281,9 +281,6 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	this->argv = p.argv;
 	this->envp = p.envp;
 
-	for (const auto & x : lookup)
-		LOG_INFO << " - " << x.filename << endl;
-
 	// Binary has to be first in list
 	lookup.extract(file);
 	lookup.push_front(file);

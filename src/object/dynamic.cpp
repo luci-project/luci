@@ -107,9 +107,13 @@ void ObjectDynamic::update() {
 }
 
 void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
+	// Initialize relocator object
+	Relocator relocator(reloc, this->global_offset_table, this->file.tls_module_id, this->file.tls_offset);
+	// find symbol
 	auto need_symbol_index = reloc.symbol_index();
 	if (need_symbol_index == 0) {
-		auto ptr = Relocator(reloc).fix(this->base, this->global_offset_table);
+		// Fix local symbol
+		auto ptr = relocator.fix(this->base);
 		return reinterpret_cast<void*>(ptr);
 	} else /* TODO: if (!dynamic_symbols.ignored(need_symbol_index)) */ {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
@@ -119,7 +123,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
 		if (symbol) {
 			relocations.emplace_back(reloc, symbol.value());
-			return reinterpret_cast<void*>(Relocator(reloc).fix(this->base, symbol.value(), symbol->object().base, this->global_offset_table));
+			return reinterpret_cast<void*>(relocator.fix(this->base, symbol.value(), symbol->object().base));
 		} else if (need_symbol.bind() == STB_WEAK) {
 			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "..." << endl;
 		} else {

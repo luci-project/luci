@@ -370,7 +370,7 @@ bool ObjectIdentity::initialize() {
 	assert(current != nullptr);
 	if (flags.initialized == 0) {
 		flags.initialized = 1;
-
+		LOG_DEBUG << "Initialize " << * this << endl;
 		for (auto & dep : current->dependencies)
 			if (!dep->initialize())
 				return false;
