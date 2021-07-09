@@ -354,17 +354,11 @@ Optional<VersionedSymbol> Loader::resolve_symbol(const char * name, uint32_t has
 			auto s = obj->resolve_symbol(name, hash, gnu_hash, version);
 			if (s) {
 				assert(s->valid());
-				switch (s->bind()) {
-					case Elf::STB_GLOBAL:
-						return s;
-					case Elf::STB_WEAK:
-						if (!f)
-							f = s;
-						break;
-					default:
-						assert(false);
-						continue;
-				};
+				assert(s->bind() != Elf::STB_LOCAL); // should not be returned
+				if (s->bind() != Elf::STB_WEAK)
+					return s;
+				else if (!f)
+					f = s;
 			}
 		}
 	return f;

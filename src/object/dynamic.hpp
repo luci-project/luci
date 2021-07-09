@@ -74,18 +74,17 @@ struct ObjectDynamic : public ObjectExecutable {
 		if (!version.valid) {
 			//return Elf::VER_NDX_LOCAL;
 		} else if (version.name != nullptr) {
-			for (auto & v : version_needed)
-				for (auto & aux : v.auxiliary())
-					if (aux.hash() == version.hash && (aux.name() == version.name || strcmp(aux.name(), version.name) == 0))
-						return aux.version_index();
-
-			for (auto & v : version_definition) {
+			for (auto & v : version_definition)
 				if (v.hash() == version.hash && !v.base()) {
 					const char * n = v.auxiliary()[0].name();
 					if (n == version.name || strcmp(n, version.name) == 0)
 						return v.version_index();
 				}
-			}
+
+			for (auto & v : version_needed)
+				for (auto & aux : v.auxiliary())
+					if (aux.hash() == version.hash && (aux.name() == version.name || strcmp(aux.name(), version.name) == 0))
+						return aux.version_index();
 		}
 
 		return Elf::VER_NDX_GLOBAL;

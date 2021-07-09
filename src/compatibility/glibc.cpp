@@ -17,7 +17,7 @@ int dl_starting_up = 0;
 extern __attribute__ ((alias("dl_starting_up"), visibility("default"))) int _dl_starting_up;
 
 void *libc_stack_end = nullptr;
-extern __attribute__ ((alias("libc_stack_end"), visibility("default"))) void * _libc_stack_end;
+extern __attribute__ ((alias("libc_stack_end"), visibility("default"))) void * __libc_stack_end;
 
 // see https://github.com/jtracey/drow-loader/blob/master/glibc.c
 

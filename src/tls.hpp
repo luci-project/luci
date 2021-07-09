@@ -44,7 +44,6 @@ struct TLS {
 		Module(const ObjectIdentity & object, size_t size, size_t align, uintptr_t image, size_t image_size, intptr_t offset = 0)
 		  : object(object), size(size), align(align), image(image), image_size(image_size), offset(offset) {
 			assert(size >= image_size);
-			assert(image_size > 0 || image == 0);
 		  }
 	};
 
