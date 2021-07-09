@@ -130,9 +130,9 @@ void Process::start(uintptr_t entry, uintptr_t stack_pointer) {
 	LOG_INFO << "Starting process at " << (void*)entry << " (with sp = " << (void*)stack_pointer << ")" << endl;
 	asm (
 		"mov    %0,%%rsp;"
-		"mov    %1,%%rbx;"
-		"mov    $2,%%rdx;"
-		"jmp    *%%rbx;"
+		"mov    %1,%%r12;"
+		"mov    %2,%%rdx;"
+		"jmp    *%%r12;"
 		:: "r" (stack_pointer), "r" (entry), "r" (exit_func)
 	);
 }
