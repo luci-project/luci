@@ -4,12 +4,10 @@ TARGET_PATH = /opt/luci/ld-luci.so
 
 SRCFOLDER = src
 BUILDDIR ?= .build
-LIBS := capstone dlh
-INCLUDE := elfo bean
-
+LIBBEAN = bean/libbean.a
 CXX = g++
 
-CFLAGS ?= -Og -g
+CFLAGS ?=
 CFLAGS += -ffunction-sections -fdata-sections -nostdlib
 CFLAGS += -fno-jump-tables -fno-plt -fPIE
 ifdef NO_FPU
@@ -18,14 +16,12 @@ endif
 CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
 
 # Default Base address
-BASEADDRESS = 0xbadc000
+BASEADDRESS = 0xba00000
 # Default config file path
 LIBPATH_CONF = /opt/luci/libpath.conf
 
-CXXFLAGS ?= -std=c++2a $(CFLAGS)
-CXXFLAGS += -I $(SRCFOLDER) $(foreach INC,$(LIBS) $(INCLUDE),-I $(INC)/include)
-# Capstone includes depend on standard c includes
-CXXFLAGS += -I dlh/legacy
+CXXFLAGS ?= -O0 -g -std=c++2a $(CFLAGS)
+CXXFLAGS += -I $(SRCFOLDER) -I $(dir $(LIBBEAN))/include/
 # Elfo ELF class should be virtual & reference to DLH
 CXXFLAGS += -DVIRTUAL -DUSE_DLH
 # Disable several CXX features
@@ -34,9 +30,6 @@ CXXFLAGS += -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
 CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS) -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
 CXXFLAGS += -fvisibility=hidden
-
-BUILDFLAGS_capstone := CFLAGS="$(CFLAGS) -Iinclude -DCAPSTONE_DIET -DCAPSTONE_X86_ATT_DISABLE -DCAPSTONE_HAS_X86" CAPSTONE_DIET=yes CAPSTONE_X86_ATT_DISABLE=yes CAPSTONE_ARCHS="x86" CAPSTONE_USE_SYS_DYN_MEM=yes CAPSTONE_STATIC=yes CAPSTONE_SHARED=yes
-
 
 SOURCES = $(shell find $(SRCFOLDER)/ -name "*.cpp")
 OBJECTS = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))
@@ -52,13 +45,17 @@ COMMA = ,
 
 all: $(TARGET_PATH) $(LIBPATH_CONF)
 
+$(LIBBEAN):
+	@echo "GEN		$@"
+	$(VERBOSE) $(MAKE) DIET=1 -C $(@D)
+
 $(TARGET_PATH): $(notdir $(TARGET_PATH))
 	@echo "CP		$@"
 	$(VERBOSE) cp $< $@
 
-$(notdir $(TARGET_PATH)): $(OBJECTS) | $(foreach LIB,$(LIBS),$(LIB)/lib$(LIB).a) $(BUILDDIR)
+$(notdir $(TARGET_PATH)): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
 	@echo "LD		$@"
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) $(foreach LIB,$(LIBS),-L $(LIB)/ -l$(LIB)) -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) -L$(dir $(LIBBEAN)) -l$(patsubst lib%.a,%,$(notdir $(LIBBEAN))) -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
 
 $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"
@@ -68,23 +65,7 @@ $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 $(BUILDDIR)/%.o : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "CXX		$@"
 	@mkdir -p $(@D)
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -c -o $@ $<
-
-define LIB_template =
-$(1)/lib$(1).a: $(MAKEFILE_LIST)
-	@echo "BUILD		$$@"
-	@test -d $1 || git submodule update --init
-	$$(VERBOSE) $$(MAKE) $$(BUILDFLAGS_$(1)) -j4 -C $1 $$(notdir $$@)
-
-clean::
-	@test -d $1 && $$(MAKE) -C $1 $$@
-
-mrproper::
-	@test -d $1 && $$(MAKE) -C $1 $$@ || true
-	@rm -f $(1)/lib$(1).a
-endef
-
-$(foreach lib,$(LIBS),$(eval $(call LIB_template,$(lib))))
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -D__MODULE__="Luci" -c -o $@ $<
 
 $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
 	$(VERBOSE) ./gen-libpath.sh $< > $@

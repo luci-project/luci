@@ -10,13 +10,12 @@
 #include <dlh/utils/auxiliary.hpp>
 #include <dlh/utils/environ.hpp>
 #include <dlh/utils/string.hpp>
+#include <dlh/utils/macro.hpp>
 #include <dlh/utils/file.hpp>
 #include <dlh/utils/log.hpp>
-
 #include "object/base.hpp"
 
 #include "loader.hpp"
-#include "init.hpp"
 
 #ifndef LIBPATH_CONF
 #error Macro config LIBPATH_CONF missing
@@ -24,8 +23,6 @@
 #ifndef SOPATH
 #error Macro config SOPATH missing
 #endif
-#define XSTR(var) #var
-#define STR(var) XSTR(var)
 
 
 // Parse Arguments
@@ -115,10 +112,6 @@ static void * const baseaddress = reinterpret_cast<void *>(BASEADDRESS);
 int main(int argc, char* argv[]) {
 	// We do no (implicit) self relocation, hence make sure it is already correct
 	assert(reinterpret_cast<uintptr_t>(&_DYNAMIC) - _GLOBAL_OFFSET_TABLE_[0] == 0);
-
-	// Initialize
-	if (!init())
-		return EXIT_FAILURE;
 
 	assert(Auxiliary::vector(Auxiliary::AT_PHENT).value() == sizeof(Elf::Phdr));
 	void * base = base_from_phdr(Auxiliary::vector(Auxiliary::AT_PHDR).pointer(), Auxiliary::vector(Auxiliary::AT_PHNUM).value());

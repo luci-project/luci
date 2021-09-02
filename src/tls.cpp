@@ -96,10 +96,10 @@ void TLS::dtv_copy(Thread * thread, size_t module_id, void * ptr) const {
 
 Thread * TLS::allocate(Thread * thread, bool set_fs) {
 	if (thread == nullptr) {
-		void * mem = calloc(initial_size + TLS_THREAD_SIZE + initial_align, 1);
-		assert(mem != nullptr);
+		uintptr_t mem = reinterpret_cast<uintptr_t>(calloc(initial_size + TLS_THREAD_SIZE + initial_align, 1));
+		assert(mem != 0);
 
-		uintptr_t addr = Math::align(reinterpret_cast<uintptr_t>(mem), initial_align);
+		uintptr_t addr = Math::align(mem, initial_align);
 		assert(TLS_THREAD_SIZE >= sizeof(Thread));
 		thread = new (reinterpret_cast<Thread*>(addr + initial_size)) Thread(nullptr, mem, initial_size + TLS_THREAD_SIZE);
 	}
@@ -123,6 +123,6 @@ void TLS::free(Thread * thread, bool free_thread_struct) {
 	dtv_free(thread);
 	if (free_thread_struct) {
 		assert(thread->map_size == initial_size + TLS_THREAD_SIZE);
-		::free(thread->map_base);
+		::free(reinterpret_cast<void*>(thread->map_base));
 	}
 }

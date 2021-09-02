@@ -1,12 +1,3 @@
-[submodule "dlh"]
-	path = dlh
-	url = ../dlh.git
-[submodule "elfo"]
-	path = elfo
-	url = ../elfo.git
 [submodule "bean"]
 	path = bean
 	url = ../bean.git
-[submodule "capstone"]
-	path = capstone
-	url = https://github.com/aquynh/capstone.git
