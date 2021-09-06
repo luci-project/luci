@@ -108,22 +108,23 @@ void ObjectDynamic::update() {
 
 void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 	// Initialize relocator object
-	Relocator relocator(reloc, this->global_offset_table, this->file.tls_module_id, this->file.tls_offset);
+	Relocator relocator(reloc, this->global_offset_table);
 	// find symbol
 	auto need_symbol_index = reloc.symbol_index();
 	if (need_symbol_index == 0) {
 		// Fix local symbol
-		auto ptr = relocator.fix(this->base);
-		return reinterpret_cast<void*>(ptr);
+		return reinterpret_cast<void*>(relocator.fix_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset));
 	} else /* TODO: if (!dynamic_symbols.ignored(need_symbol_index)) */ {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
 		//assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
 		VersionedSymbol need_symbol(dynamic_symbols[need_symbol_index], get_version(need_symbol_version_index));
-
-		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns);
+		// COPY Relocations have a defined symbol with the same name
+		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns, relocator.is_copy() ? &file : nullptr);
 		if (symbol) {
 			relocations.emplace_back(reloc, symbol.value());
-			return reinterpret_cast<void*>(relocator.fix(this->base, symbol.value(), symbol->object().base));
+			auto & symobj = symbol->object();
+			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << endl;
+			return reinterpret_cast<void*>(relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset));
 		} else if (need_symbol.bind() == STB_WEAK) {
 			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "..." << endl;
 		} else {
@@ -211,6 +212,7 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(uintptr_t addr) const {
 }
 
 bool ObjectDynamic::initialize() {
+	// use mapped memory (due to relocations)
 	dynamic_table.init(file.loader.argc, file.loader.argv, file.loader.envp, base);
 	return true;
 }

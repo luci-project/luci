@@ -103,6 +103,8 @@ Object * ObjectIdentity::load(void * ptr, bool preload, bool map, Elf::ehdr_type
 	const Elf::Header * header = reinterpret_cast<const Elf::Header *>(data.ptr);
 	if (data.size < sizeof(Elf::Header) || !supported(header)) {
 		LOG_ERROR << "Unsupported ELF header in " << *this << "!" << endl;
+		::munmap(data.ptr, data.size);
+		::close(data.fd);
 		return nullptr;
 	} else if (type == Elf::ET_NONE) {
 		type = header->type();
@@ -188,10 +190,8 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t n
 }
 
 ObjectIdentity::~ObjectIdentity() {
-	errno = 0;
-	if (loader.dynamic_update && ::inotify_rm_watch(loader.inotifyfd, wd) == -1) {
+	if (loader.dynamic_update && ::inotify_rm_watch(loader.inotifyfd, wd) == -1)
 		LOG_ERROR << "Removing watch for " << this->path << " failed: " << ::strerror(errno) << endl;
-	}
 
 	// Delete all versions
 	while (current != nullptr) {

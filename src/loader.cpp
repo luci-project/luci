@@ -218,7 +218,7 @@ bool Loader::prepare() {
 
 	// Relocate
 	LOG_DEBUG << "Relocate..." << endl;
-	for (auto & o : lookup) {
+	for (auto & o : reverse(lookup)) {
 		if (o.current->is_prepared)
 			o.current->update();
 		else if (o.current->prepare())
@@ -229,7 +229,7 @@ bool Loader::prepare() {
 
 	// Protect
 	LOG_DEBUG << "Protect memory..." << endl;
-	for (auto & o : lookup)
+	for (auto & o : reverse(lookup))
 		if (o.current->is_protected)
 			continue;
 		else if (o.current->protect())
@@ -245,9 +245,9 @@ bool Loader::prepare() {
 	GDB::init(*this);
 	GDB::notify();
 
-	// Initialize (but not binary itself)
+	// Initialize (but not executable itself)
 	LOG_DEBUG << "Initialize..." << endl;
-	for (auto & o : lookup)
+	for (auto & o : reverse(lookup))
 		if (!o.initialize())
 			return false;
 
