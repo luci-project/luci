@@ -28,19 +28,19 @@ extern __attribute__ ((alias("rtld_global"), visibility("default"))) char * _rtl
 struct rtld_global_ro {
 
 	/* If nonzero the appropriate debug information is printed.  */
-	int _dl_debug_mask;
+	int _dl_debug_mask = 0;
 
 	/* OS version.  */
-	unsigned int _dl_osversion;
+	unsigned int _dl_osversion = 0;
 	/* Platform name.  */
-	const char *_dl_platform;
-	size_t _dl_platformlen;
+	const char *_dl_platform = "";
+	size_t _dl_platformlen = 0;
 
 	/* Cached value of `getpagesize ()'.  */
-	size_t _dl_pagesize;
+	size_t _dl_pagesize = 0x1000;
 
 	/* Do we read from ld.so.cache?  */
-	int _dl_inhibit_cache;
+	int _dl_inhibit_cache = 0;
 
 	/* Copy of the content of `_dl_main_searchlist' at startup time.  */
 	struct {
@@ -51,38 +51,35 @@ struct rtld_global_ro {
 	} _dl_initial_searchlist;
 
 	/* CLK_TCK as reported by the kernel.  */
-	int _dl_clktck;
+	int _dl_clktck = 0;
 
 	/* If nonzero print warnings messages.  */
-	int _dl_verbose;
+	int _dl_verbose = 0;
 
 	/* File descriptor to write debug messages to.  */
-	int _dl_debug_fd;
+	int _dl_debug_fd = 2;
 
 	/* Do we do lazy relocations?  */
-	int _dl_lazy;
+	int _dl_lazy = 1;
 
 	/* Nonzero if runtime lookups should not update the .got/.plt.  */
-	int _dl_bind_not;
+	int _dl_bind_not = 0;
 
 	/* Nonzero if references should be treated as weak during runtime
 	   linking.  */
-	int _dl_dynamic_weak;
+	int _dl_dynamic_weak = 0 ;
 
 	/* Default floating-point control word.  */
-	unsigned int _dl_fpu_control;
+	unsigned int _dl_fpu_control = 0x037f;
 
 	/* Expected cache ID.  */
-	int _dl_correct_cache_id;
+	int _dl_correct_cache_id= 0;
 
 	/* Mask for hardware capabilities that are available.  */
-	uint64_t _dl_hwcap;
-
-	/* Mask for important hardware capabilities we honour. */
-	uint64_t _dl_hwcap_mask;
+	uint64_t _dl_hwcap = 2;
 
 	/* Pointer to the auxv list supplied to the program at startup.  */
-	void *_dl_auxv;
+	void *_dl_auxv = nullptr;
 
 
 	/* NB: When adding new fields, update sysdeps/x86/dl-diagnostics-cpu.c
@@ -159,36 +156,38 @@ struct rtld_global_ro {
 
 
 	/* Names of shared object for which the RPATH should be ignored.  */
-	const char *_dl_inhibit_rpath;
+	const char *_dl_inhibit_rpath = nullptr;
 
 	/* Location of the binary.  */
-	const char *_dl_origin_path;
+	const char *_dl_origin_path = nullptr;
 
 	/* -1 if the dynamic linker should honor library load bias,
 	   0 if not, -2 use the default (honor biases for normal
 	   binaries, don't honor for PIEs).  */
-	intptr_t _dl_use_load_bias;
+	intptr_t _dl_use_load_bias = 0;
 
 	/* Name of the shared object to be profiled (if any).  */
-	const char *_dl_profile;
+	const char *_dl_profile = 0;
 	/* Filename of the output file.  */
 	const char *_dl_profile_output;
 	/* Name of the object we want to trace the prelinking.  */
-	const char *_dl_trace_prelink;
+	const char *_dl_trace_prelink = nullptr;
 	/* Map of shared object to be prelink traced.  */
-	/* struct link_map */ void *_dl_trace_prelink_map;
+	/* struct link_map */ void *_dl_trace_prelink_map = nullptr;
 
 	/* All search directories defined at startup.  This is assigned a
 	   non-NULL pointer by the ld.so startup code (after initialization
 	   to NULL), so this can also serve as an indicator whether a copy
 	   of ld.so is initialized and active.  See the rtld_active function
 	   below.  */
-	/* struct r_search_path_elem */ void *_dl_init_all_dirs;
+	/* struct r_search_path_elem */ void *_dl_init_all_dirs = nullptr;
 
+	/* Syscall handling improvements.  This is very specific to x86.  */
+	uintptr_t _dl_sysinfo;
 
 	/* The vsyscall page is a virtual DSO pre-mapped by the kernel.
 	   This points to its ELF header.  */
-	const /* ElfW(Ehdr) */ void *_dl_sysinfo_dso;
+	/* ElfW(Ehdr) */ void *_dl_sysinfo_dso;
 
 	/* At startup time we set up the normal DSO data structure for it,
 	   and this points to it.  */
@@ -196,9 +195,9 @@ struct rtld_global_ro {
 
 	void * _dl_vdso_clock_gettime64;
 	void * _dl_vdso_gettimeofday;
-	void *_dl_vdso_time;
-	void *_dl_vdso_getcpu;
-	void *_dl_vdso_clock_getres_time64;
+	void * _dl_vdso_time;
+	void * _dl_vdso_getcpu;
+	void * _dl_vdso_clock_getres_time64;
 	/* Mask for more hardware capabilities that are available on some
 	   platforms.  */
 	uint64_t _dl_hwcap2;
@@ -217,8 +216,8 @@ struct rtld_global_ro {
 	int (*_dl_discover_osversion) (void);
 
 	/* List of auditing interfaces.  */
-	/* struct audit_ifaces */ void *_dl_audit;
-	unsigned int _dl_naudit;
+	/* struct audit_ifaces */ void *_dl_audit = nullptr;
+	unsigned int _dl_naudit = 0;
 } rtld_global_ro;
 extern __attribute__((alias("rtld_global_ro"), visibility("default"))) struct rtld_global_ro _rtld_global_ro;
 
@@ -226,11 +225,55 @@ __attribute__ ((visibility("default"))) char **_dl_argv = nullptr;
 
 
 namespace GLIBC {
-void init_start() {
-	rtld_global_ro._dl_pagesize = 4096;
-	auto clktck = Auxiliary::vector(Auxiliary::AT_CLKTCK);
-	assert(clktck.a_type == Auxiliary::AT_CLKTCK);
-	rtld_global_ro._dl_clktck = clktck.value();
+
+static void * resolve(const Loader & loader, const char * name) {
+	auto sym = loader.resolve_symbol(name);
+	return sym ? reinterpret_cast<void*>(sym->object().base + sym->value()) : nullptr;
+}
+
+void init_start(const Loader & loader) {
+	uintptr_t sysinfo = 0;
+	Auxiliary * auxv = Auxiliary::begin();
+	rtld_global_ro._dl_auxv = auxv;
+	for (int auxc = 0 ; auxv[auxc].valid(); auxc++) {
+		const auto & aux = auxv[auxc];
+		switch (aux.a_type) {
+			case Auxiliary::AT_CLKTCK:
+				rtld_global_ro._dl_clktck = aux.value();
+				break;
+			case Auxiliary::AT_PAGESZ:
+				rtld_global_ro._dl_pagesize = aux.value();
+				break;
+			case Auxiliary::AT_PLATFORM:
+				rtld_global_ro._dl_platform = reinterpret_cast<char*>(aux.pointer());
+				rtld_global_ro._dl_platformlen = strlen(rtld_global_ro._dl_platform);
+				break;
+			case Auxiliary::AT_HWCAP:
+				rtld_global_ro._dl_hwcap = aux.value();
+				break;
+			case Auxiliary::AT_HWCAP2:
+				rtld_global_ro._dl_hwcap2 = aux.value();
+				break;
+			case Auxiliary::AT_FPUCW:
+				rtld_global_ro._dl_fpu_control = aux.value();
+				break;
+			case Auxiliary::AT_SYSINFO:
+				sysinfo = aux.value();
+				break;
+			case Auxiliary::AT_SYSINFO_EHDR:
+				rtld_global_ro._dl_sysinfo_dso = aux.pointer();
+				break;
+		}
+	}
+
+	if (sysinfo != 0 && rtld_global_ro._dl_sysinfo_dso != nullptr)
+		rtld_global_ro._dl_sysinfo = sysinfo;
+
+	rtld_global_ro._dl_vdso_clock_gettime64 = resolve(loader, "__vdso_clock_gettime");
+	rtld_global_ro._dl_vdso_gettimeofday = resolve(loader, "__vdso_gettimeofday");
+	rtld_global_ro._dl_vdso_time = resolve(loader, "__vdso_time");
+	rtld_global_ro._dl_vdso_getcpu = resolve(loader, "__vdso_getcpu");
+	rtld_global_ro._dl_vdso_clock_getres_time64 = resolve(loader, "__vdso_clock_getres");
 }
 
 

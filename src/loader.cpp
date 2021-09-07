@@ -212,9 +212,10 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared
 	return nullptr;
 }
 
+extern uintptr_t __stack_chk_guard;
 bool Loader::prepare() {
 	// Init GLIBC
-	GLIBC::init_start();
+	GLIBC::init_start(*this);
 
 	// Relocate
 	LOG_DEBUG << "Relocate..." << endl;
@@ -239,7 +240,16 @@ bool Loader::prepare() {
 
 	// Initialize TLS
 	main_thread = tls.allocate(nullptr, true);
-	tls.dtv_setup(main_thread);  // TODO: DLH currently modifies TLS in init
+	auto random = Auxiliary::vector(Auxiliary::AT_RANDOM);
+	if (random.valid()) {
+		main_thread->setup_guards(random.a_un.a_ptr);
+		__stack_chk_guard = main_thread->stack_guard;
+		LOG_DEBUG << "Stack Guard: " << (void*)main_thread->stack_guard << endl;
+		LOG_DEBUG << "Pointer Guard: " << (void*)main_thread->pointer_guard << endl;
+	} else {
+		LOG_WARNING << "No AT_RANDOM!" << endl;
+	}
+	tls.dtv_setup(main_thread);
 
 	// Initialize GDB
 	GDB::init(*this);
