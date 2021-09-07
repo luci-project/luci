@@ -26,7 +26,7 @@ void TLS::dtv_setup(Thread * thread) {
 	assert(start >= initial_size);
 	assert(dtv_module_size(thread->dtv) >= initial_count);
 	for (size_t mid = 1; mid <= initial_count; mid++) {
-		assert(thread->dtv[mid].pointer.val == TLS_UNALLOCATED);
+		assert(!thread->dtv[mid].allocated());
 		auto & module = modules[mid - 1];
 
 		// Calculate address of module
@@ -37,7 +37,6 @@ void TLS::dtv_setup(Thread * thread) {
 		// Copy data & assign pointer
 		dtv_copy(thread, mid, reinterpret_cast<void*>(addr));
 	}
-	assert(start % initial_align == 0);
 
 	// Set generation
 	dtv_generation(thread->dtv) = gen;
@@ -70,7 +69,7 @@ void TLS::dtv_free(Thread * thread) {
 	auto count = dtv_module_size(thread->dtv);
 	assert(count >= initial_count);
 	for (size_t i = initial_count; i < count; i++)
-		if (thread->dtv[i].pointer.val != TLS_UNALLOCATED)
+		if (!thread->dtv[i].allocated())
 			::free(*(reinterpret_cast<void**>(thread->dtv[i].pointer.val) - 1));
 
 	::free(thread->dtv - dtv_magic_offset);
@@ -79,8 +78,8 @@ void TLS::dtv_free(Thread * thread) {
 
 void TLS::dtv_copy(Thread * thread, size_t module_id, void * ptr) const {
 	auto & module = modules[module_id - 1];
+	assert(!thread->dtv[module_id].allocated());
 	auto & dtv_ptr = thread->dtv[module_id].pointer;
-	assert(dtv_ptr.val == TLS_UNALLOCATED);
 
 	// Copy tdata
 	LOG_INFO << "Copy " << module.image_size << " from " << reinterpret_cast<void*>(module.object.current->base + module.image) << " to " << ptr << endl;

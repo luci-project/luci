@@ -8,7 +8,7 @@
 
 #include "object/identity.hpp"
 
-static void * const TLS_UNALLOCATED = reinterpret_cast<void*>(-1);
+static void * const TLS_UNALLOCATED = nullptr;
 static const size_t TLS_THREAD_SIZE = 2304;  // sizeof(struct pthread)
 
 struct TLS {
@@ -18,7 +18,7 @@ struct TLS {
 	/*! \brief Modules in initial (static) TLS */
 	size_t initial_count = 0;
 	/*! \brief Alignment of initial TLS */
-	size_t initial_align = 8;
+	size_t initial_align = 1;
 	/*! \brief Size of initial TLS */
 	size_t initial_size = 0;
 
@@ -66,10 +66,8 @@ struct TLS {
 			// Alignment of initial TLS is the maximum alignment of its modules
 			if (initial_align < align)
 				initial_align = align;
-			// Increase size for alignment if necessary
-			size = Math::align(size, initial_align);
 			// increase intital TLS size
-			initial_size += size;
+			initial_size += Math::align(size, initial_align);;
 			// Offset to thread pointer
 			offset = initial_size;
 		} else {
@@ -121,7 +119,7 @@ struct TLS {
 		// Lazy alloc
 		assert(module_id <= dtv_module_size(thread->dtv));
 		auto & dtv_ptr = thread->dtv[module_id].pointer;
-		if (dtv_ptr.val == TLS_UNALLOCATED) {
+		if (!thread->dtv[module_id].allocated()) {
 			assert(module_id > initial_count && module_id <= modules.size());
 			auto & module = modules[module_id - 1];
 
