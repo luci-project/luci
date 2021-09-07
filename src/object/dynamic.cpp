@@ -123,7 +123,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
 		if (symbol) {
 			relocations.emplace_back(reloc, symbol.value());
 			auto & symobj = symbol->object();
-			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << endl;
+			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << endl;
 			return reinterpret_cast<void*>(relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset));
 		} else if (need_symbol.bind() == STB_WEAK) {
 			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "..." << endl;
@@ -193,7 +193,7 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const char * name, uint3
 				return file_previous->resolve_symbol(sym);
 		}
 */
-		if (naked_sym.bind() != Elf::STB_LOCAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
+		if (naked_sym.section_index() != SHN_UNDEF && naked_sym.bind() != Elf::STB_LOCAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
 			auto symbol_version_index = dynamic_symbols.version(found);
 			return VersionedSymbol{naked_sym, get_version(symbol_version_index)};
 		}
