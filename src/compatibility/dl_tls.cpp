@@ -12,7 +12,7 @@ struct tls_index {
 	uintptr_t ti_offset;
 };
 
-EXPORT uintptr_t __tls_get_addr (struct tls_index *ti) {
+EXPORT uintptr_t __tls_get_addr(struct tls_index *ti) {
 	if (ti == nullptr)
 		return 0;
 

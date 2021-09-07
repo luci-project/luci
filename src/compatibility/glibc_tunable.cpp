@@ -1,21 +1,19 @@
 #include <dlh/assert.hpp>
 #include <dlh/types.hpp>
-
+#include <dlh/utils/log.hpp>
 #include "compatibility/export.hpp"
 
+// TODO: Valid for Ubuntu 20.04 only!
 enum TunableID {
-	glibc_rtld_nns,
 	glibc_elision_skip_lock_after_retries,
 	glibc_malloc_trim_threshold,
 	glibc_malloc_perturb,
 	glibc_cpu_x86_shared_cache_size,
 	glibc_elision_tries,
 	glibc_elision_enable,
-	glibc_cpu_x86_rep_movsb_threshold,
 	glibc_malloc_mxfast,
 	glibc_elision_skip_lock_busy,
 	glibc_malloc_top_pad,
-	glibc_cpu_x86_rep_stosb_threshold,
 	glibc_cpu_x86_non_temporal_threshold,
 	glibc_cpu_x86_shstk,
 	glibc_cpu_hwcap_mask,
@@ -31,7 +29,6 @@ enum TunableID {
 	glibc_malloc_tcache_count,
 	glibc_malloc_arena_test,
 	glibc_pthread_mutex_spin_count,
-	glibc_rtld_optional_static_tls,
 	glibc_malloc_tcache_max,
 	glibc_malloc_check,
 
@@ -83,18 +80,15 @@ static struct Tunable	{
 	/* The compatibility environment variable name.  */
 	const char *env_alias;
 } tunables[] = {
-	{ "glibc_rtld_nns", {Tunable::TUNABLE_TYPE_SIZE_T, 1, 16}, {4}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_elision_skip_lock_after_retries", {Tunable::TUNABLE_TYPE_INT_32, INT32_MIN, INT32_MAX}, {3}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_malloc_trim_threshold", {Tunable::TUNABLE_TYPE_SIZE_T, 0, SIZE_MAX}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_IGNORE, "MALLOC_TRIM_THRESHOLD_" },
 	{ "glibc_malloc_perturb", {Tunable::TUNABLE_TYPE_INT_32, 0, 0xff}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_IGNORE, "MALLOC_PERTURB_" },
 	{ "glibc_cpu_x86_shared_cache_size", {Tunable::TUNABLE_TYPE_SIZE_T, 0, SIZE_MAX}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_elision_tries", {Tunable::TUNABLE_TYPE_INT_32, INT32_MIN, INT32_MAX}, {3}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_elision_enable", {Tunable::TUNABLE_TYPE_INT_32, 0, 1}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
-	{ "glibc_cpu_x86_rep_movsb_threshold", {Tunable::TUNABLE_TYPE_SIZE_T, 1, SIZE_MAX}, {2048}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_malloc_mxfast", {Tunable::TUNABLE_TYPE_SIZE_T, 0, SIZE_MAX}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_IGNORE, nullptr},
 	{ "glibc_elision_skip_lock_busy", {Tunable::TUNABLE_TYPE_INT_32, INT32_MIN, INT32_MAX}, {3}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_malloc_top_pad", {Tunable::TUNABLE_TYPE_SIZE_T, 0, SIZE_MAX}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_IGNORE, "MALLOC_TOP_PAD_" },
-	{ "glibc_cpu_x86_rep_stosb_threshold", {Tunable::TUNABLE_TYPE_SIZE_T, 1, SIZE_MAX}, {2048}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_cpu_x86_non_temporal_threshold", {Tunable::TUNABLE_TYPE_SIZE_T, 0, SIZE_MAX}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_cpu_x86_shstk", {Tunable::TUNABLE_TYPE_STRING, 0, 0}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_cpu_hwcap_mask", {Tunable::TUNABLE_TYPE_UINT_64, 0, UINT64_MAX}, {HWCAP_IMPORTANT}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, "LD_HWCAP_MASK" },
@@ -110,27 +104,32 @@ static struct Tunable	{
 	{ "glibc_malloc_tcache_count", {Tunable::TUNABLE_TYPE_SIZE_T, 0, SIZE_MAX}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_malloc_arena_test", {Tunable::TUNABLE_TYPE_SIZE_T, 1, SIZE_MAX}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_IGNORE, "MALLOC_ARENA_TEST" },
 	{ "glibc_pthread_mutex_spin_count", {Tunable::TUNABLE_TYPE_INT_32, 0, 32767}, {100}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
-	{ "glibc_rtld_optional_static_tls", {Tunable::TUNABLE_TYPE_SIZE_T, 0, SIZE_MAX}, {512}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_malloc_tcache_max", {Tunable::TUNABLE_TYPE_SIZE_T, 0, SIZE_MAX}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, nullptr },
 	{ "glibc_malloc_check", {Tunable::TUNABLE_TYPE_INT_32, 0, 3}, {}, false, Tunable::TUNABLE_SECLEVEL_SXID_ERASE, "MALLOC_CHECK_"}
 };
 
-
+static_assert(sizeof(tunables) / sizeof(Tunable) == _count, "Tunables struct and enum do not match");
 
 EXPORT void __tunable_get_val (TunableID id, void * valp, void (*callback) (Tunable::Val *)) {
 	assert(id < TunableID::_count);
 	auto &cur = tunables[id];
+	LOG_DEBUG << "Get tunable " << (int)id << " (" << cur.name << ") = ";
+
 	switch (cur.type.type_code) {
 		case Tunable::TUNABLE_TYPE_UINT_64:
+			LOG_DEBUG_APPEND << (uint64_t) cur.val.numval;
 			*((uint64_t *) valp) = (uint64_t) cur.val.numval;
 			break;
 		case Tunable::TUNABLE_TYPE_INT_32:
+			LOG_DEBUG_APPEND << (int32_t) cur.val.numval;
 			*((int32_t *) valp) = (int32_t) cur.val.numval;
 			break;
 		case Tunable::TUNABLE_TYPE_SIZE_T:
+			LOG_DEBUG_APPEND << (size_t) cur.val.numval;
 			*((size_t *) valp) = (size_t) cur.val.numval;
 			break;
 		case Tunable::TUNABLE_TYPE_STRING:
+			LOG_DEBUG_APPEND << cur.val.strval;
 			*((const char **)valp) = cur.val.strval;
 			break;
 		default:
@@ -138,4 +137,5 @@ EXPORT void __tunable_get_val (TunableID id, void * valp, void (*callback) (Tuna
 	}
 	if (cur.initialized && callback != nullptr)
 		callback(&cur.val);
+	LOG_DEBUG_APPEND << endl;
 }
