@@ -95,6 +95,8 @@ void TLS::dtv_copy(Thread * thread, size_t module_id, void * ptr) const {
 
 Thread * TLS::allocate(Thread * thread, bool set_fs) {
 	if (thread == nullptr) {
+		if (initial_align < 64)
+			initial_align = 64;
 		uintptr_t mem = reinterpret_cast<uintptr_t>(calloc(initial_size + TLS_THREAD_SIZE + initial_align, 1));
 		assert(mem != 0);
 
