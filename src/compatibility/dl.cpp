@@ -80,10 +80,12 @@ EXPORT const char *dlerror() {
 
 
 EXPORT void *dlopen(const char * filename, int flags) {
+	LOG_TRACE << "GLIBC dlopen(" << filename << ", "  << flags << ")" << endl;
 	return dlmopen(DL::LM_ID_BASE, filename, flags);
 }
 
 EXPORT void *dlmopen(DL::Lmid_t lmid, const char *filename, int flags) {
+	LOG_TRACE << "GLIBC dlmopen(" << (int)lmid << ", " << filename << ", "  << flags << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -124,6 +126,7 @@ enum : int {
 };
 
 EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info) {
+	LOG_TRACE << "GLIBC dlinfo(" << handle << ", "  << request << ", " << info << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -148,6 +151,7 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 
 
 EXPORT int dladdr1(void *addr, DL::Info *info, void **extra_info, int flags) {
+	LOG_TRACE << "GLIBC dladdr(" << addr << ", " << (void*)info << ", " << (void*)extra_info << ", " << flags << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -175,6 +179,7 @@ EXPORT int dladdr1(void *addr, DL::Info *info, void **extra_info, int flags) {
 }
 
 EXPORT int dladdr(void *addr, DL::Info *info) {
+	LOG_TRACE << "GLIBC dladdr( " << addr << " ," << (void*)info << ")" << endl;
 	return dladdr1(addr, info, 0, 0);
 }
 
@@ -206,15 +211,18 @@ void *_dlvsym(void *__restrict handle, const char *__restrict symbol, const char
 
 
 EXPORT void *dlsym(void *__restrict handle, const char *__restrict symbol) {
+	LOG_TRACE << "GLIBC dlsym( " << handle << ", " << symbol << ")" << endl;
 	return _dlvsym(handle, symbol, nullptr, __builtin_extract_return_addr(__builtin_return_address(0)));
 }
 
 EXPORT void *dlvsym(void *__restrict handle, const char *__restrict symbol, const char *__restrict version) {
+	LOG_TRACE << "GLIBC dlvsym( " << handle << ", " << symbol << ", " << version << ")" << endl;
 	return _dlvsym(handle, symbol, version, __builtin_extract_return_addr(__builtin_return_address(0)));
 }
 
 /*** Additional methods used by glibc ***/
 EXPORT ObjectIdentity *_dl_find_dso_for_object(uintptr_t addr) {
+	LOG_TRACE << "GLIBC _dl_find_dso_for_object( " << addr << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -225,6 +233,6 @@ EXPORT ObjectIdentity *_dl_find_dso_for_object(uintptr_t addr) {
 }
 
 EXPORT int _dl_make_stack_executable(__attribute__((unused)) void **stack_endp) {
-	LOG_WARNING << "Method to make stack executable not implemented!" << endl;
+	LOG_WARNING << "GLIBC _dl_make_stack_executable not implemented!" << endl;
 	return 0;
 }

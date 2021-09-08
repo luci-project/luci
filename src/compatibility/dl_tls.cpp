@@ -26,6 +26,7 @@ EXPORT uintptr_t __tls_get_addr(struct tls_index *ti) {
 }
 
 EXPORT void _dl_get_tls_static_info(size_t *size, size_t *align) {
+	LOG_TRACE << "GLIBC _dl_get_tls_static_info()" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -38,6 +39,7 @@ EXPORT void _dl_get_tls_static_info(size_t *size, size_t *align) {
 // the content of the dtv for a new thread before giving control to
 // that new thread
 EXPORT Thread * _dl_allocate_tls_init(Thread *thread) {
+	LOG_TRACE << "GLIBC _dl_allocate_tls_init(" << (void*)thread << ")" << endl;
 	if (thread == nullptr)
 		return nullptr;
 
@@ -50,13 +52,17 @@ EXPORT Thread * _dl_allocate_tls_init(Thread *thread) {
 }
 
 EXPORT Thread * _dl_allocate_tls(Thread * thread) {
+	LOG_TRACE << "GLIBC _dl_allocate_tls(" << (void*)thread << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
-	return loader->tls.allocate(thread);
+	thread = loader->tls.allocate(thread);
+	loader->tls.dtv_setup(thread);
+	return thread;
 }
 
 EXPORT void _dl_deallocate_tls(Thread * thread, bool free_thread_struct) {
+	LOG_TRACE << "GLIBC _dl_deallocate_tls(" << (void*)thread << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 

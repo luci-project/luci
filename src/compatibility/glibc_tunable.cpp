@@ -113,23 +113,23 @@ static_assert(sizeof(tunables) / sizeof(Tunable) == _count, "Tunables struct and
 EXPORT void __tunable_get_val (TunableID id, void * valp, void (*callback) (Tunable::Val *)) {
 	assert(id < TunableID::_count);
 	auto &cur = tunables[id];
-	LOG_DEBUG << "Get tunable " << (int)id << " (" << cur.name << ") = ";
+	LOG_TRACE << "GLIBC __tunable_get_val " << (int)id << " (" << cur.name << ") = ";
 
 	switch (cur.type.type_code) {
 		case Tunable::TUNABLE_TYPE_UINT_64:
-			LOG_DEBUG_APPEND << (uint64_t) cur.val.numval;
+			LOG_TRACE_APPEND << (uint64_t) cur.val.numval;
 			*((uint64_t *) valp) = (uint64_t) cur.val.numval;
 			break;
 		case Tunable::TUNABLE_TYPE_INT_32:
-			LOG_DEBUG_APPEND << (int32_t) cur.val.numval;
+			LOG_TRACE_APPEND << (int32_t) cur.val.numval;
 			*((int32_t *) valp) = (int32_t) cur.val.numval;
 			break;
 		case Tunable::TUNABLE_TYPE_SIZE_T:
-			LOG_DEBUG_APPEND << (size_t) cur.val.numval;
+			LOG_TRACE_APPEND << (size_t) cur.val.numval;
 			*((size_t *) valp) = (size_t) cur.val.numval;
 			break;
 		case Tunable::TUNABLE_TYPE_STRING:
-			LOG_DEBUG_APPEND << cur.val.strval;
+			LOG_TRACE_APPEND << cur.val.strval;
 			*((const char **)valp) = cur.val.strval;
 			break;
 		default:
@@ -137,5 +137,5 @@ EXPORT void __tunable_get_val (TunableID id, void * valp, void (*callback) (Tuna
 	}
 	if (cur.initialized && callback != nullptr)
 		callback(&cur.val);
-	LOG_DEBUG_APPEND << endl;
+	LOG_TRACE_APPEND << endl;
 }
