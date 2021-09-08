@@ -16,13 +16,12 @@ void TLS::dtv_setup(Thread * thread) {
 
 	// Allocate DTV with enough space
 	if (thread->dtv == nullptr && dtv_allocate(thread) == 0) {
-		LOG_ERROR << "Allocating DTV for Thread " << reinterpret_cast<void*>(thread->tcb)<< " failed" << endl;
+		LOG_ERROR << "Allocating DTV for Thread " << reinterpret_cast<void*>(thread)<< " failed" << endl;
 		assert(false);
 	}
 
 	// Initialize array
-	assert(thread->tcb == thread);
-	uintptr_t start = reinterpret_cast<uintptr_t>(thread->tcb);
+	uintptr_t start = reinterpret_cast<uintptr_t>(thread);
 	assert(start >= initial_size);
 	assert(dtv_module_size(thread->dtv) >= initial_count);
 	for (size_t mid = 1; mid <= initial_count; mid++) {
