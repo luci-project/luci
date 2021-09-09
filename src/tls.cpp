@@ -99,9 +99,9 @@ Thread * TLS::allocate(Thread * thread, bool set_fs) {
 		uintptr_t mem = reinterpret_cast<uintptr_t>(calloc(initial_size + TLS_THREAD_SIZE + initial_align, 1));
 		assert(mem != 0);
 
-		uintptr_t addr = Math::align(mem, initial_align);
+		uintptr_t addr = Math::align_up(mem + initial_size, initial_align);
 		assert(TLS_THREAD_SIZE >= sizeof(Thread));
-		thread = new (reinterpret_cast<Thread*>(addr + initial_size)) Thread(nullptr, mem, initial_size + TLS_THREAD_SIZE);
+		thread = new (reinterpret_cast<Thread*>(addr)) Thread(nullptr, mem, initial_size + TLS_THREAD_SIZE);
 	}
 
 	dtv_allocate(thread);

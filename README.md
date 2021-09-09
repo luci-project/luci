@@ -14,3 +14,10 @@ A static libc build is not an option either, as it would contain its own TLS set
 Finally, we might include this in a kernel in the future (with has no standard libraries as well).
 
 For Linux, all required system call wrapper are embedded (copied from musl libc and glibc).
+
+
+Related Work
+------------
+
+ - [libpulp](https://github.com/SUSE/libpulp), a framework for userspace live patching, requires compiler to be compiled with patchable function entries and needs libpulp.so preloaded. Depends on ptrace
+ - [libcare](https://github.com/cloudlinux/libcare) is employed during build time, analyzes the assembly & adds new sections (like kpatch)

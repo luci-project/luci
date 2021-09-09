@@ -67,7 +67,7 @@ struct TLS {
 			if (initial_align < align)
 				initial_align = align;
 			// increase intital TLS size
-			initial_size += Math::align(size, initial_align);;
+			initial_size += Math::align_up(size, initial_align);
 			// Offset to thread pointer
 			offset = initial_size;
 		} else {
