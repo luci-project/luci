@@ -62,10 +62,61 @@ static void * base_from_phdr(void * phdr_ptr, long int entries = 1) {
 	return reinterpret_cast<void*>(base);
 }
 
+// Show build info
+const char * __attribute__((weak)) build_elfo_version() { return nullptr; }
+const char * __attribute__((weak)) build_bean_version() { return nullptr; }
+const char * __attribute__((weak)) build_bean_date() { return nullptr; }
+const char * __attribute__((weak)) build_bean_flags() { return nullptr; }
+const char * __attribute__((weak)) build_capstone_version() { return nullptr; }
+const char * __attribute__((weak)) build_capstone_flags() { return nullptr; }
+const char * __attribute__((weak)) build_dlh_version() { return nullptr; }
+const char * __attribute__((weak)) build_dlh_date() { return nullptr; }
+const char * __attribute__((weak)) build_dlh_flags() { return nullptr; }
+const char * __attribute__((weak)) build_luci_version() { return nullptr; }
+const char * __attribute__((weak)) build_luci_date() { return nullptr; }
+const char * __attribute__((weak)) build_luci_flags() { return nullptr; }
+void build_info() {
+	LOG_INFO << "Luci";
+	if (build_luci_version() != nullptr)
+		LOG_INFO_APPEND << ' ' << build_luci_version();
+	if (build_luci_date() != nullptr)
+		LOG_INFO_APPEND << " (built " << build_luci_date() << ')';
+	LOG_INFO_APPEND << endl;
+	if (build_luci_flags() != nullptr)
+		LOG_TRACE << "with flags: " << build_luci_flags() << endl;
+
+	if (build_bean_version() != nullptr) {
+		LOG_DEBUG << "Using Bean " << build_bean_version();
+		if (build_elfo_version() != nullptr)
+			LOG_DEBUG_APPEND << " and Elfo " << build_elfo_version();
+		if (build_bean_date() != nullptr)
+			LOG_DEBUG_APPEND << " (built " << build_bean_date() << ')';
+		LOG_DEBUG_APPEND << endl;
+		if (build_bean_flags() != nullptr)
+			LOG_TRACE << "with flags: " << build_bean_flags() << endl;
+	}
+	if (build_capstone_version() != nullptr) {
+		LOG_DEBUG << "Using Capstone " << build_capstone_version() << endl;
+		if (build_capstone_flags() != nullptr)
+			LOG_TRACE << "with flags: " << build_capstone_flags() << endl;
+	}
+
+	if (build_dlh_version() != nullptr) {
+		LOG_DEBUG << "Using DirtyLittleHelper (DLH) " << build_dlh_version();
+		if (build_dlh_date() != nullptr)
+			LOG_DEBUG_APPEND << " (built " << build_dlh_date() << ')';
+		LOG_DEBUG_APPEND << endl;
+		if (build_dlh_flags() != nullptr)
+			LOG_TRACE << "with flags: " << build_dlh_flags() << endl;
+	}
+}
+
+// Setup commands
 static Loader * setup(void * luci_base, const char * luci_path, struct Opts & opts) {
 	// Logger
-	LOG_DEBUG << "Setting log level to " << opts.loglevel << endl;
 	LOG.set(static_cast<Log::Level>(opts.loglevel));
+	build_info();  // should be first output
+	LOG_DEBUG << "Set log level to " << opts.loglevel << endl;
 
 	if (opts.logfile != nullptr) {
 		LOG_DEBUG << "Log to file " << opts.logfile << endl;

@@ -1,6 +1,8 @@
 VERBOSE = @
 
-TARGET_PATH = /opt/luci/ld-luci.so
+NAME = luci
+
+TARGET_PATH = /opt/$(NAME)/ld-$(NAME).so
 
 SRCFOLDER = src
 BUILDDIR ?= .build
@@ -18,7 +20,7 @@ CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
 # Default Base address
 BASEADDRESS = 0xba00000
 # Default config file path
-LIBPATH_CONF = /opt/luci/libpath.conf
+LIBPATH_CONF = /opt/$(NAME)/libpath.conf
 
 CXXFLAGS ?= -O0 -g -std=c++2a $(CFLAGS)
 CXXFLAGS += -I $(SRCFOLDER) -I $(dir $(LIBBEAN))/include/
@@ -31,8 +33,9 @@ CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable 
 CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS) -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
 CXXFLAGS += -fvisibility=hidden
 
+BUILDINFO = $(BUILDDIR)/.build_$(NAME).o
 SOURCES = $(shell find $(SRCFOLDER)/ -name "*.cpp")
-OBJECTS = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))
+OBJECTS = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o)) $(BUILDINFO)
 DEPFILES = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.d))
 VERSION_SCRIPT = luci.version
 EXPORT_SYMBOLS = $(shell cat $(VERSION_SCRIPT) | grep 'global:' | sed -e 's/global:\(.*\);/\1;/' | tr -d '\n;')
@@ -47,7 +50,8 @@ all: $(TARGET_PATH) $(LIBPATH_CONF)
 
 $(LIBBEAN):
 	@echo "GEN		$@"
-	$(VERBOSE) $(MAKE) DIET=1 -C $(@D)
+	#$(VERBOSE) $(MAKE) DIET=1 -C $(@D)
+	$(VERBOSE) $(MAKE) -C $(@D)
 
 $(TARGET_PATH): $(notdir $(TARGET_PATH))
 	@echo "CP		$@"
@@ -55,7 +59,7 @@ $(TARGET_PATH): $(notdir $(TARGET_PATH))
 
 $(notdir $(TARGET_PATH)): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
 	@echo "LD		$@"
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) -L$(dir $(LIBBEAN)) -l$(patsubst lib%.a,%,$(notdir $(LIBBEAN))) -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) -L$(dir $(LIBBEAN)) -Wl,--whole-archive -l$(patsubst lib%.a,%,$(notdir $(LIBBEAN))) -Wl,--no-whole-archive -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
 
 $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"
@@ -65,10 +69,16 @@ $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 $(BUILDDIR)/%.o : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "CXX		$@"
 	@mkdir -p $(@D)
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -D__MODULE__="Luci" -c -o $@ $<
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -D__MODULE__="$(NAME)" -c -o $@ $<
+
+$(BUILDINFO): FORCE
+	@echo "CXX		$@"
+	@echo 'const char * build_$(NAME)_version() { return "$(shell git describe --dirty --always --tags)"; } ' \
+	'const char * build_$(NAME)_date() { return "$(shell date -R)"; }' \
+	'const char * build_$(NAME)_flags() { return "$(CXXFLAGS)"; }' | $(CXX) $(CXXFLAGS) -x c++ -c -o $@ -
 
 $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
-	$(VERBOSE) ./gen-libpath.sh $< > $@
+	$(VERBOSE) ./gen-libpath.sh $< | grep -v "i386\|i486\|i686\|lib32\|libx32" > $@
 
 clean::
 	$(VERBOSE) rm -f $(DEPFILES)
@@ -84,5 +94,7 @@ $(DEPFILES):
 ifneq ($(MAKECMDGOALS),clean)
 -include $(DEPFILES)
 endif
+
+FORCE:
 
 .PHONY: all clean mrproper
