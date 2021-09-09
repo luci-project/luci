@@ -103,5 +103,5 @@ struct Loader {
 	void observer();
 
 	/*! \brief prepare all loaded files for execution */
-	bool prepare();
+	bool prepare(bool update = false);
 };

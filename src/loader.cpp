@@ -109,7 +109,7 @@ void Loader::observer() {
 					LOG_DEBUG << "Possible file modification in " << object_file.path << endl;
 					assert((event->mask & IN_ISDIR) == 0);
 					if (object_file.load() != nullptr)
-						prepare();
+						prepare(true);
 					break;
 				}
 			mutex.unlock();
@@ -193,10 +193,9 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared
 	if (o != nullptr) {
 		if (is_prepared) {
 			i->flags.initialized = 1;
-			o->is_prepared = true;
+			o->status = Object::STATUS_PREPARED;
 		}
 		if (is_mapped) {
-			o->is_protected = true;
 			i->base = o->base = reinterpret_cast<uintptr_t>(ptr);
 			for (const auto & segment : o->segments)
 				if (segment.type() == Elf::PT_DYNAMIC) {
@@ -213,30 +212,28 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared
 }
 
 extern uintptr_t __stack_chk_guard;
-bool Loader::prepare() {
+bool Loader::prepare(bool update) {
 	// Init GLIBC
 	GLIBC::init_start(*this);
 
-	// Relocate
-	LOG_DEBUG << "Relocate..." << endl;
-	for (auto & o : reverse(lookup)) {
-		if (o.current->is_prepared)
-			o.current->update();
-		else if (o.current->prepare())
-			o.current->is_prepared = true;
-		else
+	// Prepare
+	for (auto & o : reverse(lookup))
+		if (!o.prepare())
 			return false;
+
+	// Optional: Update relocations
+	if (update) {
+		// TODO: Unmap if relro
+		for (auto & o : reverse(lookup))
+			o.current->update();
 	}
 
-	// Protect
-	LOG_DEBUG << "Protect memory..." << endl;
+	/*
+	// Protect memory (TODO: for relro)
 	for (auto & o : reverse(lookup))
-		if (o.current->is_protected)
-			continue;
-		else if (o.current->protect())
-			o.current->is_protected = true;
-		else
+		if (!o.current->protect())
 			return false;
+	*/
 
 	// Initialize TLS
 	main_thread = tls.allocate(nullptr, true);
@@ -256,7 +253,6 @@ bool Loader::prepare() {
 	GDB::notify();
 
 	// Initialize (but not executable itself)
-	LOG_DEBUG << "Initialize..." << endl;
 	for (auto & o : reverse(lookup))
 		if (!o.initialize())
 			return false;

@@ -103,6 +103,8 @@ struct ObjectIdentity {
 	/*! \brief Make memory copy of ELF */
 	bool memdup(Object::Data & data);
 
+	bool prepare();
+
 	bool initialize();
 };
 

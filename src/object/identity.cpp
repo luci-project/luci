@@ -366,11 +366,40 @@ bool ObjectIdentity::memdup(Object::Data & data) {
 	}
 }
 
+bool ObjectIdentity::prepare() {
+	assert(current != nullptr);
+	switch (current->status) {
+		case Object::STATUS_MAPPED:
+			current->status = Object::STATUS_PREPARING;
+
+			// First initialize all dependencies
+			for (auto & dep : current->dependencies)
+				if (!dep->prepare())
+					return false;
+
+			LOG_DEBUG << "Preparing " << *this << endl;
+			if (current->prepare())
+				current->status = Object::STATUS_PREPARED;
+			else
+				return false;
+			break;
+
+		case Object::STATUS_PREPARING:
+			LOG_WARNING << "Circular dependency on " << *this << endl;
+			break;
+
+		case Object::STATUS_PREPARED:
+			break;
+	}
+	return true;
+}
+
 bool ObjectIdentity::initialize() {
 	assert(current != nullptr);
 	if (flags.initialized == 0) {
 		flags.initialized = 1;
-		LOG_DEBUG << "Initialize " << * this << endl;
+
+		// First initialize all dependencies
 		for (auto & dep : current->dependencies)
 			if (!dep->initialize())
 				return false;

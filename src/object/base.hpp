@@ -47,9 +47,12 @@ struct Object : public Elf {
 	/*! \brief File relative address of global offset table (for dynamic objects) */
 	uintptr_t global_offset_table = 0;
 
-	/*! \brief status flags */
-	bool is_prepared = false;
-	bool is_protected = false;
+	/*! \brief preparation status */
+	enum {
+		STATUS_MAPPED,
+		STATUS_PREPARING,
+		STATUS_PREPARED
+	} status = STATUS_MAPPED;
 
 	/*! \brief Symbol dependencies to other objects */
 	Vector<ObjectIdentity *> dependencies;
