@@ -1,23 +1,9 @@
-#include "compatibility/glibc.hpp"
+#include "compatibility/glibc/rtld/global.hpp"
 
-#include <dlh/log.hpp>
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
 #include <dlh/string.hpp>
 #include <dlh/auxiliary.hpp>
-
-#include "loader.hpp"
-#include "compatibility/patch.hpp"
-#include "compatibility/dl.hpp"
-
-__attribute__ ((visibility("default"))) int __libc_enable_secure = 0;
-
-
-int dl_starting_up = 0;
-extern __attribute__ ((alias("dl_starting_up"), visibility("default"))) int _dl_starting_up;
-
-void *libc_stack_end = nullptr;
-extern __attribute__ ((alias("libc_stack_end"), visibility("default"))) void * __libc_stack_end;
 
 // see https://github.com/jtracey/drow-loader/blob/master/glibc.c
 
@@ -221,17 +207,21 @@ struct rtld_global_ro {
 } rtld_global_ro;
 extern __attribute__((alias("rtld_global_ro"), visibility("default"))) struct rtld_global_ro _rtld_global_ro;
 
-__attribute__ ((visibility("default"))) char **_dl_argv = nullptr;
+__attribute__ ((visibility("default"))) int __libc_enable_secure = 0;
+
+void *libc_stack_end = nullptr;
+extern __attribute__ ((alias("libc_stack_end"), visibility("default"))) void * __libc_stack_end;
 
 
 namespace GLIBC {
+namespace RTLD {
 
 static void * resolve(const Loader & loader, const char * name) {
 	auto sym = loader.resolve_symbol(name);
 	return sym ? reinterpret_cast<void*>(sym->object().base + sym->value()) : nullptr;
 }
 
-void init_start(const Loader & loader) {
+void init_globals(const Loader & loader) {
 	uintptr_t sysinfo = 0;
 	Auxiliary * auxv = Auxiliary::begin();
 	rtld_global_ro._dl_auxv = auxv;
@@ -277,43 +267,9 @@ void init_start(const Loader & loader) {
 }
 
 
-static int _dl_addr_patch(void *address, DL::Info *info, void **mapp, __attribute__((unused)) const uintptr_t **symbolp) {
-	return dladdr1(address, info, mapp, DL::RTLD_DL_LINKMAP);
-}
-
-static Patch fixes[] = {
-	{ "_dl_addr", reinterpret_cast<uintptr_t>(_dl_addr_patch) },
-	{ "__libc_dlopen_mode", reinterpret_cast<uintptr_t>(dlopen) },
-	{ "__libc_dlclose", reinterpret_cast<uintptr_t>(dlclose) },
-	{ "__libc_dlsym", reinterpret_cast<uintptr_t>(dlsym) },
-	{ "__libc_dlvsym", reinterpret_cast<uintptr_t>(dlvsym) }
-};
-
-bool patch(const Elf::SymbolTable & symtab, uintptr_t base) {
-	bool r = false;
-	for (const auto & fix : fixes)
-		if (fix.apply(symtab, base))
-			r = true;
-	return r;
-}
-
-void init_end() {
-	dl_starting_up = 1;
-}
-
 void stack_end(void * ptr) {
 	libc_stack_end = ptr;
 }
 
+}  // namespace RTLD
 }  // namespace GLIBC
-
-#define CONFIG_RTLD_GLOBAL_SIZE 3992
-#define CONFIG_RTLD_GLOBAL_RO_SIZE 536
-#define CONFIG_RTLD_DL_PAGESIZE_OFFSET 24
-#define CONFIG_RTLD_DL_CLKTCK_OFFSET 56
-#define CONFIG_TCB_SIZE 2304
-#define CONFIG_TCB_TCB_OFFSET 0
-#define CONFIG_TCB_DTV_OFFSET 8
-#define CONFIG_TCB_SELF_OFFSET 16
-#define CONFIG_TCB_SYSINFO_OFFSET 32
-#define CONFIG_TCB_STACK_GUARD 40

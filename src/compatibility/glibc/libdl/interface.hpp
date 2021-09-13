@@ -5,6 +5,7 @@
 #include "object/identity.hpp"
 
 
+namespace GLIBC {
 namespace DL {
 
 struct Info {
@@ -35,14 +36,15 @@ struct link_map {
 	struct link_map *l_next, *l_prev; /* Chain of loaded objects */
 };
 
-}
+}  // namespace DL
+}  // namespace GLIBC
 
 extern "C" int dlclose(void *);
 extern "C" const char *dlerror();
 extern "C" void *dlopen(const char *, int);
-extern "C" void *dlmopen (DL::Lmid_t, const char *, int);
+extern "C" void *dlmopen (GLIBC::DL::Lmid_t, const char *, int);
 extern "C" int dlinfo(void * __restrict, int, void * __restrict);
 extern "C" void *dlsym(void *__restrict, const char *__restrict);
 extern "C" void *dlvsym(void *__restrict, const char *__restrict, const char *__restrict );
-extern "C" int dladdr(void *addr, DL::Info *info);
-extern "C" int dladdr1(void *addr, DL::Info *info, void **extra_info, int flags);
+extern "C" int dladdr(void *addr, GLIBC::DL::Info *info);
+extern "C" int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int flags);

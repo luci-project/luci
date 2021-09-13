@@ -1,7 +1,8 @@
 #include <dlh/assert.hpp>
 #include <dlh/types.hpp>
+#include <dlh/macro.hpp>
 #include <dlh/log.hpp>
-#include "compatibility/export.hpp"
+
 
 // TODO: always check glibc `cat elf/dl-tunables.list | awk -f scripts/gen-tunables.awk`!
 enum TunableID {

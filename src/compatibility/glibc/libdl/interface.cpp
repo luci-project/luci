@@ -1,8 +1,8 @@
-#include "compatibility/dl.hpp"
+#include "compatibility/glibc/libdl/interface.hpp"
 
 #include <dlh/log.hpp>
+#include <dlh/macro.hpp>
 
-#include "compatibility/export.hpp"
 #include "object/base.hpp"
 #include "loader.hpp"
 
@@ -21,10 +21,10 @@ EXPORT const char *dlerror() {
 
 EXPORT void *dlopen(const char * filename, int flags) {
 	LOG_TRACE << "GLIBC dlopen(" << filename << ", "  << flags << ")" << endl;
-	return dlmopen(DL::LM_ID_BASE, filename, flags);
+	return dlmopen(GLIBC::DL::LM_ID_BASE, filename, flags);
 }
 
-EXPORT void *dlmopen(DL::Lmid_t lmid, const char *filename, int flags) {
+EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
 	LOG_TRACE << "GLIBC dlmopen(" << (int)lmid << ", " << filename << ", "  << flags << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
@@ -78,7 +78,7 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 
 	switch(request) {
 		case RTLD_DI_LMID:
-			*((DL::Lmid_t*)info) = o->ns;
+			*((GLIBC::DL::Lmid_t*)info) = o->ns;
 			return 0;
 		case RTLD_DI_LINKMAP:
 			*((const ObjectIdentity**)info) = o;
@@ -90,7 +90,7 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 }
 
 
-EXPORT int dladdr1(void *addr, DL::Info *info, void **extra_info, int flags) {
+EXPORT int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int flags) {
 	LOG_TRACE << "GLIBC dladdr(" << addr << ", " << (void*)info << ", " << (void*)extra_info << ", " << flags << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
@@ -102,13 +102,13 @@ EXPORT int dladdr1(void *addr, DL::Info *info, void **extra_info, int flags) {
 	assert(info != nullptr);
 	info->dli_fname = o->file.filename;
 	info->dli_fbase = o->base;
-	if (flags == DL::RTLD_DL_LINKMAP)
+	if (flags == GLIBC::DL::RTLD_DL_LINKMAP)
 		*extra_info = reinterpret_cast<void*>(&(o->file));
 	auto sym = o->resolve_symbol(reinterpret_cast<uintptr_t>(addr));
 	if (sym) {
 		info->dli_sname = sym->name();
 		info->dli_saddr = o->base + sym->value();
-		if (flags == DL::RTLD_DL_SYMENT)
+		if (flags == GLIBC::DL::RTLD_DL_SYMENT)
 			*extra_info = (void *)(sym->_data);
 	} else {
 		info->dli_sname = nullptr;
@@ -118,12 +118,12 @@ EXPORT int dladdr1(void *addr, DL::Info *info, void **extra_info, int flags) {
 	return 1;
 }
 
-EXPORT int dladdr(void *addr, DL::Info *info) {
+EXPORT int dladdr(void *addr, GLIBC::DL::Info *info) {
 	LOG_TRACE << "GLIBC dladdr( " << addr << " ," << (void*)info << ")" << endl;
 	return dladdr1(addr, info, 0, 0);
 }
 
-void *_dlvsym(void *__restrict handle, const char *__restrict symbol, const char *__restrict version, void * caller) {
+static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, const char *__restrict version, void * caller) {
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -158,21 +158,4 @@ EXPORT void *dlsym(void *__restrict handle, const char *__restrict symbol) {
 EXPORT void *dlvsym(void *__restrict handle, const char *__restrict symbol, const char *__restrict version) {
 	LOG_TRACE << "GLIBC dlvsym( " << handle << ", " << symbol << ", " << version << ")" << endl;
 	return _dlvsym(handle, symbol, version, __builtin_extract_return_addr(__builtin_return_address(0)));
-}
-
-/*** Additional methods used by glibc ***/
-EXPORT ObjectIdentity *_dl_find_dso_for_object(uintptr_t addr) {
-	LOG_TRACE << "GLIBC _dl_find_dso_for_object( " << addr << ")" << endl;
-	auto loader = Loader::instance();
-	assert(loader != nullptr);
-
-	auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
-	if (o != nullptr)
-		return &(o->file);
-	return nullptr;
-}
-
-EXPORT int _dl_make_stack_executable(__attribute__((unused)) void **stack_endp) {
-	LOG_WARNING << "GLIBC _dl_make_stack_executable not implemented!" << endl;
-	return 0;
 }

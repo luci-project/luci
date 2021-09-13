@@ -1,9 +1,8 @@
 #include <dlh/log.hpp>
 #include <dlh/types.hpp>
+#include <dlh/macro.hpp>
 #include <dlh/assert.hpp>
 #include <dlh/thread.hpp>
-
-#include "compatibility/export.hpp"
 
 #include "loader.hpp"
 

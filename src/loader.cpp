@@ -11,7 +11,8 @@
 
 #include "object/base.hpp"
 #include "compatibility/gdb.hpp"
-#include "compatibility/glibc.hpp"
+#include "compatibility/glibc/rtld/dl.hpp"
+#include "compatibility/glibc/rtld/global.hpp"
 #include "process.hpp"
 
 static Loader * _instance = nullptr;
@@ -210,8 +211,8 @@ ObjectIdentity * Loader::open(uintptr_t addr, bool prevent_updates, bool is_prep
 
 extern uintptr_t __stack_chk_guard;
 bool Loader::prepare(bool update) {
-	// Init GLIBC
-	GLIBC::init_start(*this);
+	// Init GLIBC globals
+	GLIBC::RTLD::init_globals(*this);
 
 	// Prepare
 	for (auto & o : reverse(lookup))
@@ -254,8 +255,8 @@ bool Loader::prepare(bool update) {
 		if (!o.initialize())
 			return false;
 
-	// End of init GLIBC
-	GLIBC::init_end();
+	// Mark start of program
+	GLIBC::RTLD::starting();
 
 	return true;
 }
