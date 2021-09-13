@@ -2,7 +2,7 @@
 
 #include <dlh/container/hash.hpp>
 #include <dlh/container/vector.hpp>
-#include <dlh/utils/auxiliary.hpp>
+#include <dlh/auxiliary.hpp>
 
 class Process {
 

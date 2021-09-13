@@ -3,16 +3,13 @@
 
 #include <dlh/container/initializer_list.hpp>
 #include <dlh/container/vector.hpp>
-#include <dlh/container/tree.hpp>
-#include <dlh/container/hash.hpp>
 #include <dlh/stream/output.hpp>
 #include <dlh/parser/arguments.hpp>
-#include <dlh/utils/auxiliary.hpp>
-#include <dlh/utils/environ.hpp>
-#include <dlh/utils/string.hpp>
-#include <dlh/utils/macro.hpp>
-#include <dlh/utils/file.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/auxiliary.hpp>
+#include <dlh/environ.hpp>
+#include <dlh/macro.hpp>
+#include <dlh/file.hpp>
+#include <dlh/log.hpp>
 #include "object/base.hpp"
 
 #include "loader.hpp"
@@ -41,17 +38,17 @@ extern uintptr_t _DYNAMIC[];
 extern const uintptr_t _GLOBAL_OFFSET_TABLE_[];
 
 // Get ELF base from program header (Hack)
-static void * base_from_phdr(void * phdr_ptr, long int entries = 1) {
+static uintptr_t base_from_phdr(void * phdr_ptr, long int entries = 1) {
 	Elf::Phdr * phdr = reinterpret_cast<Elf::Phdr *>(phdr_ptr);
-	uintptr_t ptr = reinterpret_cast<uintptr_t>(phdr_ptr);
+	uintptr_t addr = reinterpret_cast<uintptr_t>(phdr_ptr);
 	bool valid = false;
 	uintptr_t base = phdr[0].p_vaddr;
 	for (long int i = 0; i < entries; i++)
 		switch(phdr[i].p_type) {
 			case Elf::PT_PHDR:
-				return reinterpret_cast<void*>(ptr - phdr[i].p_offset);
+				return addr - phdr[i].p_offset;
 			case Elf::PT_LOAD:
-				if (ptr >= phdr[i].p_vaddr && ptr <= phdr[i].p_vaddr + phdr[i].p_memsz)
+				if (addr >= phdr[i].p_vaddr && addr <= phdr[i].p_vaddr + phdr[i].p_memsz)
 					valid = true;
 				if (base > phdr[i].p_vaddr)
 					base = phdr[i].p_vaddr;
@@ -59,7 +56,7 @@ static void * base_from_phdr(void * phdr_ptr, long int entries = 1) {
 				continue;
 		}
 	assert(valid);
-	return reinterpret_cast<void*>(base);
+	return base;
 }
 
 // Show build info
@@ -112,7 +109,7 @@ void build_info() {
 }
 
 // Setup commands
-static Loader * setup(void * luci_base, const char * luci_path, struct Opts & opts) {
+static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts & opts) {
 	// Logger
 	LOG.set(static_cast<Log::Level>(opts.loglevel));
 	build_info();  // should be first output
@@ -159,16 +156,15 @@ static Loader * setup(void * luci_base, const char * luci_path, struct Opts & op
 	return loader;
 }
 
-static void * const baseaddress = reinterpret_cast<void *>(BASEADDRESS);
 int main(int argc, char* argv[]) {
 	// We do no (implicit) self relocation, hence make sure it is already correct
 	assert(reinterpret_cast<uintptr_t>(&_DYNAMIC) - _GLOBAL_OFFSET_TABLE_[0] == 0);
 
 	assert(Auxiliary::vector(Auxiliary::AT_PHENT).value() == sizeof(Elf::Phdr));
-	void * base = base_from_phdr(Auxiliary::vector(Auxiliary::AT_PHDR).pointer(), Auxiliary::vector(Auxiliary::AT_PHNUM).value());
+	uintptr_t base = base_from_phdr(Auxiliary::vector(Auxiliary::AT_PHDR).pointer(), Auxiliary::vector(Auxiliary::AT_PHNUM).value());
 
 	// Luci explicitly started from command line?
-	if (base == baseaddress) {
+	if (base == BASEADDRESS) {
 		// Available commandline options
 		auto args = Parser::Arguments<Opts>({
 				/* short & long name,  argument, element            required, help text,  optional validation function */
@@ -227,8 +223,8 @@ int main(int argc, char* argv[]) {
 		Opts opts;
 
 		// Setup interpreter (luci)
-		void * luci_base = Auxiliary::vector(Auxiliary::AT_BASE).pointer();
-		Loader * loader = setup(luci_base == nullptr ? baseaddress : luci_base, STR(SOPATH), opts);
+		uintptr_t luci_base = Auxiliary::vector(Auxiliary::AT_BASE).value();
+		Loader * loader = setup(luci_base == 0 ? BASEADDRESS : luci_base, STR(SOPATH), opts);
 
 		// Load target binary
 		const char * bin = reinterpret_cast<const char *>(Auxiliary::vector(Auxiliary::AT_EXECFN).pointer());

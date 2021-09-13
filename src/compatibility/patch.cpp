@@ -1,9 +1,9 @@
 #include "compatibility/patch.hpp"
 
+#include <dlh/log.hpp>
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
-#include <dlh/unistd.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/syscall.hpp>
 
 #include "page.hpp"
 
@@ -20,8 +20,9 @@ bool Patch::apply(const Elf::SymbolTable & symtab, uintptr_t base) const {
 
 	unsigned long page_start = start - (start % Page::SIZE);
 	unsigned long page_size = (start - page_start) + size;
-	if (::mprotect(reinterpret_cast<void*>(page_start), page_size, PROT_READ | PROT_EXEC | PROT_WRITE) != 0) {
-		LOG_ERROR << "Unprotecting " << page_size << " Bytes at " << page_start << " failed: " << strerror(errno) << endl;
+
+	if (auto protect = Syscall::mprotect(page_start, page_size, PROT_READ | PROT_EXEC | PROT_WRITE); protect.failed()) {
+		LOG_ERROR << "Unprotecting " << page_size << " Bytes at " << page_start << " failed: " << protect.error_message() << endl;
 		return false;
 	}
 
@@ -56,9 +57,9 @@ bool Patch::apply(const Elf::SymbolTable & symtab, uintptr_t base) const {
 	*(addr++) = (replace >> 56) & 0xff;
 
 	//assert(reinterpret_cast<uintptr_t>(addr - 1) == start + size);
-
-	if (::mprotect(reinterpret_cast<void*>(page_start), page_size, PROT_READ | PROT_EXEC) != 0) {
-		LOG_ERROR << "Reprotecting " << page_size << " Bytes at " << page_start << " failed: " << strerror(errno) << endl;
+	auto reprotect = Syscall::mprotect(page_start, page_size, PROT_READ | PROT_EXEC);
+	if (!reprotect.success()) {
+		LOG_ERROR << "Reprotecting " << page_size << " Bytes at " << page_start << " failed: " << reprotect.error_message() << endl;
 		return false;
 	}
 

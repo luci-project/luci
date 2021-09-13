@@ -1,7 +1,7 @@
+#include <dlh/log.hpp>
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
-#include <dlh/utils/log.hpp>
-#include <dlh/utils/thread.hpp>
+#include <dlh/thread.hpp>
 
 #include "compatibility/export.hpp"
 

@@ -1,8 +1,8 @@
 #include "object/base.hpp"
 
-#include <dlh/errno.hpp>
-#include <dlh/utils/auxiliary.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/syscall.hpp>
+#include <dlh/auxiliary.hpp>
+#include <dlh/log.hpp>
 
 #include "object/identity.hpp"
 #include "object/dynamic.hpp"
@@ -12,8 +12,8 @@
 #include "loader.hpp"
 
 
-Object::Object(ObjectIdentity & file, const Data & data) : Elf(reinterpret_cast<uintptr_t>(data.ptr)), file(file), data(data) {
-	assert(data.ptr != nullptr);
+Object::Object(ObjectIdentity & file, const Data & data) : Elf(data.addr), file(file), data(data) {
+	assert(data.addr != 0);
 }
 
 Object::~Object() {
@@ -33,14 +33,13 @@ Object::~Object() {
 	for (auto & seg : memory_map)
 		seg.unmap();
 
-	errno = 0;
-	if (munmap(data.ptr, data.size) == -1) {
-		LOG_ERROR << "Unmapping data from " << *this << " failed: " << strerror(errno) << endl;
+	if (auto unmap = Syscall::munmap(data.addr, data.size); unmap.failed()) {
+		LOG_ERROR << "Unmapping data from " << *this << " failed: " << unmap.error_message() << endl;
 	}
 
 	// close file descriptor
 	if (data.fd > 0)
-		close(data.fd);
+		Syscall::close(data.fd);
 
 	// TODO: unmap file.data?
 }

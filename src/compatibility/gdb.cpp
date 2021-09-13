@@ -1,7 +1,7 @@
 #include "compatibility/gdb.hpp"
 
 #include <dlh/assert.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/log.hpp>
 
 /* Rendezvous structure used by the run-time dynamic linker to communicate
    details of shared object loading to the debugger.  If the executable's

@@ -1,28 +1,23 @@
 #include "process.hpp"
 
+#include <dlh/syscall.hpp>
 #include <dlh/assert.hpp>
-#include <dlh/unistd.hpp>
 #include <dlh/string.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/log.hpp>
 
 
 Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(stack_pointer), stack_size(stack_size) {
 	if (this->stack_size == 0) {
 		struct rlimit l;
-		errno = 0;
-		if (getrlimit(RLIMIT_STACK, &l) == -1) {
-			LOG_ERROR << "Reading systems default stack limit failed: " << strerror(errno) << endl;
-			exit(EXIT_FAILURE);
-		} else {
-			this->stack_size = reinterpret_cast<size_t>(l.rlim_cur);
-			LOG_INFO << "Current system stack size is " << this->stack_size << " bytes" << endl;
-		}
+		Syscall::getrlimit(RLIMIT_STACK, &l).exit_on_error("Reading systems default stack limit failed");
+		this->stack_size = reinterpret_cast<size_t>(l.rlim_cur);
+		LOG_INFO << "Current system stack size is " << this->stack_size << " bytes" << endl;
 	}
 
 	// Allocate stack
 	if (this->stack_pointer == 0 && (this->stack_pointer = allocate_stack(this->stack_size)) == 0) {
 		LOG_ERROR << "Cannot create process without stack!" << endl;
-		exit(EXIT_FAILURE);
+		Syscall::exit(EXIT_FAILURE);
 	}
 
 	// Read current environment variables
@@ -44,14 +39,12 @@ Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(sta
 }
 
 uintptr_t Process::allocate_stack(size_t stack_size) {
-	errno = 0;
-	void *stack = ::mmap(NULL, stack_size, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_STACK | MAP_ANONYMOUS, -1, 0);
-	if (stack == MAP_FAILED) {
-		LOG_ERROR << "Mapping Stack with " << stack_size << " Bytes failed: " << strerror(errno) << endl;
-		return 0;
+	auto mmap = Syscall::mmap(NULL, stack_size, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_STACK | MAP_ANONYMOUS, -1, 0);
+	if (mmap.success()) {
+		return mmap.value() + stack_size - sizeof(void*);
 	} else {
-		LOG_DEBUG << "Stack at " << stack << " with " << stack_size << endl;
-		return reinterpret_cast<uintptr_t>(stack) + stack_size - sizeof(void*);
+		LOG_ERROR << "Mapping Stack with " << stack_size << " Bytes failed: " << mmap.error_message() << endl;
+		return 0;
 	}
 }
 
@@ -73,15 +66,15 @@ void Process::init(const Vector<const char *> &arg) {
 	// environment strings
 	Vector<const char *> env_str;
 	for (auto it = env.rbegin(); it != env.rend(); ++it) {
-		stack_pointer -= strlen(*it) + 1;
-		env_str.push_back(strcpy(reinterpret_cast<char *>(stack_pointer), *it));
+		stack_pointer -= String::len(*it) + 1;
+		env_str.push_back(String::copy(reinterpret_cast<char *>(stack_pointer), *it));
 	}
 
 	// argument strings
 	Vector<const char *> arg_str;
 	for (auto it = arg.rbegin(); it != arg.rend(); ++it) {
-		stack_pointer -= strlen(*it) + 1;
-		arg_str.push_back(strcpy(reinterpret_cast<char *>(stack_pointer), *it));
+		stack_pointer -= String::len(*it) + 1;
+		arg_str.push_back(String::copy(reinterpret_cast<char *>(stack_pointer), *it));
 	}
 
 	// padding

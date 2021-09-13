@@ -1,13 +1,13 @@
 #include "loader.hpp"
 
-#include <dlh/unistd.hpp>
-#include <dlh/errno.hpp>
 #include <dlh/stream/output.hpp>
 #include <dlh/stream/buffer.hpp>
-#include <dlh/utils/auxiliary.hpp>
-#include <dlh/utils/xxhash.hpp>
-#include <dlh/utils/file.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/auxiliary.hpp>
+#include <dlh/syscall.hpp>
+#include <dlh/xxhash.hpp>
+#include <dlh/error.hpp>
+#include <dlh/file.hpp>
+#include <dlh/log.hpp>
 
 #include "object/base.hpp"
 #include "compatibility/gdb.hpp"
@@ -21,26 +21,26 @@ int observer_kickoff(void * ptr) {
 	return 0;
 }
 
-Loader::Loader(void * luci_self, const char * sopath, bool dynamicUpdate) : dynamic_update(dynamicUpdate), next_namespace(NAMESPACE_BASE + 1) {
-	errno = 0;
-
+Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate) : dynamic_update(dynamicUpdate), next_namespace(NAMESPACE_BASE + 1) {
 	if (dynamic_update) {
-		if ((inotifyfd = ::inotify_init1(IN_CLOEXEC)) == -1) {
-			LOG_ERROR << "Initializing inotify failed: " << strerror(errno) << endl;
-		} else if (Thread::create(&observer_kickoff, this, true) == nullptr) {
-			LOG_ERROR << "Creating background thread failed: " << strerror(errno) << endl;
+		if (auto inotify = Syscall::inotify_init(IN_CLOEXEC)) {
+			inotifyfd = inotify.value();
+			if (Thread::create(&observer_kickoff, this, true) == nullptr) {
+				LOG_ERROR << "Creating background thread failed" << endl;
+			} else {
+				LOG_INFO << "Created observer background thread";
+			}
 		} else {
-			LOG_INFO << "Created observer background thread";
+			LOG_ERROR << "Initializing inotify failed: " << inotify.error_message() << endl;
 		}
 	}
 
 	// Add vDSO (if available)
-	auto vdso = Auxiliary::vector(Auxiliary::AT_SYSINFO_EHDR);
-	if (vdso.valid())
-		open(vdso.a_un.a_ptr, true, true, true, "linux-vdso.so.1");
+	if (auto vdso = Auxiliary::vector(Auxiliary::AT_SYSINFO_EHDR))
+		open(vdso.value(), true, true, true, "linux-vdso.so.1");
 
 	// add self as dynamic exec
-	assert(luci_self != nullptr);
+	assert(luci_self != 0);
 	self = open(luci_self, true, true, true, sopath, NAMESPACE_BASE, Elf::ET_DYN);
 	LOG_INFO << "Base of " << sopath << " is " << (void*)(self->current->base) << endl;
 	self->current->base = 0;
@@ -53,10 +53,10 @@ Loader::~Loader() {
 	_instance = nullptr;
 
 	if (dynamic_update) {
-		if (close(inotifyfd) != 0) {
-			LOG_ERROR << "Closing inotify failed: " << strerror(errno) << endl;
-		} else {
+		if (auto close = Syscall::close(inotifyfd)) {
 			LOG_INFO << "Destroyed observer background thread" << endl;
+		} else {
+			LOG_ERROR << "Closing inotify failed: " << close.error_message() << endl;
 		}
 	}
 
@@ -65,37 +65,34 @@ Loader::~Loader() {
 
 static void observer_signal(int signum) {
 	LOG_INFO << "Observer ends (Signal " << signum << ")" << endl;
-	exit(0);
+	Syscall::exit(EXIT_SUCCESS);
 }
 
 void Loader::observer() {
 	// Set signal handler
-	errno = 0;
 	struct sigaction action;
-	memset(&action, 0, sizeof(struct sigaction));
+	Memory::set(&action, 0, sizeof(struct sigaction));
 	action.sa_handler = observer_signal;
-	auto ret_sa = sigaction(SIGTERM, &action, NULL);
-	if (ret_sa == -1)
-		LOG_WARNING << "Unable to set observer signal handler: " << __errno_string(errno) << endl;
 
-	// Set death handler
-	errno = 0;
-	auto ret_pr = prctl(PR_SET_PDEATHSIG, SIGTERM);  // Stop with parent
-	if (ret_pr == -1)
-		LOG_WARNING << "Unable to set observer death signal: " << __errno_string(errno) << endl;
+	if (auto sigaction = Syscall::sigaction(SIGTERM, &action, NULL); sigaction.failed())
+		LOG_WARNING << "Unable to set observer signal handler: " << sigaction.error_message() << endl;
+
+	if (auto prctl = Syscall::prctl(PR_SET_PDEATHSIG, SIGTERM); prctl.failed())
+		LOG_WARNING << "Unable to set observer death signal: " << prctl.error_message() << endl;
 
 	// Loop over inotify
 	char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
 	while (true) {
-		errno = 0;
-		ssize_t len = read(inotifyfd, buf, sizeof(buf));
+		auto read = Syscall::read(inotifyfd, buf, sizeof(buf));
 
-		if (len == -1 && errno != EAGAIN) {
-			LOG_ERROR << "Reading file modifications failed: " << strerror(errno) << endl;
-			break;
-		} else if (len <= 0) {
+		if (read.failed() && read.error() != EAGAIN) {
+			LOG_ERROR << "Reading file modifications failed: " << read.error_message() << endl;
 			break;
 		}
+
+		ssize_t len = read.value();
+		if (len <= 0)
+			break;
 
 		char *ptr = buf;
 		while (ptr < buf + len) {
@@ -121,7 +118,7 @@ void Loader::observer() {
 
 ObjectIdentity * Loader::library(const char * filename, const Vector<const char *> & rpath, const Vector<const char *> & runpath, namespace_t ns)  {
 	StrPtr path(filename);
-	auto name = path.rchr('/');
+	auto name = path.find_last('/');
 	if (ns != NAMESPACE_NEW)
 		for (auto & i : lookup)
 			if (ns == i.ns && name == i.name)
@@ -148,12 +145,12 @@ ObjectIdentity * Loader::library(const char * filename, const Vector<const char 
 }
 
 ObjectIdentity * Loader::open(const char * filename, const char * directory, namespace_t ns) {
-	auto filename_len = strlen(filename);
-	auto directory_len = strlen(directory);
+	auto filename_len = String::len(filename);
+	auto directory_len = String::len(directory);
 	char path[directory_len + filename_len + 2];
-	::strncpy(path, directory, directory_len);
+	String::copy(path, directory, directory_len);
 	path[directory_len] = '/';
-	::strncpy(path + directory_len + 1, filename, filename_len + 1);
+	String::copy(path + directory_len + 1, filename, filename_len + 1);
 
 	return open(path, ns);
 }
@@ -177,11 +174,11 @@ ObjectIdentity * Loader::open(const char * filepath, namespace_t ns) {
 	return nullptr;
 }
 
-ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath, namespace_t ns, Elf::ehdr_type type) {
+ObjectIdentity * Loader::open(uintptr_t addr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath, namespace_t ns, Elf::ehdr_type type) {
 	if (ns == NAMESPACE_NEW)
 		ns = next_namespace++;
 
-	LOG_DEBUG << "Loading from memory " << (void*)ptr << " (" << filepath << ")..." << endl;
+	LOG_DEBUG << "Loading from memory " << (void*)addr << " (" << filepath << ")..." << endl;
 	auto i = lookup.emplace_back(*this, filepath, ns);
 
 	if (prevent_updates) {
@@ -189,23 +186,23 @@ ObjectIdentity * Loader::open(void * ptr, bool prevent_updates, bool is_prepared
 		i->flags.immutable_source = 1;
 	}
 
-	Object * o = i->load(ptr, !is_prepared, !is_mapped, type);
+	Object * o = i->load(addr, !is_prepared, !is_mapped, type);
 	if (o != nullptr) {
 		if (is_prepared) {
 			i->flags.initialized = 1;
 			o->status = Object::STATUS_PREPARED;
 		}
 		if (is_mapped) {
-			i->base = o->base = reinterpret_cast<uintptr_t>(ptr);
+			i->base = o->base = addr;
 			for (const auto & segment : o->segments)
 				if (segment.type() == Elf::PT_DYNAMIC) {
-					i->dynamic = (reinterpret_cast<const Elf::Header *>(ptr)->type() != Elf::ET_EXEC ? i->base : 0) + segment.virt_addr();
+					i->dynamic = (reinterpret_cast<const Elf::Header *>(addr)->type() != Elf::ET_EXEC ? i->base : 0) + segment.virt_addr();
 					break;
 				}
 		}
 		return i.operator->();
 	} else {
-		LOG_ERROR << "Unable to open " << ptr << endl;
+		LOG_ERROR << "Unable to open " << (void*)addr << endl;
 		lookup.pop_back();
 	}
 	return nullptr;

@@ -30,7 +30,7 @@ CXXFLAGS += -DVIRTUAL -DUSE_DLH
 CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit
 CXXFLAGS += -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
-CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS) -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
+CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
 CXXFLAGS += -fvisibility=hidden
 
 BUILDINFO = $(BUILDDIR)/.build_$(NAME).o

@@ -1,9 +1,9 @@
 #include <dlh/assert.hpp>
 #include <dlh/types.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/log.hpp>
 #include "compatibility/export.hpp"
 
-// TODO: Valid for Ubuntu 20.04 only!
+// TODO: always check glibc `cat elf/dl-tunables.list | awk -f scripts/gen-tunables.awk`!
 enum TunableID {
 	glibc_elision_skip_lock_after_retries,
 	glibc_malloc_trim_threshold,

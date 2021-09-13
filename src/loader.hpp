@@ -4,8 +4,8 @@
 #include <dlh/container/vector.hpp>
 #include <dlh/container/tree.hpp>
 #include <dlh/container/list.hpp>
-#include <dlh/utils/mutex.hpp>
-#include <dlh/utils/thread.hpp>
+#include <dlh/mutex.hpp>
+#include <dlh/thread.hpp>
 
 #include "object/identity.hpp"
 #include "versioned_symbol.hpp"
@@ -45,7 +45,7 @@ struct Loader {
 	const char ** envp = nullptr;
 
 	/*! \brief Constructor */
-	Loader(void * self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false);
+	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
@@ -56,7 +56,7 @@ struct Loader {
 	/*! \brief Load file */
 	ObjectIdentity * open(const char * filename, const char * directory, namespace_t ns = NAMESPACE_BASE);
 	ObjectIdentity * open(const char * path, namespace_t ns = NAMESPACE_BASE);
-	ObjectIdentity * open(void * ptr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
+	ObjectIdentity * open(uintptr_t addr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief Run */
 	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0);

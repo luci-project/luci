@@ -1,7 +1,7 @@
 #pragma once
 
 #include <dlh/container/vector.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/log.hpp>
 
 #include "object/identity.hpp"
 #include "object/relocatable.hpp"

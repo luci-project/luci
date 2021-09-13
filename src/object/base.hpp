@@ -9,7 +9,7 @@
 #include <dlh/container/optional.hpp>
 #include <dlh/stream/buffer.hpp>
 #include <dlh/stream/output.hpp>
-#include <dlh/utils/strptr.hpp>
+#include <dlh/strptr.hpp>
 
 #include <elfo/elf.hpp>
 #include <bean/bean.hpp>
@@ -34,8 +34,8 @@ struct Object : public Elf {
 		/*! \brief File descriptor for this object */
 		int fd = -1;
 
-		/*! \brief Pointer to data */
-		void * ptr = nullptr;
+		/*! \brief Address of data in memory*/
+		uintptr_t addr = 0;
 
 		/*! \brief File data hash */
 		uint64_t hash = 0;

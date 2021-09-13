@@ -1,9 +1,9 @@
 #pragma once
 
-#include <dlh/unistd.hpp>
-#include <dlh/utils/log.hpp>
-#include <dlh/utils/math.hpp>
-#include <dlh/utils/thread.hpp>
+#include <dlh/log.hpp>
+#include <dlh/math.hpp>
+#include <dlh/thread.hpp>
+#include <dlh/syscall.hpp>
 #include <dlh/container/vector.hpp>
 
 #include "object/identity.hpp"
@@ -124,14 +124,13 @@ struct TLS {
 			auto & module = modules[module_id - 1];
 
 			// Allocate memory
-			void * mem = malloc(module.size + module.align + sizeof(void*));
-			assert(mem != nullptr);
+			uintptr_t mem = Memory::alloc(module.size + module.align + sizeof(void*));
 
 			// Align pointer
-			uintptr_t data = Math::align(reinterpret_cast<uintptr_t>(mem) + sizeof(void*), module.align);
+			uintptr_t data = Math::align(mem + sizeof(void*), module.align);
 
 			// Store address of pointer for free;
-			*(reinterpret_cast<void**>(data) - 1) = mem;
+			*(reinterpret_cast<uintptr_t*>(data) - 1) = mem;
 
 			// Copy contents
 			dtv_copy(thread, module_id, reinterpret_cast<void*>(data));

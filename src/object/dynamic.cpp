@@ -1,13 +1,11 @@
 #include "object/dynamic.hpp"
 
 #include <elfo/elf_rel.hpp>
-#include <dlh/utils/log.hpp>
+#include <dlh/log.hpp>
 
 #include "compatibility/glibc.hpp"
+#include "dynamic_resolve.hpp"
 #include "loader.hpp"
-
-// Defined in compatibility/dl.cpp
-extern "C" void _dlresolve();
 
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
 	// It is possible that multiple threads try to access an unresolved function, hence we have to use a mutex

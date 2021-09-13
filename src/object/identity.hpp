@@ -3,7 +3,7 @@
 #include <dlh/types.hpp>
 #include <dlh/container/vector.hpp>
 #include <dlh/container/list.hpp>
-#include <dlh/utils/strptr.hpp>
+#include <dlh/strptr.hpp>
 #include <dlh/stream/buffer.hpp>
 
 #include "object/base.hpp"
@@ -79,12 +79,12 @@ struct ObjectIdentity {
 	Object * current = nullptr;
 
 	/*! \brief Load/get current version
-	 * \param ptr use memory mapped Elf instead of file located at path
+	 * \param addr use memory mapped Elf instead of file located at path
 	 * \param preload preload and map object
 	 * \param type ELF type (`ET_NONE` to auto determine)
 	 * \return pointer to newly opened object (or nullptr on failure / if already loaded)
 	 */
-	Object * load(void * ptr = nullptr, bool preload = true, bool map = true, Elf::ehdr_type type = Elf::ET_NONE);
+	Object * load(uintptr_t addr = 0, bool preload = true, bool map = true, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief constructor */
 	ObjectIdentity(Loader & loader, const char * path = nullptr, namespace_t ns = NAMESPACE_BASE, const char * altname = nullptr);

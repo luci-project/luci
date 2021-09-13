@@ -1,11 +1,11 @@
 #include "object/identity.hpp"
 
+#include <dlh/log.hpp>
+#include <dlh/file.hpp>
 #include <dlh/string.hpp>
-#include <dlh/unistd.hpp>
+#include <dlh/xxhash.hpp>
 #include <dlh/utility.hpp>
-#include <dlh/utils/log.hpp>
-#include <dlh/utils/file.hpp>
-#include <dlh/utils/xxhash.hpp>
+#include <dlh/syscall.hpp>
 
 #include "object/base.hpp"
 #include "object/dynamic.hpp"
@@ -50,7 +50,7 @@ static bool supported(const Elf::Header * header) {
 	return true;
 }
 
-Object * ObjectIdentity::load(void * ptr, bool preload, bool map, Elf::ehdr_type type) {
+Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_type type) {
 	// Not updatable: Allow only one (current) version
 	if (!flags.updatable && current != nullptr)
 		return nullptr;
@@ -58,53 +58,57 @@ Object * ObjectIdentity::load(void * ptr, bool preload, bool map, Elf::ehdr_type
 	Object::Data data;
 	LOG_DEBUG << "Loading " << name << "..." << endl;
 
-	if (ptr == nullptr) {
+	if (addr == 0) {
 		assert(!path.empty());
 
 		// Open file
-		errno = 0;
-		if ((data.fd = ::open(path.str, O_RDONLY)) < 0) {
-			LOG_VERBOSE << "Opening " << *this << " failed: " << strerror(errno) << endl;
+		if (auto open = Syscall::open(path.str, O_RDONLY)) {
+			data.fd = open.value();
+		} else {
+			LOG_VERBOSE << "Opening " << *this << " failed: " << open.error_message() << endl;
 			return nullptr;
 		}
 
 		// Determine file size and inode
-		struct stat sb;
-		if (::fstat(data.fd, &sb) == -1) {
-			LOG_ERROR << "Stat file " << *this << " failed: " << strerror(errno) << endl;
-			::close(data.fd);
+		if (struct stat sb; auto fstat = Syscall::fstat(data.fd, &sb)) {
+			data.modification_time = sb.st_mtim;
+			data.size = sb.st_size;
+		} else {
+			LOG_ERROR << "Stat file " << *this << " failed: " << fstat.error_message() << endl;
+			Syscall::close(data.fd);
 			return nullptr;
 		}
-		data.modification_time = sb.st_mtim;
-		data.size = sb.st_size;
+
 
 		// Check if already loaded (using modification time)
 		if (!flags.ignore_mtime)
 			for (Object * obj = current; obj != nullptr; obj = obj->file_previous)
 				if (obj->data.modification_time.tv_sec == data.modification_time.tv_sec && obj->data.modification_time.tv_nsec == data.modification_time.tv_nsec && obj->data.size == data.size) {
 					LOG_INFO << "Already loaded " << *this << " with same modification time -- abort loading..." << endl;
-					::close(data.fd);
+					Syscall::close(data.fd);
 					return nullptr;
 				}
 
 		// Map file
-		if ((data.ptr = ::mmap(NULL, data.size, PROT_READ, MAP_SHARED, data.fd, 0)) == MAP_FAILED) {
-			LOG_ERROR << "Mapping " << *this << " failed: " << strerror(errno) << endl;
-			::close(data.fd);
+		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ, MAP_SHARED, data.fd, 0)) {
+			data.addr = mmap.value();
+		} else {
+			LOG_ERROR << "Mapping " << *this << " failed: " << mmap.error_message() << endl;
+			Syscall::close(data.fd);
 			return nullptr;
 		}
 
 	} else {
-		data.ptr = ptr;
-		data.size = Elf(ptr).size(true);
+		data.addr = addr;
+		data.size = Elf(addr).size(true);
 	}
 
 	// Check ELF
-	const Elf::Header * header = reinterpret_cast<const Elf::Header *>(data.ptr);
+	const Elf::Header * header = reinterpret_cast<const Elf::Header *>(data.addr);
 	if (data.size < sizeof(Elf::Header) || !supported(header)) {
 		LOG_ERROR << "Unsupported ELF header in " << *this << "!" << endl;
-		::munmap(data.ptr, data.size);
-		::close(data.fd);
+		Syscall::munmap(data.addr, data.size);
+		Syscall::close(data.fd);
 		return nullptr;
 	} else if (type == Elf::ET_NONE) {
 		type = header->type();
@@ -113,8 +117,8 @@ Object * ObjectIdentity::load(void * ptr, bool preload, bool map, Elf::ehdr_type
 	// Create object
 	Object * o = create(data, preload, map, type);
 	if (o == nullptr && data.fd != -1) {
-		::munmap(data.ptr, data.size);
-		::close(data.fd);
+		Syscall::munmap(data.addr, data.size);
+		Syscall::close(data.fd);
 	}
 	return o;
 }
@@ -133,10 +137,10 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t n
 		buffer[0] = '\0';
 	} else {
 		// We need the absolute path to the directory (GLIBC requirement...)
-		auto pathlen = strlen(path) + 1;
+		auto pathlen = String::len(path) + 1;
 		char tmp[pathlen];
-		::strncpy(tmp, path, pathlen);
-		auto tmpfilename = ::strrchr(tmp, '/');
+		String::copy(tmp, path, pathlen);
+		auto tmpfilename = String::find_last(tmp, '/');
 		size_t bufferlen;
 		bool success;
 		if (tmpfilename == nullptr) {
@@ -149,29 +153,30 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t n
 		if (success) {
 			if (bufferlen > 0)
 				buffer[bufferlen++] = '/';
-			::strncpy(buffer + bufferlen, tmpfilename, PATH_MAX - bufferlen);
+			String::copy(buffer + bufferlen, tmpfilename, PATH_MAX - bufferlen);
 		} else {
-			::strncpy(buffer, path, PATH_MAX);
+			String::copy(buffer, path, PATH_MAX);
 		}
 		this->path = StrPtr(buffer);
 		if (altname == nullptr)
-			this->name = this->path.rchr('/');
+			this->name = this->path.find_last('/');
 
 		// Observe file?
 		if (flags.updatable) {
 			struct stat sb;
-			errno = 0;
-			if (lstat(this->path.str, &sb) == -1) {
-				LOG_ERROR << "Lstat of " << path << " failed: " << strerror(errno) << endl;
+			auto lstat = Syscall::lstat(this->path.str, &sb);
+			if (lstat.failed()) {
+				LOG_ERROR << "Lstat of " << path << " failed: " << lstat.error_message() << endl;
 			} else if (S_ISLNK(sb.st_mode)) {
 				LOG_DEBUG << "Library " << this->path << " is a symbolic link (hence we do not expect changes to the binary itself)" << endl;
 				flags.immutable_source = 1;
 			}
 
-			if ((wd = ::inotify_add_watch(loader.inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) == -1) {
-				LOG_ERROR << "Cannot watch for modification of " << this->path << ": " << ::strerror(errno) << endl;
-			} else {
+			if (auto inotify = Syscall::inotify_add_watch(loader.inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
 				LOG_DEBUG << "Watching for modifications at " << this->path << endl;
+				wd = inotify.value();
+			} else {
+				LOG_ERROR << "Cannot watch for modification of " << this->path << ": " << inotify.error_message() << endl;
 			}
 		}
 	}
@@ -179,24 +184,26 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t n
 	filename = buffer;
 
 	// Create shared memory for data
-	errno = 0;
 	StringStream<NAME_MAX + 1> shdatastr;
 	shdatastr << name.str << ".DATA";
 	const char * shdata = shdatastr.str();
 
-	if ((memfd = memfd_create(shdata, MFD_CLOEXEC)) == -1) {
-		LOG_ERROR << "Creating memory file " << shdata << " failed: " << strerror(errno) << endl;
+	auto memfd_create = Syscall::memfd_create(shdata, MFD_CLOEXEC);
+	if (memfd_create.success()) {
+		memfd = memfd_create.value();
+	} else {
+		LOG_ERROR << "Creating memory file " << shdata << " failed: " << memfd_create.error_message() << endl;
 	}
 }
 
 ObjectIdentity::~ObjectIdentity() {
-	if (loader.dynamic_update && ::inotify_rm_watch(loader.inotifyfd, wd) == -1)
-		LOG_ERROR << "Removing watch for " << this->path << " failed: " << ::strerror(errno) << endl;
-
-	// Delete all versions
-	while (current != nullptr) {
-		delete current;
+	if (loader.dynamic_update) {
+		if (auto inotify = Syscall::inotify_rm_watch(loader.inotifyfd, wd); inotify.failed())
+			LOG_ERROR << "Removing watch for " << this->path << " failed: " << inotify.error_message() << endl;
 	}
+	// Delete all versions
+	while (current != nullptr)
+		delete current;
 }
 
 
@@ -204,7 +211,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 	// Hash file contents
 	if (flags.updatable) {
 		XXHash64 datahash(name.hash);  // Name hash as seed
-		datahash.add(data.ptr, data.size);
+		datahash.add(data.addr, data.size);
 		data.hash = datahash.hash();
 		LOG_DEBUG << "Elf " << *this << " has hash " << hex << data.hash << dec << endl;
 
@@ -225,7 +232,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 
 	/*
 	// Temporary Elf object
-	Elf tmp(reinterpret_cast<uintptr_t>(data.ptr));
+	Elf tmp(data.addr);
 	uintptr_t base = 0;
 	switch (type) {
 		case Elf::ET_DYN:
@@ -311,59 +318,54 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 }
 
 bool ObjectIdentity::memdup(Object::Data & data) {
-	int dupfd = -1;
-	void * dupptr = nullptr;
 
 	StringStream<NAME_MAX + 1> memnamestr;
 	memnamestr << name.str << '.' << hex << data.hash;
 	const char * memname = memnamestr.str();
 
-	errno = 0;
-	if ((dupfd = memfd_create(memname, MFD_CLOEXEC | MFD_ALLOW_SEALING)) == -1) {
-		LOG_ERROR << "Creating memory file " << memname << " failed: " << strerror(errno) << endl;
-	} else if (ftruncate(dupfd, data.size) == -1) {
-		LOG_ERROR << "Setting size of " << memname << " failed: " << strerror(errno) << endl;
-		::close(dupfd);
-		dupfd = -1;
-	} else if ((dupptr = ::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_SHARED, dupfd, 0)) == MAP_FAILED) {
-		LOG_ERROR << "Mapping " << memname << " failed: " << strerror(errno) << endl;
-		::close(dupfd);
-		dupfd = -1;
-	} else if (::memcpy(dupptr, data.ptr, data.size) != dupptr) {
-		// this never happens
-		assert(false);
-	} else if (::mprotect(dupptr, data.size, PROT_READ) == -1) {
-		LOG_ERROR << "Protecting " << memname << " (read-only) failed: " << strerror(errno) << endl;
-		::close(dupfd);
-		::munmap(dupptr, data.size);
-		dupfd = -1;
-		dupptr = nullptr;
-	} else if (fcntl(dupfd, F_ADD_SEALS, F_SEAL_FUTURE_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL) == -1) {
-		LOG_ERROR << "Sealing " << memname << " (read-only) failed: " << strerror(errno) << endl;
-		::close(dupfd);
-		::munmap(dupptr, data.size);
-		dupfd = -1;
-		dupptr = nullptr;
-	} else {
-		LOG_INFO << "Created memory copy of " << *this << " in " << memname << endl;
-	}
+	if (auto memfd_create = Syscall::memfd_create(memname, MFD_CLOEXEC | MFD_ALLOW_SEALING)) {
+		if (auto ftruncate = Syscall::ftruncate(memfd_create.value(), data.size)) {
+			if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_SHARED, memfd_create.value(), 0)) {
+				Memory::copy(mmap.value(), data.addr, data.size);
+				if (auto mprotect = Syscall::mprotect(mmap.value(), data.size, PROT_READ)) {
+					if (auto fcntl = Syscall::fcntl(memfd_create.value(), F_ADD_SEALS, F_SEAL_FUTURE_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL)) {
+						LOG_INFO << "Created memory copy of " << *this << " in " << memname << endl;
+						// Clean up old memdup
+						if (data.fd != -1) {
+							if (auto munmap = Syscall::munmap(data.addr, data.size); munmap.failed())
+								LOG_WARNING << "Unable to unmap file " << *this << ": " << munmap.error_message() << endl;
 
-	if (dupptr == nullptr) {
-		return false;
-	} else {
-		// Clean up
-		if (data.fd != -1) {
-			if (::munmap(data.ptr, data.size) == -1) {
-				LOG_WARNING << "Unable to unmap file " << *this << ": " << strerror(errno) << endl;
-			} else if (::close(data.fd) == -1) {
-				LOG_WARNING << "Unable to close file " << *this << ": " << strerror(errno) << endl;
+							if (auto close = Syscall::close(data.fd); close.failed())
+								LOG_WARNING << "Unable to close file " << *this << ": " << close.error_message() << endl;
+						}
+
+						data.fd = memfd_create.value();
+						data.addr = mmap.value();
+						return true;
+					} else {
+						LOG_ERROR << "Sealing " << memname << " (read-only) failed: " << fcntl.error_message() << endl;
+					}
+				} else {
+					LOG_ERROR << "Protecting " << memname << " (read-only) failed: " << mprotect.error_message() << endl;
+				}
+
+				// Clean up
+				auto munmap = Syscall::munmap(mmap.value(), data.size);
+				if (!munmap.success())
+					LOG_WARNING << "Unable to unmap file " << *this << ": " << munmap.error_message() << endl;
+			} else {
+				LOG_ERROR << "Mapping " << memname << " failed: " << mmap.error_message() << endl;
 			}
+		} else {
+			LOG_ERROR << "Setting size of " << memname << " failed: " << ftruncate.error_message() << endl;
 		}
 
-		data.fd = dupfd;
-		data.ptr = dupptr;
-		return true;
+		// Clean up
+		Syscall::close(memfd_create.value());
+	} else {
+		LOG_ERROR << "Creating memory file " << memname << " failed: " << memfd_create.error_message() << endl;
 	}
+	return false;
 }
 
 bool ObjectIdentity::prepare() {

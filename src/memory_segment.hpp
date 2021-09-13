@@ -2,7 +2,7 @@
 
 #include <dlh/assert.hpp>
 #include <dlh/string.hpp>
-#include <dlh/unistd.hpp>
+#include <dlh/syscall.hpp>
 
 #include <elfo/elf.hpp>
 

@@ -1,10 +1,10 @@
 #include "compatibility/glibc.hpp"
 
+#include <dlh/log.hpp>
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
-#include <dlh/unistd.hpp>
-#include <dlh/utils/log.hpp>
-#include <dlh/utils/auxiliary.hpp>
+#include <dlh/string.hpp>
+#include <dlh/auxiliary.hpp>
 
 #include "loader.hpp"
 #include "compatibility/patch.hpp"
@@ -246,7 +246,7 @@ void init_start(const Loader & loader) {
 				break;
 			case Auxiliary::AT_PLATFORM:
 				rtld_global_ro._dl_platform = reinterpret_cast<char*>(aux.pointer());
-				rtld_global_ro._dl_platformlen = strlen(rtld_global_ro._dl_platform);
+				rtld_global_ro._dl_platformlen = String::len(rtld_global_ro._dl_platform);
 				break;
 			case Auxiliary::AT_HWCAP:
 				rtld_global_ro._dl_hwcap = aux.value();

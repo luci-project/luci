@@ -1,10 +1,9 @@
 #include "tls.hpp"
 
-#include <dlh/errno.hpp>
-#include <dlh/unistd.hpp>
-#include <dlh/utils/log.hpp>
-#include <dlh/utils/math.hpp>
-#include <dlh/utils/thread.hpp>
+#include <dlh/log.hpp>
+#include <dlh/math.hpp>
+#include <dlh/thread.hpp>
+#include <dlh/syscall.hpp>
 #include <dlh/container/vector.hpp>
 
 /*! \brief Addtional space reserved for DTV (negative offset) */
@@ -46,9 +45,9 @@ size_t TLS::dtv_allocate(Thread * thread) {
 	size_t n = new_size + dtv_magic_offset + 1;
 	void * ptr;
 	if (thread->dtv == nullptr)
-		ptr = calloc(n, sizeof(Thread::DynamicThreadVector));
+		ptr = Memory::alloc_array<Thread::DynamicThreadVector>(n);
 	else
-		ptr = realloc(reinterpret_cast<void*>(thread->dtv - dtv_magic_offset), n * sizeof(Thread::DynamicThreadVector));
+		ptr = Memory::realloc(reinterpret_cast<void*>(thread->dtv - dtv_magic_offset), n * sizeof(Thread::DynamicThreadVector));
 	if (ptr == nullptr)
 		return 0;
 
@@ -69,9 +68,9 @@ void TLS::dtv_free(Thread * thread) {
 	assert(count >= initial_count);
 	for (size_t i = initial_count; i < count; i++)
 		if (!thread->dtv[i].allocated())
-			::free(*(reinterpret_cast<void**>(thread->dtv[i].pointer.val) - 1));
+			Memory::free(*(reinterpret_cast<uintptr_t*>(thread->dtv[i].pointer.val) - 1));
 
-	::free(thread->dtv - dtv_magic_offset);
+	Memory::free(thread->dtv - dtv_magic_offset);
 	thread->dtv = nullptr;
 }
 
@@ -82,10 +81,10 @@ void TLS::dtv_copy(Thread * thread, size_t module_id, void * ptr) const {
 
 	// Copy tdata
 	LOG_INFO << "Copy " << module.image_size << " from " << reinterpret_cast<void*>(module.object.current->base + module.image) << " to " << ptr << endl;
-	memcpy(ptr, reinterpret_cast<void*>(module.object.current->base + module.image), module.image_size);
+	Memory::copy(ptr, reinterpret_cast<void*>(module.object.current->base + module.image), module.image_size);
 	// Clear tbss
 	if (module.size > module.image_size)
-		memset(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr) + module.image_size), 0, module.size - module.image_size);
+		Memory::set(reinterpret_cast<uintptr_t>(ptr) + module.image_size, 0, module.size - module.image_size);
 
 	// Assign pointer DTV structure
 	dtv_ptr.val = ptr;
@@ -96,7 +95,7 @@ Thread * TLS::allocate(Thread * thread, bool set_fs) {
 	if (thread == nullptr) {
 		if (initial_align < 64)
 			initial_align = 64;
-		uintptr_t mem = reinterpret_cast<uintptr_t>(calloc(initial_size + TLS_THREAD_SIZE + initial_align, 1));
+		uintptr_t mem = Memory::alloc_array(initial_size + TLS_THREAD_SIZE + initial_align, 1);
 		assert(mem != 0);
 
 		uintptr_t addr = Math::align_up(mem + initial_size, initial_align);
@@ -107,10 +106,11 @@ Thread * TLS::allocate(Thread * thread, bool set_fs) {
 	dtv_allocate(thread);
 
 	if (set_fs) {
-		if (arch_prctl(ARCH_SET_FS, reinterpret_cast<uintptr_t>(thread)) == 0) {
-			LOG_INFO << "Changed %fs of " << ::gettid() << " to " << (void*)thread << endl;
+		auto set_fs = Syscall::arch_prctl(ARCH_SET_FS, reinterpret_cast<uintptr_t>(thread));
+		if (set_fs.success()) {
+			LOG_INFO << "Changed %fs of " << Syscall::gettid() << " to " << (void*)thread << endl;
 		} else {
-			LOG_WARNING << "Changing %fs of " << ::gettid() << " to " << (void*)thread << " failed: " << __errno_string(errno) << endl;
+			LOG_WARNING << "Changing %fs of " << Syscall::gettid() << " to " << (void*)thread << " failed: " << set_fs.error_message() << endl;
 		}
 	}
 
@@ -123,6 +123,6 @@ void TLS::free(Thread * thread, bool free_thread_struct) {
 	dtv_free(thread);
 	if (free_thread_struct) {
 		assert(thread->map_size == initial_size + TLS_THREAD_SIZE);
-		::free(reinterpret_cast<void*>(thread->map_base));
+		Memory::free(thread->map_base);
 	}
 }
