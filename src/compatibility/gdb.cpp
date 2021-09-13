@@ -22,27 +22,29 @@ struct r_debug {
 	/* This state value describes the mapping change taking place when
 	   the `r_brk' address is called.  */
 
-	enum {
-		RT_CONSISTENT,   /* Mapping change is complete.  */
-		RT_ADD,          /* Beginning to add a new object.  */
-		RT_DELETE        /* Beginning to remove an object mapping.  */
-	} r_state;
+	GDB::State r_state;
 
 	uintptr_t r_ldbase;  /* Base address the linker is loaded at.  */
 } _r_debug;
 
 
+EXPORT void _dl_debug_state(void) {
+	asm volatile("nop" ::: "memory");
+}
+
 namespace GDB {
 
-void notify() {
-	asm volatile ("nop" ::: "memory");
+void notify(State state) {
+	_r_debug.r_state = state;
+	if (_r_debug.r_brk)
+		_r_debug.r_brk();
 }
 
 void init(const Loader & loader) {
 	_r_debug.r_version = 1;
 	_r_debug.r_map = &loader.lookup.front();
-	_r_debug.r_brk = notify;
-	_r_debug.r_state = r_debug::RT_CONSISTENT;
+	_r_debug.r_brk = _dl_debug_state;
+	_r_debug.r_state = State::RT_CONSISTENT;
 	_r_debug.r_ldbase = loader.self->base;
 	assert(_r_debug.r_map != nullptr);
 	if (_r_debug.r_map->dynamic != 0) {

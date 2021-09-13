@@ -3,6 +3,7 @@
 #include <dlh/log.hpp>
 #include <dlh/macro.hpp>
 
+#include "compatibility/gdb.hpp"
 #include "object/base.hpp"
 #include "loader.hpp"
 
@@ -31,7 +32,8 @@ EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
 
 	if (flags != 0)
 		LOG_WARNING << "dl[m]open currently ignores the flags!" << endl;
-	return reinterpret_cast<void*>(loader->library(filename, {}, {}, lmid));
+
+	return reinterpret_cast<void*>(loader->dlopen(filename, lmid));
 }
 
 enum : int {

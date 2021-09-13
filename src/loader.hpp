@@ -58,6 +58,9 @@ struct Loader {
 	ObjectIdentity * open(const char * path, namespace_t ns = NAMESPACE_BASE);
 	ObjectIdentity * open(uintptr_t addr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
 
+	/*! \brief Search, load & initizalize libary (during runtime) */
+	ObjectIdentity * dlopen(const char * file, namespace_t ns = NAMESPACE_BASE);
+
 	/*! \brief Run */
 	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
 	bool run(ObjectIdentity * file, uintptr_t stack_pointer);

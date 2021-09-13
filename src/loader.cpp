@@ -209,6 +209,21 @@ ObjectIdentity * Loader::open(uintptr_t addr, bool prevent_updates, bool is_prep
 	return nullptr;
 }
 
+ObjectIdentity * Loader::dlopen(const char * file, namespace_t ns) {
+	GDB::notify(GDB::State::RT_ADD);
+	auto o = library(file, {}, {}, ns);
+	if (o != nullptr && !o->prepare()) {
+		LOG_WARNING << "Preparation of " << o << " failed!" << endl;
+		o = nullptr;
+	}
+	GDB::notify(GDB::State::RT_CONSISTENT);
+	if (o != nullptr && !o->initialize()){
+		LOG_WARNING << "Initialization of " << o << " failed!" << endl;
+		o = nullptr;
+	}
+	return o;
+}
+
 extern uintptr_t __stack_chk_guard;
 bool Loader::prepare(bool update) {
 	// Init GLIBC globals
