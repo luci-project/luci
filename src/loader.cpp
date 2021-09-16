@@ -17,9 +17,9 @@
 
 static Loader * _instance = nullptr;
 
-int observer_kickoff(void * ptr) {
+void* observer_kickoff(void * ptr) {
 	reinterpret_cast<Loader *>(ptr)->observer();
-	return 0;
+	return nullptr;
 }
 
 Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate) : dynamic_update(dynamicUpdate), next_namespace(NAMESPACE_BASE + 1) {
@@ -29,7 +29,7 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate) : d
 			if (Thread::create(&observer_kickoff, this, true) == nullptr) {
 				LOG_ERROR << "Creating background thread failed" << endl;
 			} else {
-				LOG_INFO << "Created observer background thread";
+				LOG_INFO << "Created observer background thread" << endl;
 			}
 		} else {
 			LOG_ERROR << "Initializing inotify failed: " << inotify.error_message() << endl;
@@ -130,14 +130,14 @@ ObjectIdentity * Loader::library(const char * filename, const Vector<const char 
 	if (path == name) {
 		for (const auto & path : { rpath, library_path_runtime, runpath, library_path_config, library_path_default }) {
 			for (auto & dir : path)
-				if ((lib = open(filename, dir, ns)) != nullptr)
+				if ((lib = open(filename, dir, false, ns)) != nullptr)
 					return lib;
 		}
 
 
 	} else {
 		// Full path
-		if ((lib = open(filename, ns)) != 0)
+		if ((lib = open(filename, false, ns)) != 0)
 			return lib;
 	}
 
@@ -145,7 +145,7 @@ ObjectIdentity * Loader::library(const char * filename, const Vector<const char 
 	return nullptr;
 }
 
-ObjectIdentity * Loader::open(const char * filename, const char * directory, namespace_t ns) {
+ObjectIdentity * Loader::open(const char * filename, const char * directory, bool prevent_updates, namespace_t ns) {
 	auto filename_len = String::len(filename);
 	auto directory_len = String::len(directory);
 	char path[directory_len + filename_len + 2];
@@ -153,10 +153,10 @@ ObjectIdentity * Loader::open(const char * filename, const char * directory, nam
 	path[directory_len] = '/';
 	String::copy(path + directory_len + 1, filename, filename_len + 1);
 
-	return open(path, ns);
+	return open(path, prevent_updates, ns);
 }
 
-ObjectIdentity * Loader::open(const char * filepath, namespace_t ns) {
+ObjectIdentity * Loader::open(const char * filepath, bool prevent_updates, namespace_t ns) {
 	// Does file contain a valid full path?
 	if (File::exists(filepath)) {
 		if (ns == NAMESPACE_NEW)
@@ -165,6 +165,12 @@ ObjectIdentity * Loader::open(const char * filepath, namespace_t ns) {
 		LOG_DEBUG << "Loading " << filepath << "..." << endl;
 		auto i = lookup.emplace_back(*this, filepath, ns);
 		assert(i);
+
+		if (prevent_updates) {
+			i->flags.updatable = 0;
+			i->flags.immutable_source = 1;
+		}
+
 		if (i->load() != nullptr) {
 			return i.operator->();
 		} else {
@@ -181,6 +187,7 @@ ObjectIdentity * Loader::open(uintptr_t addr, bool prevent_updates, bool is_prep
 
 	LOG_DEBUG << "Loading from memory " << (void*)addr << " (" << filepath << ")..." << endl;
 	auto i = lookup.emplace_back(*this, filepath, ns);
+	assert(i);
 
 	if (prevent_updates) {
 		i->flags.updatable = 0;
@@ -409,7 +416,7 @@ uintptr_t Loader::next_address() const {
 
 	// Default address
 	if (next == 0) {
-		next = 0x500000;
+		next = LIBADDRESS;
 	}
 	return next;
 }

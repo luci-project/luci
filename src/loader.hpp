@@ -54,8 +54,8 @@ struct Loader {
 	ObjectIdentity * library(const char * file, const Vector<const char *> & rpath = {}, const Vector<const char *> & runpath = {}, namespace_t ns = NAMESPACE_BASE);
 
 	/*! \brief Load file */
-	ObjectIdentity * open(const char * filename, const char * directory, namespace_t ns = NAMESPACE_BASE);
-	ObjectIdentity * open(const char * path, namespace_t ns = NAMESPACE_BASE);
+	ObjectIdentity * open(const char * filename, const char * directory, bool prevent_updates, namespace_t ns = NAMESPACE_BASE);
+	ObjectIdentity * open(const char * path, bool prevent_updates, namespace_t ns = NAMESPACE_BASE);
 	ObjectIdentity * open(uintptr_t addr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief Search, load & initizalize libary (during runtime) */
@@ -90,7 +90,7 @@ struct Loader {
 	static Loader * instance();
 
  private:
-	friend int observer_kickoff(void * ptr);
+	friend void* observer_kickoff(void * ptr);
 	friend struct ObjectIdentity;
 
 	/*! \brief Next Namespace */

@@ -24,7 +24,7 @@
 
 // Parse Arguments
 struct Opts {
-	int loglevel{Log::DEBUG};
+	int loglevel{Log::WARNING};
 	const char * logfile{};
 	Vector<const char *> libpath{};
 	const char * libpathconf{ STR(LIBPATH_CONF) };
@@ -197,7 +197,7 @@ int main(int argc, char* argv[]) {
 			Vector<const char *> start_args;
 			ObjectIdentity * start = nullptr;
 			for (auto & bin : args.get_positional()) {
-				ObjectIdentity * o = loader->open(bin);
+				ObjectIdentity * o = loader->open(bin, true);
 				if (o == nullptr) {
 					LOG_ERROR << "Failed loading " << bin << endl;
 					return EXIT_FAILURE;
