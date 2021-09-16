@@ -3,7 +3,7 @@
 #include <elfo/elf_rel.hpp>
 #include <dlh/log.hpp>
 
-#include "compatibility/glibc/dl-patch.hpp"
+#include "compatibility/glibc/patch.hpp"
 #include "dynamic_resolve.hpp"
 #include "loader.hpp"
 
@@ -72,7 +72,7 @@ bool ObjectDynamic::prepare() {
 	bool success = true;
 
 	// Patch glibc
-	if (GLIBC::DL::patch(dynamic_symbols, base))
+	if (GLIBC::patch(dynamic_symbols, base))
 		LOG_INFO << "Applied GLIBC Patch at " << *this << endl;
 
 	// Perform initial relocations

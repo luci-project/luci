@@ -90,6 +90,9 @@ struct ObjectIdentity {
 	ObjectIdentity(Loader & loader, const char * path = nullptr, namespace_t ns = NAMESPACE_BASE, const char * altname = nullptr);
 	~ObjectIdentity();
 
+	/*! \brief Wrapper for memfd_create syscall */
+	int memfd_create(const char * suffix = nullptr, uint64_t id = 0, int flags = 0) const;
+
  private:
 	friend struct Loader;
 

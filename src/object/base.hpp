@@ -34,7 +34,7 @@ struct Object : public Elf {
 		/*! \brief File descriptor for this object */
 		int fd = -1;
 
-		/*! \brief Address of data in memory*/
+		/*! \brief Address of data in memory */
 		uintptr_t addr = 0;
 
 		/*! \brief File data hash */

@@ -13,12 +13,12 @@ bool MemorySegment::map() {
 	               || (target.protection & PROT_WRITE) != 0; // TODO: memfd
 	if (copy || source.size == 0) {
 		LOG_DEBUG << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " anonymous..." << endl;
-		auto mmap = Syscall::mmap(target.page_start(), target.page_size(), target.protection, MAP_FIXED_NOREPLACE | MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+		auto mmap = Syscall::mmap(target.page_start(), target.page_size(), target.protection, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		if (mmap.failed()) {
 			LOG_ERROR << "Mapping " << target.page_size() << " Bytes shared at " << (void*)target.page_start() << " failed: " << mmap.error_message() << endl;
 			return false;
 		} else if (mmap.value() != target.page_start()) {
-			LOG_ERROR << "Requested shared Mapping at " << (void*)target.page_start() << " but got " << mmap.value() << endl;
+			LOG_ERROR << "Requested shared mapping at " << (void*)target.page_start() << " but got " << mmap.value() << endl;
 			return false;
 		}
 		// TODO: Remove, since mmap should aready zero the memory
@@ -32,11 +32,10 @@ bool MemorySegment::map() {
 			LOG_ERROR << "Mapping " << target.page_size() << " Bytes private at " << (void*)target.page_start() << " failed: " << mmap.error_message() << endl;
 			return false;
 		} else if (mmap.value() != target.page_start()) {
-			LOG_ERROR << "Requested privateMapping at " << (void*)target.page_start() << " but got " << mmap.value() << endl;
+			LOG_ERROR << "Requested private mapping at " << (void*)target.page_start() << " but got " << mmap.value() << endl;
 			return false;
 		}
 	}
-
 
 	if (copy && source.size > 0) {
 		LOG_DEBUG << "Copy " << source.size << " Bytes from " << (void*)source.offset << " to "  << (void*)target.address() << endl;

@@ -90,7 +90,7 @@ Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_
 				}
 
 		// Map file
-		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ, MAP_SHARED, data.fd, 0)) {
+		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ, MAP_PRIVATE, data.fd, 0)) {
 			data.addr = mmap.value();
 		} else {
 			LOG_ERROR << "Mapping " << *this << " failed: " << mmap.error_message() << endl;
@@ -121,6 +121,25 @@ Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_
 		Syscall::close(data.fd);
 	}
 	return o;
+}
+
+int ObjectIdentity::memfd_create(const char * suffix, uint64_t id, int flags) const {
+	// Create shared memory for data
+	StringStream<NAME_MAX + 1> shdatastr;
+	shdatastr << name.str;
+	if (suffix != nullptr)
+		shdatastr << '.' << suffix;
+	if (id != 0)
+		shdatastr << '-' << id;
+	const char * shdata = shdatastr.str();
+
+	auto memfd_create = Syscall::memfd_create(shdata, flags);
+	if (memfd_create.success()) {
+		return memfd_create.value();
+	} else {
+		LOG_ERROR << "Creating memory file " << shdata << " failed: " << memfd_create.error_message() << endl;
+		return -1;
+	}
 }
 
 ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t ns, const char * altname) : ns(ns), loader(loader), name(altname) {
@@ -182,18 +201,6 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t n
 	}
 	// GLIBC related
 	filename = buffer;
-
-	// Create shared memory for data
-	StringStream<NAME_MAX + 1> shdatastr;
-	shdatastr << name.str << ".DATA";
-	const char * shdata = shdatastr.str();
-
-	auto memfd_create = Syscall::memfd_create(shdata, MFD_CLOEXEC);
-	if (memfd_create.success()) {
-		memfd = memfd_create.value();
-	} else {
-		LOG_ERROR << "Creating memory file " << shdata << " failed: " << memfd_create.error_message() << endl;
-	}
 }
 
 ObjectIdentity::~ObjectIdentity() {
@@ -274,6 +281,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 
 	// If dynamic updates are enabled, calculate function hashes
 	if (flags.updatable) {
+		LOG_INFO << "Calculate Binary hash of " << *this << endl;
 		o->binary_hash.emplace(*o);
 		// if previous version exist, check if we can patch it
 		if (current != nullptr) {
@@ -318,53 +326,49 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 }
 
 bool ObjectIdentity::memdup(Object::Data & data) {
+	int tmpfd = memfd_create("COPY", data.hash, MFD_CLOEXEC | MFD_ALLOW_SEALING);
+	if (tmpfd < 0)
+		return false;
 
-	StringStream<NAME_MAX + 1> memnamestr;
-	memnamestr << name.str << '.' << hex << data.hash;
-	const char * memname = memnamestr.str();
+	if (auto ftruncate = Syscall::ftruncate(tmpfd, data.size)) {
+		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_SHARED, tmpfd, 0)) {
+			Memory::copy(mmap.value(), data.addr, data.size);
+			if (auto mprotect = Syscall::mprotect(mmap.value(), data.size, PROT_READ)) {
+				if (auto fcntl = Syscall::fcntl(tmpfd, F_ADD_SEALS, F_SEAL_FUTURE_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL)) {
+					LOG_INFO << "Created memory copy of " << *this << endl;
+					// Clean up old memdup
+					if (data.fd != -1) {
+						if (auto munmap = Syscall::munmap(data.addr, data.size); munmap.failed())
+							LOG_WARNING << "Unable to unmap file " << *this << ": " << munmap.error_message() << endl;
 
-	if (auto memfd_create = Syscall::memfd_create(memname, MFD_CLOEXEC | MFD_ALLOW_SEALING)) {
-		if (auto ftruncate = Syscall::ftruncate(memfd_create.value(), data.size)) {
-			if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_SHARED, memfd_create.value(), 0)) {
-				Memory::copy(mmap.value(), data.addr, data.size);
-				if (auto mprotect = Syscall::mprotect(mmap.value(), data.size, PROT_READ)) {
-					if (auto fcntl = Syscall::fcntl(memfd_create.value(), F_ADD_SEALS, F_SEAL_FUTURE_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL)) {
-						LOG_INFO << "Created memory copy of " << *this << " in " << memname << endl;
-						// Clean up old memdup
-						if (data.fd != -1) {
-							if (auto munmap = Syscall::munmap(data.addr, data.size); munmap.failed())
-								LOG_WARNING << "Unable to unmap file " << *this << ": " << munmap.error_message() << endl;
-
-							if (auto close = Syscall::close(data.fd); close.failed())
-								LOG_WARNING << "Unable to close file " << *this << ": " << close.error_message() << endl;
-						}
-
-						data.fd = memfd_create.value();
-						data.addr = mmap.value();
-						return true;
-					} else {
-						LOG_ERROR << "Sealing " << memname << " (read-only) failed: " << fcntl.error_message() << endl;
+						if (auto close = Syscall::close(data.fd); close.failed())
+							LOG_WARNING << "Unable to close file " << *this << ": " << close.error_message() << endl;
 					}
+
+					data.fd = tmpfd;
+					data.addr = mmap.value();
+					return true;
 				} else {
-					LOG_ERROR << "Protecting " << memname << " (read-only) failed: " << mprotect.error_message() << endl;
+					LOG_ERROR << "Sealing memcopy of " << *this << " (read-only) failed: " << fcntl.error_message() << endl;
 				}
-
-				// Clean up
-				auto munmap = Syscall::munmap(mmap.value(), data.size);
-				if (!munmap.success())
-					LOG_WARNING << "Unable to unmap file " << *this << ": " << munmap.error_message() << endl;
 			} else {
-				LOG_ERROR << "Mapping " << memname << " failed: " << mmap.error_message() << endl;
+				LOG_ERROR << "Protecting memcopy of " << *this << " (read-only) failed: " << mprotect.error_message() << endl;
 			}
-		} else {
-			LOG_ERROR << "Setting size of " << memname << " failed: " << ftruncate.error_message() << endl;
-		}
 
-		// Clean up
-		Syscall::close(memfd_create.value());
+			// Clean up
+			auto munmap = Syscall::munmap(mmap.value(), data.size);
+			if (!munmap.success())
+				LOG_WARNING << "Unable to unmap file " << *this << ": " << munmap.error_message() << endl;
+		} else {
+			LOG_ERROR << "Mapping memcopy of " << *this << " failed: " << mmap.error_message() << endl;
+		}
 	} else {
-		LOG_ERROR << "Creating memory file " << memname << " failed: " << memfd_create.error_message() << endl;
+		LOG_ERROR << "Setting memcopy size of " << *this << " failed: " << ftruncate.error_message() << endl;
 	}
+
+	// Clean up
+	Syscall::close(tmpfd);
+
 	return false;
 }
 
