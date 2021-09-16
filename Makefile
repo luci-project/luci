@@ -17,8 +17,10 @@ CFLAGS += -mno-mmx -mno-sse -mgeneral-regs-only -DNO_FPU
 endif
 CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
 
-# Default Base address
-BASEADDRESS = 0xba00000
+# Default Luci base address
+BASEADDRESS = 0x6ffff0000000
+# Default library start address
+LIBADDRESS = 0x600000000000
 # Default config file path
 LIBPATH_CONF = /opt/$(NAME)/libpath.conf
 
@@ -30,7 +32,7 @@ CXXFLAGS += -DVIRTUAL -DUSE_DLH
 CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit
 CXXFLAGS += -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
-CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
+CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBADDRESS=$(LIBADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
 CXXFLAGS += -fvisibility=hidden
 
 BUILDINFO = $(BUILDDIR)/.build_$(NAME).o
