@@ -7,7 +7,7 @@
    details of shared object loading to the debugger.  If the executable's
    dynamic section has a DT_DEBUG element, the run-time linker sets that
    element's value to the address where this structure can be found.  */
-struct r_debug {
+struct RDebug{
 	int r_version;		/* Version number for this protocol.  */
 
 	const ObjectIdentity *r_map;	/* Head of the chain of loaded objects.  */
@@ -25,8 +25,9 @@ struct r_debug {
 	GDB::State r_state;
 
 	uintptr_t r_ldbase;  /* Base address the linker is loaded at.  */
-} _r_debug;
+} r_debug;
 
+extern __attribute__ ((alias("r_debug"), visibility("default"))) RDebug _r_debug;
 
 EXPORT void _dl_debug_state(void) {
 	asm volatile("nop" ::: "memory");
@@ -35,27 +36,37 @@ EXPORT void _dl_debug_state(void) {
 namespace GDB {
 
 void notify(State state) {
-	_r_debug.r_state = state;
-	if (_r_debug.r_brk)
-		_r_debug.r_brk();
+	r_debug.r_state = state;
+	if (r_debug.r_brk)
+		r_debug.r_brk();
+}
+
+static bool set_dynamic_debug(const ObjectIdentity * object) {
+	if (object->dynamic != 0)
+		for (auto dyn = reinterpret_cast<Elf::Dyn *>(object->dynamic); dyn->d_tag != Elf::DT_NULL; dyn++)
+			if (dyn->d_tag == Elf::DT_DEBUG) {
+				dyn->d_un.d_ptr = reinterpret_cast<uintptr_t>(&r_debug);
+				LOG_INFO << "GDB debug structure in " << *object << " at *" << &(dyn->d_un.d_ptr) << " = " << &r_debug << endl;
+				return true;
+			}
+	return false;
 }
 
 void init(const Loader & loader) {
-	_r_debug.r_version = 1;
-	_r_debug.r_map = &loader.lookup.front();
-	_r_debug.r_brk = _dl_debug_state;
-	_r_debug.r_state = State::RT_CONSISTENT;
-	_r_debug.r_ldbase = loader.self->base;
-	assert(_r_debug.r_map != nullptr);
-	if (_r_debug.r_map->dynamic != 0) {
-		assert(_r_debug.r_map->current != nullptr);
-		for (auto dyn = reinterpret_cast<Elf::Dyn *>(_r_debug.r_map->dynamic); dyn->d_tag != Elf::DT_NULL; dyn++)
-			if (dyn->d_tag == Elf::DT_DEBUG) {
-				dyn->d_un.d_ptr = reinterpret_cast<uintptr_t>(&_r_debug);
-				LOG_INFO << "GDB debug structure at *" << &(dyn->d_un.d_ptr) << " = " << &_r_debug << endl;
-				return;
-			}
-	}
-	LOG_WARNING << "GDB debug structure not assigned" << endl;
+	r_debug.r_version = 1;
+	r_debug.r_map = &loader.lookup.front();
+	r_debug.r_brk = _dl_debug_state;
+	r_debug.r_state = State::RT_CONSISTENT;
+	r_debug.r_ldbase = loader.self->base;
+
+	assert(r_debug.r_map != nullptr);
+
+	// Set for Luci (in case it is executed from the command line)
+	if (!set_dynamic_debug(loader.self))
+		LOG_WARNING << "GDB debug structure not assigned in loader" << endl;
+
+	// Set for target binary (in case Luci is started as interpreter)
+	if (!set_dynamic_debug(r_debug.r_map))
+		LOG_WARNING << "GDB debug structure not assigned in target" << endl;
 }
 }  // namespace GDB
