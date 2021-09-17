@@ -23,7 +23,7 @@ struct ObjectIdentity {
 	uintptr_t base = 0;
 
 	/*! \brief Library name (\see name) */
-	const char *filename = nullptr;
+	const char * filename = nullptr;
 
 	/*! \brief Dynamic section of the shared object */
 	uintptr_t dynamic = 0;
@@ -66,9 +66,6 @@ struct ObjectIdentity {
 		Flags() : value(0) {}
 	} flags;
 
-	/*! \brief Shared memory (for .data and .bss) */
-	int memfd = -1;
-
 	/*! \brief TLS/DTV module id (0 = none)*/
 	size_t tls_module_id = 0;
 
@@ -89,9 +86,6 @@ struct ObjectIdentity {
 	/*! \brief constructor */
 	ObjectIdentity(Loader & loader, const char * path = nullptr, namespace_t ns = NAMESPACE_BASE, const char * altname = nullptr);
 	~ObjectIdentity();
-
-	/*! \brief Wrapper for memfd_create syscall */
-	int memfd_create(const char * suffix = nullptr, uint64_t id = 0, int flags = 0) const;
 
  private:
 	friend struct Loader;

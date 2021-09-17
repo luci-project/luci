@@ -34,9 +34,13 @@ struct MemorySegment {
 		/*! \brief length */
 		size_t size;
 
-		/*! \brief mmap memory protection flags */
+		/*! \brief memory protection flags for runtime */
 		int protection;
 
+		/*! \brief Current memory protection flags */
+		int effective_protection;
+
+		/*! \brief Memory file descriptor for shared data */
 		int fd;
 
 		/*! \brief Mapped into memory */
@@ -64,9 +68,13 @@ struct MemorySegment {
 		}
 	} target;
 
+	/*! \brief Constructor */
 	MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base = 0)
 	  : source{object, segment.offset(), segment.size() },
-	    target{base, segment.virt_addr(), segment.virt_size(), PROT_NONE | (segment.readable() ? PROT_READ : 0) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), -1, false} {}
+	    target{base, segment.virt_addr(), segment.virt_size(), PROT_NONE | (segment.readable() ? PROT_READ : 0) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, false} {}
+
+	/*! \brief Destructor (clean up) */
+	~MemorySegment();
 
 	/*! \brief allocate in memory */
 	bool map();
@@ -76,4 +84,11 @@ struct MemorySegment {
 
 	/*! \brief release memory allocation */
 	bool unmap();
+
+	/*! \brief duplicate memory fd for this segment */
+	int shmemdup();
+
+ private:
+	/*! \brief create sharedmemory fd for this segment */
+	int shmemfd();
 };

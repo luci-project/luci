@@ -50,6 +50,7 @@ static bool supported(const Elf::Header * header) {
 	return true;
 }
 
+
 Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_type type) {
 	// Not updatable: Allow only one (current) version
 	if (!flags.updatable && current != nullptr)
@@ -90,7 +91,7 @@ Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_
 				}
 
 		// Map file
-		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ, MAP_PRIVATE, data.fd, 0)) {
+		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ, MAP_PRIVATE | (flags.immutable_source ? 0 : MAP_POPULATE), data.fd, 0)) {
 			data.addr = mmap.value();
 		} else {
 			LOG_ERROR << "Mapping " << *this << " failed: " << mmap.error_message() << endl;
@@ -123,24 +124,6 @@ Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_
 	return o;
 }
 
-int ObjectIdentity::memfd_create(const char * suffix, uint64_t id, int flags) const {
-	// Create shared memory for data
-	StringStream<NAME_MAX + 1> shdatastr;
-	shdatastr << name.str;
-	if (suffix != nullptr)
-		shdatastr << '.' << suffix;
-	if (id != 0)
-		shdatastr << '-' << id;
-	const char * shdata = shdatastr.str();
-
-	auto memfd_create = Syscall::memfd_create(shdata, flags);
-	if (memfd_create.success()) {
-		return memfd_create.value();
-	} else {
-		LOG_ERROR << "Creating memory file " << shdata << " failed: " << memfd_create.error_message() << endl;
-		return -1;
-	}
-}
 
 ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t ns, const char * altname) : ns(ns), loader(loader), name(altname) {
 	assert(ns != NAMESPACE_NEW);
@@ -203,6 +186,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t n
 	filename = buffer;
 }
 
+
 ObjectIdentity::~ObjectIdentity() {
 	if (loader.dynamic_update) {
 		if (auto inotify = Syscall::inotify_rm_watch(loader.inotifyfd, wd); inotify.failed())
@@ -253,10 +237,6 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 
 	*/
 
-	// Copy contents into memory (if changes on the underlying file are possible)
-	if (!flags.immutable_source && !memdup(data))
-		return nullptr;
-
 	// Create object
 	Object * o = nullptr;
 	switch (type) {
@@ -280,7 +260,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 	o->file_previous = current;
 
 	// If dynamic updates are enabled, calculate function hashes
-	if (flags.updatable) {
+/*	if (flags.updatable) {
 		LOG_INFO << "Calculate Binary hash of " << *this << endl;
 		o->binary_hash.emplace(*o);
 		// if previous version exist, check if we can patch it
@@ -293,7 +273,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 			}
 		}
 	}
-	// Add to list
+*/	// Add to list
 	current = o;
 
 	// perform preload and map memory
@@ -309,7 +289,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 		delete o;
 		return nullptr;
 	} else {
-		LOG_INFO << "Successfully loaded " << path << " at " << (void*)o  << endl;
+		LOG_INFO << "Successfully loaded " << path << endl;
 	}
 
 	// Initialize GLIBC specific stuff (on first version only)
@@ -325,52 +305,6 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 	return o;
 }
 
-bool ObjectIdentity::memdup(Object::Data & data) {
-	int tmpfd = memfd_create("COPY", data.hash, MFD_CLOEXEC | MFD_ALLOW_SEALING);
-	if (tmpfd < 0)
-		return false;
-
-	if (auto ftruncate = Syscall::ftruncate(tmpfd, data.size)) {
-		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_SHARED, tmpfd, 0)) {
-			Memory::copy(mmap.value(), data.addr, data.size);
-			if (auto mprotect = Syscall::mprotect(mmap.value(), data.size, PROT_READ)) {
-				if (auto fcntl = Syscall::fcntl(tmpfd, F_ADD_SEALS, F_SEAL_FUTURE_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL)) {
-					LOG_INFO << "Created memory copy of " << *this << endl;
-					// Clean up old memdup
-					if (data.fd != -1) {
-						if (auto munmap = Syscall::munmap(data.addr, data.size); munmap.failed())
-							LOG_WARNING << "Unable to unmap file " << *this << ": " << munmap.error_message() << endl;
-
-						if (auto close = Syscall::close(data.fd); close.failed())
-							LOG_WARNING << "Unable to close file " << *this << ": " << close.error_message() << endl;
-					}
-
-					data.fd = tmpfd;
-					data.addr = mmap.value();
-					return true;
-				} else {
-					LOG_ERROR << "Sealing memcopy of " << *this << " (read-only) failed: " << fcntl.error_message() << endl;
-				}
-			} else {
-				LOG_ERROR << "Protecting memcopy of " << *this << " (read-only) failed: " << mprotect.error_message() << endl;
-			}
-
-			// Clean up
-			auto munmap = Syscall::munmap(mmap.value(), data.size);
-			if (!munmap.success())
-				LOG_WARNING << "Unable to unmap file " << *this << ": " << munmap.error_message() << endl;
-		} else {
-			LOG_ERROR << "Mapping memcopy of " << *this << " failed: " << mmap.error_message() << endl;
-		}
-	} else {
-		LOG_ERROR << "Setting memcopy size of " << *this << " failed: " << ftruncate.error_message() << endl;
-	}
-
-	// Clean up
-	Syscall::close(tmpfd);
-
-	return false;
-}
 
 bool ObjectIdentity::prepare() {
 	assert(current != nullptr);
@@ -399,6 +333,7 @@ bool ObjectIdentity::prepare() {
 	}
 	return true;
 }
+
 
 bool ObjectIdentity::initialize() {
 	assert(current != nullptr);
