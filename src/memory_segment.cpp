@@ -101,7 +101,7 @@ int MemorySegment::shmemdup() {
 		if (tmpfd != -1) {
 			assert(target.available && target.fd != -1);
 			if (auto mmap = Syscall::mmap(NULL, target.page_size(), PROT_WRITE, MAP_SHARED, tmpfd, 0)) {
-				Memory::copy(target.page_start(), mmap.value(), target.page_size());
+				Memory::copy(mmap.value(), target.page_start(), target.page_size());
 				if (auto munmap = Syscall::munmap(mmap.value(), target.page_size()); munmap.failed())
 					LOG_WARNING << "Unmapping " << (void*)mmap.value() << " (" << target.page_size() << " Bytes) failed: " << munmap.error_message() << endl;
 
