@@ -51,16 +51,19 @@ static bool supported(const Elf::Header * header) {
 }
 
 
-Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_type type) {
+Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 	// Not updatable: Allow only one (current) version
-	if (!flags.updatable && current != nullptr)
+	if (!flags.updatable && current != nullptr) {
+		LOG_WARNING << "Cannot load new version of " << *this << " - updates are not allowed!" << endl;
 		return nullptr;
+	}
 
 	Object::Data data;
 	LOG_DEBUG << "Loading " << name << "..." << endl;
 
 	if (addr == 0) {
 		assert(!path.empty());
+		assert(flags.premapped == 0);
 
 		// Open file
 		if (auto open = Syscall::open(path.str, O_RDONLY)) {
@@ -79,7 +82,6 @@ Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_
 			Syscall::close(data.fd);
 			return nullptr;
 		}
-
 
 		// Check if already loaded (using modification time)
 		if (!flags.ignore_mtime)
@@ -108,7 +110,8 @@ Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_
 	const Elf::Header * header = reinterpret_cast<const Elf::Header *>(data.addr);
 	if (data.size < sizeof(Elf::Header) || !supported(header)) {
 		LOG_ERROR << "Unsupported ELF header in " << *this << "!" << endl;
-		Syscall::munmap(data.addr, data.size);
+		if (flags.premapped == 0)
+			Syscall::munmap(data.addr, data.size);
 		Syscall::close(data.fd);
 		return nullptr;
 	} else if (type == Elf::ET_NONE) {
@@ -116,23 +119,26 @@ Object * ObjectIdentity::load(uintptr_t addr, bool preload, bool map, Elf::ehdr_
 	}
 
 	// Create object
-	Object * o = create(data, preload, map, type);
+	Object * o = create(data, type);
 	if (o == nullptr && data.fd != -1) {
-		Syscall::munmap(data.addr, data.size);
+		if (flags.premapped == 0)
+			Syscall::munmap(data.addr, data.size);
 		Syscall::close(data.fd);
 	}
 	return o;
 }
 
 
-ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t ns, const char * altname) : ns(ns), loader(loader), name(altname) {
+ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * path, namespace_t ns, const char * altname) : ns(ns), loader(loader), name(altname), flags(flags) {
 	assert(ns != NAMESPACE_NEW);
 
 	// Dynamic updates?
-	if (loader.dynamic_update)
-		flags.updatable = 1;
-	else
-		flags.immutable_source = 1;  // Without updates, don't expect changes to the binaries during runtime
+	if (!loader.dynamic_update) {
+		this->flags.updatable = 0;
+		this->flags.immutable_source = 1;  // Without updates, don't expect changes to the binaries during runtime
+	} else if (this->flags.updatable == 1) {
+		assert(this->flags.initialized == 0 && this->flags.premapped == 0);
+	}
 
 	// File based?
 	if (path == nullptr) {
@@ -164,14 +170,14 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const char * path, namespace_t n
 			this->name = this->path.find_last('/');
 
 		// Observe file?
-		if (flags.updatable) {
+		if (this->flags.updatable == 1) {
 			struct stat sb;
 			auto lstat = Syscall::lstat(this->path.str, &sb);
 			if (lstat.failed()) {
 				LOG_ERROR << "Lstat of " << path << " failed: " << lstat.error_message() << endl;
 			} else if (S_ISLNK(sb.st_mode)) {
 				LOG_DEBUG << "Library " << this->path << " is a symbolic link (hence we do not expect changes to the binary itself)" << endl;
-				flags.immutable_source = 1;
+				this->flags.immutable_source = 1;
 			}
 
 			if (auto inotify = Syscall::inotify_add_watch(loader.inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
@@ -198,7 +204,7 @@ ObjectIdentity::~ObjectIdentity() {
 }
 
 
-Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf::ehdr_type type) {
+Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 	// Hash file contents
 	if (flags.updatable) {
 		XXHash64 datahash(name.hash);  // Name hash as seed
@@ -244,7 +250,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 			o = new ObjectExecutable{*this, data};
 			break;
 		case Elf::ET_DYN:
-			o = new ObjectDynamic{*this, data, !map};
+			o = new ObjectDynamic{*this, data};
 			break;
 		case Elf::ET_REL:
 			o = new ObjectRelocatable{*this, data};
@@ -260,7 +266,7 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 	o->file_previous = current;
 
 	// If dynamic updates are enabled, calculate function hashes
-/*	if (flags.updatable) {
+	if (flags.updatable) {
 		LOG_INFO << "Calculate Binary hash of " << *this << endl;
 		o->binary_hash.emplace(*o);
 		// if previous version exist, check if we can patch it
@@ -273,31 +279,36 @@ Object * ObjectIdentity::create(Object::Data & data, bool preload, bool map, Elf
 			}
 		}
 	}
-*/	// Add to list
+	// Add to list
 	current = o;
 
-	// perform preload and map memory
-
-	if (preload && !o->preload()) {
+	// perform preload
+	if (flags.initialized == 1) {
+		o->base = data.addr;
+		o->status = Object::STATUS_PREPARED;
+	} else if (!o->preload()) {
 		LOG_ERROR << "Loading of " << path << " failed (while preloading)..." << endl;
 		current = o->file_previous;
 		delete o;
 		return nullptr;
-	} else if (map && !o->map()) {
+	}
+
+	// Map memory
+	if (flags.premapped == 0 && !o->map()) {
 		LOG_ERROR << "Loading of " << path << " failed (while mapping into memory)..." << endl;
 		current = o->file_previous;
 		delete o;
 		return nullptr;
-	} else {
-		LOG_INFO << "Successfully loaded " << path << endl;
 	}
+
+	LOG_INFO << "Successfully loaded " << path << endl;
 
 	// Initialize GLIBC specific stuff (on first version only)
 	if (current == o) {
 		base = o->base;
 		for (const auto & segment : o->segments)
 			if (segment.type() == Elf::PT_DYNAMIC) {
-				dynamic = base + segment.virt_addr();
+				dynamic = (reinterpret_cast<const Elf::Header *>(data.addr)->type() != Elf::ET_EXEC ? base : 0) + segment.virt_addr();
 				break;
 			}
 	}
@@ -330,6 +341,23 @@ bool ObjectIdentity::prepare() {
 
 		case Object::STATUS_PREPARED:
 			break;
+	}
+	return true;
+}
+
+
+bool ObjectIdentity::update() {
+	assert(current != nullptr);
+	LOG_DEBUG << "Updating relocations at " << *this << endl;
+	return current->update();
+}
+
+
+bool ObjectIdentity::protect() {
+	assert(current != nullptr);
+	if (flags.premapped == 0) {
+		LOG_DEBUG << "Protecting " << *this << endl;
+		return current->protect();
 	}
 	return true;
 }

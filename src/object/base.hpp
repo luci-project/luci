@@ -97,7 +97,7 @@ struct Object : public Elf {
 	virtual bool prepare() { return true; };
 
 	/*! \brief Update relocations */
-	virtual void update() { };
+	virtual bool update() { return true; };
 
 	/*! \brief Set protection flags in memory */
 	bool protect();
@@ -129,6 +129,8 @@ struct Object : public Elf {
 		return {};
 	};
 
+	/*! \brief Check & get the symbol */
+	bool has_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version, Optional<VersionedSymbol> & result) const;
 
 	bool operator==(const Object & o) const {
 		return this == &o;

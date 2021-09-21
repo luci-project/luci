@@ -44,6 +44,9 @@ struct Loader {
 	const char ** argv = nullptr;
 	const char ** envp = nullptr;
 
+	/*! \brief Default flags for objects */
+	ObjectIdentity::Flags default_flags;
+
 	/*! \brief Constructor */
 	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false);
 
@@ -51,28 +54,41 @@ struct Loader {
 	~Loader();
 
 	/*! \brief Search & load libary */
-	ObjectIdentity * library(const char * file, const Vector<const char *> & rpath = {}, const Vector<const char *> & runpath = {}, namespace_t ns = NAMESPACE_BASE);
+	ObjectIdentity * library(const char * file, ObjectIdentity::Flags flags, const Vector<const char *> & rpath = {}, const Vector<const char *> & runpath = {}, namespace_t ns = NAMESPACE_BASE, bool load = true);
+	inline ObjectIdentity * library(const char * file) {
+		return library(file, default_flags);
+	}
 
 	/*! \brief Load file */
-	ObjectIdentity * open(const char * filename, const char * directory, bool prevent_updates, namespace_t ns = NAMESPACE_BASE);
-	ObjectIdentity * open(const char * path, bool prevent_updates, namespace_t ns = NAMESPACE_BASE);
-	ObjectIdentity * open(uintptr_t addr, bool prevent_updates, bool is_prepared, bool is_mapped, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
+	ObjectIdentity * open(const char * filename, const char * directory, ObjectIdentity::Flags flags, namespace_t ns = NAMESPACE_BASE);
+	ObjectIdentity * open(const char * path, ObjectIdentity::Flags flags, namespace_t ns = NAMESPACE_BASE, uintptr_t addr = 0, Elf::ehdr_type type = Elf::ET_NONE);
+	inline ObjectIdentity * open(const char * path) {
+		return open(path, default_flags);
+	}
+	//ObjectIdentity * open(uintptr_t addr, ObjectIdentity::Flags flags, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief Search, load & initizalize libary (during runtime) */
-	ObjectIdentity * dlopen(const char * file, namespace_t ns = NAMESPACE_BASE);
+	ObjectIdentity * dlopen(const char * file, ObjectIdentity::Flags flags, namespace_t ns = NAMESPACE_BASE, bool load = true);
 
 	/*! \brief Run */
 	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
 	bool run(ObjectIdentity * file, uintptr_t stack_pointer);
 
 	/*! \brief find Symbol with same name and version from other objects in same namespace */
-	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * after = nullptr) const {
-		return resolve_symbol(sym.name(), sym.hash_value(), sym.gnu_hash_value(), sym.version, ns, after);
+	enum ResolveSymbolMode {
+		RESOLVE_DEFAULT,
+		RESOLVE_AFTER_OBJECT,
+		RESOLVE_EXCEPT_OBJECT,
+		RESOLVE_OBJECT_FIRST,
+		RESOLVE_NO_DEPENDENCIES,
+	};
+	inline Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * obj = nullptr, ResolveSymbolMode mode = RESOLVE_DEFAULT) const {
+		return resolve_symbol(sym.name(), sym.hash_value(), sym.gnu_hash_value(), sym.version, ns, obj, mode);
 	}
-	Optional<VersionedSymbol> resolve_symbol(const char * name, const char * version = nullptr, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * after = nullptr) const {
-		return resolve_symbol(name, ELF_Def::hash(name), ELF_Def::gnuhash(name), VersionedSymbol::Version(version), ns, after);
+	inline Optional<VersionedSymbol> resolve_symbol(const char * name, const char * version = nullptr, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * obj = nullptr, ResolveSymbolMode mode = RESOLVE_DEFAULT) const {
+		return resolve_symbol(name, ELF_Def::hash(name), ELF_Def::gnuhash(name), VersionedSymbol::Version(version), ns, obj, mode);
 	}
-	Optional<VersionedSymbol> resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * after = nullptr) const;
+	Optional<VersionedSymbol> resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version, namespace_t ns = NAMESPACE_BASE, const ObjectIdentity * obj = nullptr, ResolveSymbolMode mode = RESOLVE_DEFAULT) const;
 
 	/*! \brief find Symbol overlapping the given address in same namespace */
 	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr, namespace_t ns = NAMESPACE_BASE) const;
@@ -105,6 +121,9 @@ struct Loader {
 	/*! \brief observer method */
 	void observer();
 
+	/*! \brief relocate all loaded files for execution */
+	bool relocate(bool update = false);
+
 	/*! \brief prepare all loaded files for execution */
-	bool prepare(bool update = false);
+	bool prepare();
 };

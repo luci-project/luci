@@ -10,18 +10,23 @@
 const void* RTLD_NEXT = reinterpret_cast<void*>(-1l);
 const void* RTLD_DEFAULT = 0;
 
+// TODO: Should be __thread
+static const char * error_msg = nullptr;
+
 EXPORT int dlclose(void *) {
-	LOG_WARNING << "dlclose is not implemented (yet)" << endl;
+	error_msg = "Unloading is not supported (yet)";
+	LOG_WARNING << "dlclose failed: " << error_msg << endl;
 	return -1;
 }
 
 EXPORT const char *dlerror() {
-	return "dlerror not implemented (yet)";
+	const char * msg = error_msg;
+	error_msg = nullptr;
+	return msg;
 }
 
 
 EXPORT void *dlopen(const char * filename, int flags) {
-	LOG_TRACE << "GLIBC dlopen(" << filename << ", "  << flags << ")" << endl;
 	return dlmopen(GLIBC::DL::LM_ID_BASE, filename, flags);
 }
 
@@ -30,10 +35,19 @@ EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
-	if (flags != 0)
-		LOG_WARNING << "dl[m]open currently ignores the flags!" << endl;
+	ObjectIdentity::Flags objflags;
+	objflags.bind_now = (flags & GLIBC::DL::RTLD_NOW) != 0;
+	objflags.bind_global = (flags & GLIBC::DL::RTLD_GLOBAL) != 0;
+	objflags.persistent = (flags & GLIBC::DL::RTLD_NODELETE) != 0;
+	objflags.bind_deep = (flags & GLIBC::DL::RTLD_DEEPBIND) != 0;
+	objflags.updatable = (flags & GLIBC::DL::RTLD_NOUPDATE) == 0;
 
-	return reinterpret_cast<void*>(loader->dlopen(filename, lmid));
+	auto r = loader->dlopen(filename, objflags, lmid, (flags & GLIBC::DL::RTLD_NOLOAD) == 0);
+	if (r == nullptr) {
+		error_msg = "Unable to open shared object!";
+		LOG_WARNING << "dl[m]open of " << filename << " failed: " << error_msg << endl;
+	}
+	return reinterpret_cast<void*>(r);
 }
 
 enum : int {
@@ -74,7 +88,8 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 
 	auto o = reinterpret_cast<const ObjectIdentity *>(handle);
 	if (!loader->is_loaded(o)) {
-		LOG_WARNING << "Invalid handle " << handle << endl;
+		error_msg = "Invalid handle for dlinfo!";
+		LOG_WARNING << error_msg << endl;
 		return -1;
 	}
 
@@ -85,8 +100,26 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 		case RTLD_DI_LINKMAP:
 			*((const ObjectIdentity**)info) = o;
 			return 0;
+		case RTLD_DI_SERINFO:
+			error_msg = "Request RTLD_DI_SERINFO not implemented (yet)!";
+			LOG_WARNING << "dlinfo failed: " << error_msg << endl;
+			return -1;
+		case RTLD_DI_SERINFOSIZE:
+			error_msg = "Request RTLD_DI_SERINFOSIZE not implemented (yet)!";
+			LOG_WARNING << "dlinfo failed: " << error_msg << endl;
+			return -1;
+		case RTLD_DI_ORIGIN:
+			*((const char**)info) = o->path.str;
+			return 0;
+		case RTLD_DI_TLS_MODID:
+			*((size_t*)info) = o->tls_module_id;
+			return 0;
+		case RTLD_DI_TLS_DATA:
+			*((uintptr_t*)info) = o->tls_offset == 0 ? 0 : loader->tls.get_addr(Thread::self(), o->tls_module_id, false);
+			return 0;
 		default:
-			LOG_WARNING << "Request " << request << " not implemented yet" << endl;
+			error_msg = "Unknown request for dlinfo!";
+			LOG_WARNING << error_msg << endl;
 			return -1;
 	}
 }
@@ -133,22 +166,25 @@ static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, con
 	if (handle == RTLD_DEFAULT || handle == RTLD_NEXT) {
 		auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(caller));
 		assert(o != nullptr);
-		ObjectIdentity * after = handle == RTLD_NEXT ? &(o->file) : nullptr;
-		r = loader->resolve_symbol(symbol, version, o->file.ns, after);
+		r = loader->resolve_symbol(symbol, version, o->file.ns, &(o->file), handle == RTLD_NEXT ? Loader::RESOLVE_AFTER_OBJECT : Loader::RESOLVE_DEFAULT);
 	} else {
 		auto o = reinterpret_cast<const ObjectIdentity *>(handle);
 		if (!loader->is_loaded(o)) {
-			LOG_WARNING << "Invalid handle " << handle << endl;
+			error_msg = "Invalid handle for dl[v]sym!";
+			LOG_WARNING << error_msg << endl;
 			return nullptr;
 		}
 
 		r = o->current->resolve_symbol(symbol, version);
 	}
 
-	if (r && r->valid())
+	if (r && r->valid()) {
 		return reinterpret_cast<void*>(r->object().base + r->value());
-
-	return nullptr;
+	} else {
+		error_msg = "Symbol not found!";
+		LOG_WARNING << "dl[v]sym for " << symbol << " failed: " << error_msg << endl;
+		return nullptr;
+	}
 }
 
 

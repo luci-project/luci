@@ -23,6 +23,26 @@ enum : int {
 	RTLD_DL_LINKMAP = 2
 };
 
+/* The MODE argument to `dlopen' contains one of the following: */
+enum : unsigned {
+	RTLD_LAZY     = 0x00001,	/* Lazy function call binding.  */
+	RTLD_NOW      = 0x00002,	/* Immediate function call binding.  */
+	RTLD_NOLOAD   = 0x00004,	/* Do not load the object.  */
+	RTLD_DEEPBIND = 0x00008,	/* Use deep binding.  */
+	/* If the following bit is set in the MODE argument to `dlopen',
+	   the symbols of the loaded object and its dependencies are made
+	   visible as if the object were linked directly into the program.  */
+	RTLD_GLOBAL   = 0x00100,
+	/* Unix98 demands the following flag which is the inverse to RTLD_GLOBAL.
+	   The implementation does this by default and so we can define the
+	   value to zero.  */
+	RTLD_LOCAL    = 0,
+	RTLD_NODELETE = 0x01000, /* Do not delete object when closed.  */
+	/* CUSTOM for LUCI */
+	RTLD_NOUPDATE = 0x10000, /* Disallow updates  */
+};
+
+
 typedef long int Lmid_t;
 static_assert(sizeof(Lmid_t) == sizeof(namespace_t), "Namespace has wrong type");
 const Lmid_t LM_ID_BASE = 0;

@@ -98,9 +98,14 @@ struct TLS {
 	/*! \brief Get base address of an tls module (do lazy allocation if necessary)
 	 * \param thread current Thread
 	 * \param module_id module
+	 * \param alloc allocate if not ready
 	 * \return absolute address of module
 	 */
-	inline uintptr_t get_addr(Thread * thread, size_t module_id) {
+	inline uintptr_t get_addr(Thread * thread, size_t module_id, bool alloc = true) {
+		assert(thread != nullptr);
+		if (!alloc)
+			return module_id <= dtv_module_size(thread->dtv) ? reinterpret_cast<uintptr_t>(thread->dtv[module_id].pointer.val) : 0;
+
 		// Check generation
 		size_t & dtv_gen = dtv_generation(thread->dtv);
 		if (dtv_gen != gen) {

@@ -10,13 +10,13 @@
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
 	// It is possible that multiple threads try to access an unresolved function, hence we have to use a mutex
 	file.loader.mutex.lock();
-	auto r = relocate(dynamic_relocations_plt[index]);
+	auto r = relocate(dynamic_relocations_plt[index], file.flags.bind_not == 0);
 	file.loader.mutex.unlock();
 	return r;
 }
 
 bool ObjectDynamic::preload() {
-	base = file.loader.next_address();
+	base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
 	return preload_segments()
 	    && preload_libraries();
 }
@@ -44,6 +44,13 @@ bool ObjectDynamic::preload_libraries() {
 				continue;
 		}
 	}
+	// Adjust non-inheritable flags
+	auto flags = file.flags;
+	flags.immutable_source = 0;
+	flags.ignore_mtime = 0;
+	flags.initialized = 0;
+	flags.premapped = 0;
+
 
 	for (auto & lib : libs) {
 		// Is lib excluded? TODO: Should be done with resolved path
@@ -54,7 +61,7 @@ bool ObjectDynamic::preload_libraries() {
 				skip = true;
 			}
 		if (!skip) {
-			auto o = file.loader.library(lib, rpath, runpath);
+			auto o = file.loader.library(lib, flags, rpath, runpath, file.ns);
 			if (o == nullptr) {
 				LOG_WARNING << "Unresolved dependency: " << lib << endl;
 				success = false;
@@ -77,7 +84,7 @@ bool ObjectDynamic::prepare() {
 
 	// Perform initial relocations
 	for (auto & reloc : dynamic_relocations)
-		relocate(reloc);
+		relocate(reloc, true);
 
 	// PLT relocations
 	if (global_offset_table != 0) {
@@ -89,8 +96,8 @@ bool ObjectDynamic::prepare() {
 
 		// Remainder for relocations
 		for (const auto & reloc : dynamic_relocations_plt)
-			if (file.flags.bind_now)
-				relocate(reloc);
+			if (file.flags.bind_now == 1)
+				relocate(reloc, true);
 			else
 				Relocator(reloc).increment_value(base, base);
 	}
@@ -98,35 +105,42 @@ bool ObjectDynamic::prepare() {
 	return success;
 }
 
-void ObjectDynamic::update() {
+bool ObjectDynamic::update() {
 	for (const auto & relpair : relocations)
 		if (!relpair.second.object().is_latest_version())
-			relocate(relpair.first);
+			relocate(relpair.first, file.flags.bind_not == 0);
+	return true;
 }
 
-void* ObjectDynamic::relocate(const Elf::Relocation & reloc) const {
+void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 	// Initialize relocator object
 	Relocator relocator(reloc, this->global_offset_table);
 	// find symbol
 	auto need_symbol_index = reloc.symbol_index();
 	if (need_symbol_index == 0) {
-		// Fix local symbol
-		return reinterpret_cast<void*>(relocator.fix_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset));
+		// Local symbol
+		if (fix)
+			return reinterpret_cast<void*>(relocator.fix_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset));
+		else
+			return reinterpret_cast<void*>(relocator.value_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset));
 	} else /* TODO: if (!dynamic_symbols.ignored(need_symbol_index)) */ {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
 		//assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
 		VersionedSymbol need_symbol(dynamic_symbols[need_symbol_index], get_version(need_symbol_version_index));
 		// COPY Relocations have a defined symbol with the same name
-		auto symbol = file.loader.resolve_symbol(need_symbol, file.ns, relocator.is_copy() ? &file : nullptr);
-		if (symbol) {
+		Loader::ResolveSymbolMode mode = relocator.is_copy() ? Loader::RESOLVE_EXCEPT_OBJECT : (file.flags.bind_deep == 1 ? Loader::RESOLVE_OBJECT_FIRST : Loader::RESOLVE_DEFAULT);
+		if (auto symbol =  file.loader.resolve_symbol(need_symbol, file.ns, &file, mode)) {
 			relocations.emplace_back(reloc, symbol.value());
 			auto & symobj = symbol->object();
 			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << endl;
-			return reinterpret_cast<void*>(relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset));
+			if (fix)
+				return reinterpret_cast<void*>(relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset));
+			else
+				return reinterpret_cast<void*>(relocator.value_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset));
 		} else if (need_symbol.bind() == STB_WEAK) {
 			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "..." << endl;
 		} else {
-			LOG_ERROR << "Unable to resolve symbol " << need_symbol << " for relocation..." << endl;
+			LOG_ERROR << "Unable to resolve symbol " << need_symbol << " for relocation..." << file << endl;
 			assert(false);
 		}
 	}

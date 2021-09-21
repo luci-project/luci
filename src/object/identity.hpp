@@ -55,11 +55,16 @@ struct ObjectIdentity {
 	/*! \brief Object specific flags*/
 	union Flags {
 		struct {
-			unsigned bind_now         : 1,
+			unsigned bind_now         : 1,  // Resolve all relocations on load (or, if not set, lazy)
+			         bind_not         : 1,  // Do not fix GOT (for debugging)
+			         bind_global      : 1,  // Use symbol for lookup
+			         bind_deep        : 1,  // First lookup in own scope
+			         persistent       : 1,  // This cannot be unloaded
 			         updatable        : 1,  // Object can be updated during runtime
 			         immutable_source : 1,  // ELF Source (file / memory) is immutable (no changes during runtime)
 			         ignore_mtime     : 1,  // Do not rely on modification time when checking for file modifications
-			         initialized      : 1;  // Do not executed INIT functions / constructors (again)
+			         initialized      : 1,  // Do not executed INIT functions / constructors (again)
+			         premapped        : 1;  // Already mapped into target memory
 		};
 		unsigned value;
 
@@ -77,14 +82,13 @@ struct ObjectIdentity {
 
 	/*! \brief Load/get current version
 	 * \param addr use memory mapped Elf instead of file located at path
-	 * \param preload preload and map object
 	 * \param type ELF type (`ET_NONE` to auto determine)
 	 * \return pointer to newly opened object (or nullptr on failure / if already loaded)
 	 */
-	Object * load(uintptr_t addr = 0, bool preload = true, bool map = true, Elf::ehdr_type type = Elf::ET_NONE);
+	Object * load(uintptr_t addr = 0, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief constructor */
-	ObjectIdentity(Loader & loader, const char * path = nullptr, namespace_t ns = NAMESPACE_BASE, const char * altname = nullptr);
+	ObjectIdentity(Loader & loader, const Flags flags, const char * path = nullptr, namespace_t ns = NAMESPACE_BASE, const char * altname = nullptr);
 	~ObjectIdentity();
 
  private:
@@ -95,12 +99,16 @@ struct ObjectIdentity {
 
 
 	/*! \brief create new object instance */
-	Object * create(Object::Data & data, bool preload, bool map, Elf::ehdr_type type);
+	Object * create(Object::Data & data, Elf::ehdr_type type);
 
 	/*! \brief Make memory copy of ELF */
 	bool memdup(Object::Data & data);
 
 	bool prepare();
+
+	bool update();
+
+	bool protect();
 
 	bool initialize();
 };

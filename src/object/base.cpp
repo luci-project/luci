@@ -79,3 +79,17 @@ void* Object::dynamic_resolve(size_t index) const {
 	assert(false);
 	return nullptr;
 }
+
+bool Object::has_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version, Optional<VersionedSymbol> & result) const {
+	auto tmp = resolve_symbol(name, hash, gnu_hash, version);
+	if (tmp) {
+		assert(tmp->valid());
+		assert(tmp->bind() != Elf::STB_LOCAL); // should not be returned
+		bool strong = tmp->bind() != Elf::STB_WEAK;
+		if (strong || !result) {
+			result = tmp;
+			return strong;
+		}
+	}
+	return false;
+}

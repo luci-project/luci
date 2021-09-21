@@ -30,6 +30,8 @@ struct Opts {
 	const char * libpathconf{ STR(LIBPATH_CONF) };
 	Vector<const char *> preload{};
 	bool dynamicUpdate{};
+	bool bindNow{};
+	bool bindNot{};
 	bool showHelp{};
 };
 
@@ -111,46 +113,64 @@ void build_info() {
 // Setup commands
 static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts & opts) {
 	// Logger
-	LOG.set(static_cast<Log::Level>(opts.loglevel));
+	auto env_loglevel = Parser::string_as<int>(Environ::variable("LD_LOGLEVEL", true)) ;
+	cerr << env_loglevel << endl;
+	LOG.set(static_cast<Log::Level>(env_loglevel && env_loglevel.value() > opts.loglevel ? env_loglevel.value() : opts.loglevel));
 	build_info();  // should be first output
 	LOG_DEBUG << "Set log level to " << opts.loglevel << endl;
 
-	if (opts.logfile != nullptr) {
-		LOG_DEBUG << "Log to file " << opts.logfile << endl;
-		LOG.output(opts.logfile);
+	const char * logfile = opts.logfile == nullptr ? Environ::variable("LD_LOGFILE", true) : opts.logfile;
+	if (logfile != nullptr) {
+		LOG_DEBUG << "Log to file " << logfile << endl;
+		LOG.output(logfile);
 	}
 
 	// New Loader
-	Loader * loader = new Loader(luci_base, luci_path, opts.dynamicUpdate);
-	assert(loader != nullptr);
+	auto env_dynamicupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC", true));
+	Loader * loader = new Loader(luci_base, luci_path, opts.dynamicUpdate || (env_dynamicupdate && env_dynamicupdate.value()));
+	if (loader == nullptr) {
+		LOG_ERROR << "Unable to allocate loader" << endl;
+	} else {
+		if (loader->dynamic_update) {
+			LOG_INFO << "Dynamic updates are enabled!" << endl;
+		} else {
+			LOG_DEBUG << "Dynamic updates are disabled!" << endl;
+		}
 
-	// Library search path
-	for (auto & libpath : opts.libpath) {
-		LOG_DEBUG << "Add '" << libpath << "' (from --library-path) to library search path..." << endl;
-		loader->library_path_runtime.push_back(libpath);
-	}
+		// Flags
+		auto env_bindnow = Parser::string_as<bool>(Environ::variable("LD_BIND_NOW", true));
+		loader->default_flags.bind_now = opts.bindNow || (env_bindnow && env_bindnow.value());
+		auto env_bindnot = Parser::string_as<bool>(Environ::variable("LD_BIND_NOT", true));
+		loader->default_flags.bind_not = opts.bindNot || (env_bindnot && env_bindnot.value());
 
-	char * ld_library_path = Environ::variable("LD_LIBRARY_PATH", true);
-	if (ld_library_path != nullptr && *ld_library_path != '\0') {
-		LOG_DEBUG << "Add '" << ld_library_path<< "' (from LD_LIBRARY_PATH) to library search path..." << endl;
-		loader->library_path_runtime = String::split(ld_library_path, ';');
-	}
+		// Library search path
+		for (auto & libpath : opts.libpath) {
+			LOG_DEBUG << "Add '" << libpath << "' (from --library-path) to library search path..." << endl;
+			loader->library_path_runtime.push_back(libpath);
+		}
 
-	LOG_DEBUG << "Adding contents of '" << opts.libpathconf << "' to library search path..." << endl;
-	loader->library_path_config += File::lines(opts.libpathconf);
-	LOG_DEBUG << "Config has " << loader->library_path_config.size() << " entries!" << endl;
+		char * ld_library_path = Environ::variable("LD_LIBRARY_PATH", true);
+		if (ld_library_path != nullptr && *ld_library_path != '\0') {
+			LOG_DEBUG << "Add '" << ld_library_path<< "' (from LD_LIBRARY_PATH) to library search path..." << endl;
+			loader->library_path_runtime = String::split(ld_library_path, ';');
+		}
 
-	// Preload Library
-	for (auto & preload : opts.preload) {
-		LOG_DEBUG << "Loading '" << preload << "' (from --preload)..." << endl;
-		loader->library(preload);
-	}
+		LOG_DEBUG << "Adding contents of '" << opts.libpathconf << "' to library search path..." << endl;
+		loader->library_path_config += File::lines(opts.libpathconf);
+		LOG_DEBUG << "Config has " << loader->library_path_config.size() << " entries!" << endl;
 
-	char * preload = Environ::variable("LD_PRELOAD", true);
-	if (preload != nullptr && *preload != '\0') {
-		LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)..." << endl;
-		for (auto & lib : String::split(preload, ';'))
-			loader->library(lib);
+		// Preload Library
+		for (auto & preload : opts.preload) {
+			LOG_DEBUG << "Loading '" << preload << "' (from --preload)..." << endl;
+			loader->library(preload);
+		}
+
+		char * preload = Environ::variable("LD_PRELOAD", true);
+		if (preload != nullptr && *preload != '\0') {
+			LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)..." << endl;
+			for (auto & lib : String::split(preload, ';'))
+				loader->library(lib);
+		}
 	}
 
 	return loader;
@@ -168,12 +188,14 @@ int main(int argc, char* argv[]) {
 		// Available commandline options
 		auto args = Parser::Arguments<Opts>({
 				/* short & long name,  argument, element            required, help text,  optional validation function */
-				{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug)", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
-				{'f',  "logfile",      "FILE",  &Opts::logfile,       false, "Log to file" },
-				{'p',  "library-path", "DIR",   &Opts::libpath,       false, "Add library search path (this parameter may be used multiple times to specify additional directories)" },
+				{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
+				{'f',  "logfile",      "FILE",  &Opts::logfile,       false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
+				{'p',  "library-path", "DIR",   &Opts::libpath,       false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
 				{'c',  "library-conf", "FILE",  &Opts::libpathconf,   false, "library path configuration" },
-				{'P',  "preload",      "FILE",  &Opts::preload,       false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries)" },
-				{'d',  "dynamic",      nullptr, &Opts::dynamicUpdate, false, "Enable dynamic updates" },
+				{'P',  "preload",      "FILE",  &Opts::preload,       false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
+				{'d',  "dynamic",      nullptr, &Opts::dynamicUpdate, false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC to 1" },
+				{'n',  "bind-now",     nullptr, &Opts::bindNow,       false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
+				{'N',  "bind-not",     nullptr, &Opts::bindNot,       false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
 				{'h',  "help",         nullptr, &Opts::showHelp,      false, "Show this help" }
 			},
 			File::executable,
@@ -197,7 +219,9 @@ int main(int argc, char* argv[]) {
 			Vector<const char *> start_args;
 			ObjectIdentity * start = nullptr;
 			for (auto & bin : args.get_positional()) {
-				ObjectIdentity * o = loader->open(bin, true);
+				auto flags = loader->default_flags;
+				flags.updatable = 0;
+				ObjectIdentity * o = loader->open(bin, flags);
 				if (o == nullptr) {
 					LOG_ERROR << "Failed loading " << bin << endl;
 					return EXIT_FAILURE;
@@ -228,7 +252,10 @@ int main(int argc, char* argv[]) {
 
 		// Load target binary
 		const char * bin = reinterpret_cast<const char *>(Auxiliary::vector(Auxiliary::AT_EXECFN).pointer());
-		ObjectIdentity * start = loader->open(base, true, false, true, bin);
+		auto flags = loader->default_flags;
+		flags.updatable = 0;
+		flags.premapped = 1;
+		ObjectIdentity * start = loader->open(bin, flags, NAMESPACE_BASE, base);
 		if (start == nullptr) {
 			LOG_ERROR << "Failed loading " << bin << endl;
 			return EXIT_FAILURE;
