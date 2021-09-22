@@ -38,8 +38,6 @@ enum : unsigned {
 	   value to zero.  */
 	RTLD_LOCAL    = 0,
 	RTLD_NODELETE = 0x01000, /* Do not delete object when closed.  */
-	/* CUSTOM for LUCI */
-	RTLD_NOUPDATE = 0x10000, /* Disallow updates  */
 };
 
 

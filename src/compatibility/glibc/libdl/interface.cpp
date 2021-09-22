@@ -40,7 +40,6 @@ EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
 	objflags.bind_global = (flags & GLIBC::DL::RTLD_GLOBAL) != 0;
 	objflags.persistent = (flags & GLIBC::DL::RTLD_NODELETE) != 0;
 	objflags.bind_deep = (flags & GLIBC::DL::RTLD_DEEPBIND) != 0;
-	objflags.updatable = (flags & GLIBC::DL::RTLD_NOUPDATE) == 0;
 
 	auto r = loader->dlopen(filename, objflags, lmid, (flags & GLIBC::DL::RTLD_NOLOAD) == 0);
 	if (r == nullptr) {
