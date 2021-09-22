@@ -476,7 +476,7 @@ uintptr_t Loader::next_address() const {
 	uintptr_t start = 0, end = 0, next = 0;
 	for (const auto & object_file : lookup)
 		for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous)
-			if (obj->memory_range(start, end) && end > next)
+			if (obj->memory_range(start, end) && end > next && (BASEADDRESS < LIBADDRESS || end < BASEADDRESS))
 				next = end;
 
 	// Default address

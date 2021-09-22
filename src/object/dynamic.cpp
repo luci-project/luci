@@ -50,7 +50,7 @@ bool ObjectDynamic::preload_libraries() {
 	flags.ignore_mtime = 0;
 	flags.initialized = 0;
 	flags.premapped = 0;
-
+	flags.updatable = file.loader.dynamic_update ? 1 : 0;
 
 	for (auto & lib : libs) {
 		// Is lib excluded? TODO: Should be done with resolved path
@@ -74,13 +74,17 @@ bool ObjectDynamic::preload_libraries() {
 	return success;
 }
 
-bool ObjectDynamic::prepare() {
-	LOG_INFO << "Prepare " << *this << endl;
-	bool success = true;
-
+bool ObjectDynamic::fix() {
 	// Patch glibc
 	if (GLIBC::patch(dynamic_symbols, base))
 		LOG_INFO << "Applied GLIBC Patch at " << *this << endl;
+
+	return true;
+}
+
+bool ObjectDynamic::prepare() {
+	LOG_INFO << "Prepare " << *this << endl;
+	bool success = true;
 
 	// Perform initial relocations
 	for (auto & reloc : dynamic_relocations)
@@ -155,9 +159,15 @@ bool ObjectDynamic::patchable() const {
 		return false;
 
 	assert(file_previous->binary_hash && this->binary_hash);
-	LOG_INFO << "Checking if " << this->file.name << " can be patch previous version..." << endl;
+	LOG_INFO << "Checking if " << this->file << " can patch previous version..." << endl;
 
 	// TODO: Check if TLS data size has changed
+	auto diff = binary_hash->diff(*(file.current->binary_hash));
+	LOG_DEBUG << "Found " << diff.size() << " differences in " << this->file << " (compared to the current version)" << endl;
+	if (!Bean::patchable(diff)) {
+		LOG_WARNING << "New version of " << this->file << " has non-trivial changes in the data section..." << endl;
+		return false;
+	}
 
 	// Check if all required (referenced) symbols to previous object still exist in the new version
 	for (const auto & object_file : file.loader.lookup)
@@ -167,11 +177,12 @@ bool ObjectDynamic::patchable() const {
 				if (&relpair.second.object() == file_previous) {
 					// TODO: Check if relocations are in some protected memory part
 					LOG_DEBUG << " - referenced symbol " << relpair.second.name() << endl;
-					if (!resolve_symbol(relpair.second)) {
+					if (!this->resolve_symbol(relpair.second.name())) {
 						LOG_WARNING << "Required symbol " << relpair.second.name() << " not found in new version of " << this->file << ") -- not patching the library!" << endl;
 						return false;
 					}
 			}
+
 /*
 	// Check if data section has changed (TODO: Other sections?)
 	for (const auto &sym : this->binary_hash.value().diff(file_previous->binary_hash.value(), true))

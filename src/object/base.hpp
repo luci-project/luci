@@ -87,6 +87,9 @@ struct Object : public Elf {
 	/*! \brief resolve dynamic relocation entry (if possible!) */
 	virtual void* dynamic_resolve(size_t index) const;
 
+	/*! \brief Luci specific fixes performed right after mapping */
+	virtual bool fix() { return true; };
+
 	/*! \brief Initialisation of object (after creation) */
 	virtual bool preload() = 0;
 

@@ -11,6 +11,7 @@
 #include "object/dynamic.hpp"
 #include "object/executable.hpp"
 #include "object/relocatable.hpp"
+#include "compatibility/glibc/patch.hpp"
 
 #include "loader.hpp"
 
@@ -273,7 +274,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 		if (current != nullptr) {
 			assert(current->binary_hash && o->binary_hash);
 			if (!o->patchable()) {
-				LOG_ERROR << "Got new version of " << path << ", however, it is incompatible with previous data..." << endl;
+				LOG_WARNING << "Got new version of " << path << ", however, it is incompatible with current version and hence cannot be employed..." << endl;
 				delete o;
 				return nullptr;
 			}
@@ -283,10 +284,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 	current = o;
 
 	// perform preload
-	if (flags.initialized == 1) {
-		o->base = data.addr;
-		o->status = Object::STATUS_PREPARED;
-	} else if (!o->preload()) {
+	if (!o->preload()) {
 		LOG_ERROR << "Loading of " << path << " failed (while preloading)..." << endl;
 		current = o->file_previous;
 		delete o;
@@ -299,6 +297,17 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 		current = o->file_previous;
 		delete o;
 		return nullptr;
+	}
+
+	// Apply (Luci specific) fixes
+	if (!o->fix()) {
+		LOG_WARNING << "Applying fixes at " << this << " failed!" << endl;
+	}
+
+	// Prepare
+	if (flags.initialized == 1) {
+		assert(o->file_previous != nullptr || o->base == data.addr);
+		o->status = Object::STATUS_PREPARED;
 	}
 
 	LOG_INFO << "Successfully loaded " << path << endl;

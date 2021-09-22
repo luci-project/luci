@@ -44,6 +44,8 @@ struct ObjectDynamic : public ObjectExecutable {
 
 	bool preload() override;
 
+	bool fix() override;
+
 	/*! \brief load required libaries */
 	bool preload_libraries();
 
