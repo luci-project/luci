@@ -9,7 +9,6 @@ MemorySegment::~MemorySegment() {
 	unmap();
 }
 
-
 bool MemorySegment::map() {
 	uintptr_t mem = 0;
 	auto & identity = source.object.file;
@@ -18,7 +17,7 @@ bool MemorySegment::map() {
 	         || (source.size > 0 && (source.offset % Page::SIZE) != (target.address() % Page::SIZE))
 	         || writable;
 
-	int flags =  MAP_FIXED_NOREPLACE | MAP_PRIVATE;
+	int flags =  MAP_FIXED_NOREPLACE;
 	int fd = -1;
 	int offset = 0;
 	int protection = target.protection | (writable ? PROT_WRITE : 0);
@@ -26,23 +25,27 @@ bool MemorySegment::map() {
 	if (identity.loader.dynamic_update && writable) {
 		// Shared memory for updatable writable sections (if set, it is already initialized)
 		if ((copy = (target.fd == -1))) {
+			// Only first version
+			assert(source.object.file_previous == nullptr);
 			// Create new shared memory
 			if ((target.fd = shmemfd()) == -1)
 				return false;
 		}
+		flags |= MAP_SHARED;
 		fd = target.fd;
 	} else if (copy || source.size == 0) {
 		// Anonymous mapping if not updatable and writable, emtpy or not aligned
-		flags |= MAP_ANONYMOUS;
+		flags |= MAP_ANONYMOUS | MAP_PRIVATE;
 	} else {
 		// File backed mapping
 		fd = source.object.data.fd;
+		flags |= MAP_PRIVATE;
 		auto page_offset = target.address() % Page::SIZE;
 		assert(page_offset < Page::SIZE && source.offset >= page_offset);
 		offset = source.offset - page_offset;
 	}
 
-	LOG_DEBUG << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << "..." << endl;
+	LOG_DEBUG << "Mapping " << target.page_size() << " Bytes (fd " << fd << ") at " << (void*)target.page_start() << "..." << endl;
 	auto mmap = Syscall::mmap(target.page_start(), target.page_size(), protection, flags, fd, offset);
 	if (mmap.failed()) {
 		LOG_ERROR << "Mapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mmap.error_message() << endl;
