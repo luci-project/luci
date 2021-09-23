@@ -126,11 +126,35 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 			Syscall::munmap(data.addr, data.size);
 		Syscall::close(data.fd);
 	}
+
+	watch();
+
 	return o;
 }
 
+bool ObjectIdentity::watch(bool force) {
+	if (flags.updatable == 1 && (wd == -1 || force)) {
+		if (wd != -1) {
+			if (auto inotify = Syscall::inotify_rm_watch(loader.inotifyfd, wd)) {
+				LOG_DEBUG << "Remove old watch for modifications at " << this->path << endl;
+			} else if (force) {
+				LOG_DEBUG << "Cannot remove old watch for modification of " << this->path << " (" << inotify.error_message() << "). however we have expected this in force mode... (ignored)" << endl;
+			} else  {
+				LOG_WARNING << "Cannot remove old watch for modification of " << this->path << ": " << inotify.error_message() << endl;
+			}
+		}
+		if (auto inotify = Syscall::inotify_add_watch(loader.inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
+			LOG_DEBUG << "Watching for modifications at " << this->path << endl;
+			wd = inotify.value();
+		} else {
+			LOG_ERROR << "Cannot watch for modification of " << this->path << ": " << inotify.error_message() << endl;
+			wd = -1;
+		}
+	}
+	return wd != -1;
+}
 
-ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * path, namespace_t ns, const char * altname) : ns(ns), loader(loader), name(altname), flags(flags) {
+ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * path, namespace_t ns, const char * altname) : ns(ns), loader(loader), name(altname), flags(flags), wd(-1) {
 	assert(ns != NAMESPACE_NEW);
 
 	// Dynamic updates?
@@ -179,13 +203,6 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 			} else if (S_ISLNK(sb.st_mode)) {
 				LOG_DEBUG << "Library " << this->path << " is a symbolic link (hence we do not expect changes to the binary itself)" << endl;
 				this->flags.immutable_source = 1;
-			}
-
-			if (auto inotify = Syscall::inotify_add_watch(loader.inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
-				LOG_DEBUG << "Watching for modifications at " << this->path << endl;
-				wd = inotify.value();
-			} else {
-				LOG_ERROR << "Cannot watch for modification of " << this->path << ": " << inotify.error_message() << endl;
 			}
 		}
 	}
@@ -267,7 +284,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 	o->file_previous = current;
 
 	// If dynamic updates are enabled, calculate function hashes
-	if (flags.updatable) {
+	if (flags.updatable == 1) {
 		LOG_INFO << "Calculate Binary hash of " << *this << endl;
 		o->binary_hash.emplace(*o);
 		// if previous version exist, check if we can patch it

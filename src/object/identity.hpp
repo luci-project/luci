@@ -97,6 +97,8 @@ struct ObjectIdentity {
 	int wd;
 	char buffer[PATH_MAX + 1];
 
+	/*! \brief watch for file modification */
+	bool watch(bool force = false);
 
 	/*! \brief create new object instance */
 	Object * create(Object::Data & data, Elf::ehdr_type type);

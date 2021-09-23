@@ -122,9 +122,13 @@ void Loader::observer() {
 			mutex.lock();
 			for (auto & object_file : lookup)
 				if (event->wd == object_file.wd) {
-					LOG_DEBUG << "Possible file modification in " << object_file.path << endl;
+					LOG_DEBUG << "Notification for file modification in " << object_file.path << endl;
 					assert((event->mask & IN_ISDIR) == 0);
-					if (object_file.load() != nullptr && !relocate(true)) {
+					if ((event->mask & IN_IGNORED) != 0) {
+						// Reinstall watch
+						if (!object_file.watch(true))
+							LOG_ERROR << "Unable to watch for updates of " << object_file.path << endl;
+					} else if (object_file.load() != nullptr && !relocate(true)) {
 						LOG_ERROR << "Relocation failed during update of " << object_file.path << endl;
 						assert(false);
 					}
