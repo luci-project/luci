@@ -44,6 +44,13 @@ Object::~Object() {
 	// TODO: unmap file.data?
 }
 
+uintptr_t Object::dynamic_address() const {
+	for (const auto & segment : this->segments)
+		if (segment.type() == Elf::PT_DYNAMIC)
+			return (this->header.type() == Elf::ET_EXEC ? 0 : base) + segment.virt_addr();
+	return 0;
+}
+
 bool Object::is_latest_version() const {
 	return this == file.current;
 }

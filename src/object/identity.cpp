@@ -329,15 +329,9 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 
 	LOG_INFO << "Successfully loaded " << path << endl;
 
-	// Initialize GLIBC specific stuff (on first version only)
-	if (current == o) {
-		base = o->base;
-		for (const auto & segment : o->segments)
-			if (segment.type() == Elf::PT_DYNAMIC) {
-				dynamic = (reinterpret_cast<const Elf::Header *>(data.addr)->type() != Elf::ET_EXEC ? base : 0) + segment.virt_addr();
-				break;
-			}
-	}
+	// Initialize GLIBC specific stuff
+	base = o->base;
+	dynamic = o->dynamic_address();
 
 	return o;
 }

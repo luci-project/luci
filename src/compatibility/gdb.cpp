@@ -68,5 +68,7 @@ void init(const Loader & loader) {
 	// Set for target binary (in case Luci is started as interpreter)
 	if (!set_dynamic_debug(r_debug.r_map))
 		LOG_WARNING << "GDB debug structure not assigned in target" << endl;
+
+	notify(State::RT_CONSISTENT);
 }
 }  // namespace GDB

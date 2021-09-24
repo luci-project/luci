@@ -118,23 +118,28 @@ void Loader::observer() {
 			const struct inotify_event * event = reinterpret_cast<const struct inotify_event *>(ptr);
 			ptr += sizeof(struct inotify_event) + event->len;
 
-			// Get Object
-			mutex.lock();
-			for (auto & object_file : lookup)
-				if (event->wd == object_file.wd) {
-					LOG_DEBUG << "Notification for file modification in " << object_file.path << endl;
-					assert((event->mask & IN_ISDIR) == 0);
-					if ((event->mask & IN_IGNORED) != 0) {
-						// Reinstall watch
-						if (!object_file.watch(true))
-							LOG_ERROR << "Unable to watch for updates of " << object_file.path << endl;
-					} else if (object_file.load() != nullptr && !relocate(true)) {
-						LOG_ERROR << "Relocation failed during update of " << object_file.path << endl;
-						assert(false);
+			assert((event->mask & IN_ISDIR) == 0);
+			if ((event->mask & IN_Q_OVERFLOW) != 0) {
+				LOG_WARNING << "Notification event queue overflow!" << endl;
+			}
+			if (event->wd != -1) {
+				// Get Object
+				mutex.lock();
+				for (auto & object_file : lookup)
+					if (event->wd == object_file.wd) {
+						LOG_DEBUG << "Notification for file modification in " << object_file.path << endl;
+						if ((event->mask & IN_IGNORED) != 0) {
+							// Reinstall watch
+							if (!object_file.watch(true))
+								LOG_ERROR << "Unable to watch for updates of " << object_file.path << endl;
+						} else if (object_file.load() != nullptr && !relocate(true)) {
+							LOG_ERROR << "Relocation failed during update of " << object_file.path << endl;
+							assert(false);
+						}
+						break;
 					}
-					break;
-				}
-			mutex.unlock();
+				mutex.unlock();
+			}
 		}
 	}
 	LOG_INFO << "Observer background thread ends." << endl;
@@ -191,10 +196,13 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 			LOG_DEBUG_APPEND << " from memory at " << (void*)addr;
 		LOG_DEBUG_APPEND << "..." << endl;
 
+		GDB::notify(GDB::RT_ADD);
 		auto i = lookup.emplace_back(*this, flags, filepath, ns, nullptr);
 		assert(i);
 
-		if (i->load(addr, type) != nullptr) {
+		auto o = i->load(addr, type);
+		GDB::notify(GDB::RT_CONSISTENT);
+		if (o != nullptr) {
 			return i.operator->();
 		} else {
 			LOG_ERROR << "Unable to open " << filepath << endl;
@@ -204,42 +212,7 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 	return nullptr;
 }
 
-/*
-ObjectIdentity * Loader::open(uintptr_t addr, ObjectIdentity::Flags flags, const char * filepath, namespace_t ns, Elf::ehdr_type type) {
-	if (ns == NAMESPACE_NEW)
-		ns = next_namespace++;
-
-	LOG_DEBUG << "Loading from memory " << (void*)addr << " (" << filepath << ")..." << endl;
-	auto i = lookup.emplace_back(*this, filepath, ns, nullptr, flags);
-	assert(i);
-
-	Object * o = i->load(addr, type);
-	if (o != nullptr) {
-		if (is_prepared) {
-			i->flags.initialized = 1;
-			o->status = Object::STATUS_PREPARED;
-		}
-		if (is_mapped) {
-			i->base = o->base = addr;
-			for (const auto & segment : o->segments)
-				if (segment.type() == Elf::PT_DYNAMIC) {
-					i->dynamic = (reinterpret_cast<const Elf::Header *>(addr)->type() != Elf::ET_EXEC ? i->base : 0) + segment.virt_addr();
-					break;
-				}
-		}
-		return i.operator->();
-	} else {
-		LOG_ERROR << "Unable to open " << (void*)addr << endl;
-		lookup.pop_back();
-	}
-	return nullptr;
-}
-*/
-
 ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, namespace_t ns, bool load) {
-	if (load)
-		GDB::notify(GDB::State::RT_ADD);
-
 	auto o = library(file, flags, {}, {}, ns, load);
 	if (o != nullptr) {
 		// Update flags
@@ -253,9 +226,6 @@ ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, 
 			o = nullptr;
 		}
 	}
-
-	if (load)
-		GDB::notify(GDB::State::RT_CONSISTENT);
 
 	if (o != nullptr && !o->initialize()){
 		LOG_WARNING << "Initialization of " << o << " failed!" << endl;
@@ -311,7 +281,6 @@ bool Loader::prepare() {
 
 	// Initialize GDB
 	GDB::init(*this);
-	GDB::notify();
 
 	// Initialize (but not executable itself)
 	for (auto & o : reverse(lookup))
@@ -351,7 +320,6 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	// Binary has to be first in list
 	lookup.extract(file);
 	lookup.push_front(file);
-	lookup.front().filename = ""; // required by gdb
 
 	// Prepare libraries
 	if (!prepare()) {
@@ -387,7 +355,6 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	// Binary has to be first in list
 	lookup.extract(file);
 	lookup.push_front(file);
-	lookup.front().filename = ""; // required by gdb
 
 	// Prepare libraries
 	if (!prepare()) {

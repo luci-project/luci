@@ -78,7 +78,10 @@ struct Object : public Elf {
 	/*! \brief destroy object */
 	virtual ~Object();
 
-	/*! check if this object is the current (latest) version */
+	/*! \brief Get address of dynamic section */
+	uintptr_t dynamic_address() const;
+
+	/*! \brief check if this object is the current (latest) version */
 	bool is_latest_version() const;
 
 	/*! \brief virtual memory range used by this object */
