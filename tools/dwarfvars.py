@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 import sys
 import regex
@@ -10,7 +12,7 @@ import subprocess
 
 class DwarfVars:
 	def __init__(self, file, aliases = True, names = True):
-		self.DIEs = {}
+		self.DIEs = []
 		self.aliases = aliases
 		self.names = names
 		entries = regex.compile(r'^<(\d+)><(0x[0-9a-f]+)(?:\+0x[0-9a-f]+)?><([^>]+)>(.*)$')
@@ -18,6 +20,7 @@ class DwarfVars:
 		hexvals = regex.compile(r'^[<]?(0x[0-9a-f]+|[0-9]+)(:? \(-[0-9]+\))?[>]?$')
 		level = 0
 		last = 0
+		unit = 0
 		dwarfdump = subprocess.Popen(['dwarfdump', '-i', '-e', '-d', file], stdout=subprocess.PIPE)
 		while line := dwarfdump.stdout.readline().decode('utf-8'):
 			if entry := entries.match(line):
@@ -27,23 +30,30 @@ class DwarfVars:
 				DIE['tag'] = entry.group(3)
 				DIE['children'] = []
 
-				# Nesting level
-				l = int(entry.group(1))
-				if l == 0:
+				if entry.group(3) == 'compile_unit':
+					assert(entry.group(1) == '0')
 					DIE['parent'] = ID
+					self.DIEs.append({})
+					unit = len(self.DIEs) - 1
 				else:
-					if l == level:
-						parent = self.DIEs[last]['parent']
-					elif l > level:
+					# Nesting level
+					l = int(entry.group(1))
+					assert(l > 0)
+					if l > level:
+						assert(l == level + 1)
 						parent = last
-					elif l < level:
-						last_parent = self.DIEs[last]['parent']
-						parent = self.DIEs[last_parent]['parent']
-					level = l
+						level = l
+					else:
+						parent = self.DIEs[unit][last]['parent']
+						while l < level:
+							parent = self.DIEs[unit][parent]['parent']
+							level = level - 1
+						assert(level == l)
+
 					# Set parent
 					DIE['parent'] = parent
 					# In parent add child
-					self.DIEs[parent]['children'].append(ID)
+					self.DIEs[unit][parent]['children'].append(ID)
 				last = ID
 
 				# Additional attributes
@@ -62,30 +72,35 @@ class DwarfVars:
 						DIE['decl'] += ':' + str(DIE['decl_column'])
 						del DIE['decl_column']
 
-				self.DIEs[ID] = DIE
-
-
-	def __getitem__(self, ID):
-		return self.DIEs[ID]
-
+				DIE['unit'] = unit
+				self.DIEs[unit][ID] = DIE
 
 	def get_type(self, DIE, resolve_members = True):
-		if isinstance(DIE, int):
-			DIE = self.DIEs[DIE]
+		if not resolve_members and 'children' in DIE:
+			# We are not able to resolve the members yet
+			# so we use special keys to cache the results
+			key_id = 'identifier_flat'
+			key_hash = 'hash_flat'
+		else:
+			key_id = 'identifier'
+			key_hash = 'hash'
 
-		if not 'identifier' in DIE:
+		if not key_id in DIE:
 			hash = xxhash.xxh64()
 			id = ''
 			size = 0
 			factor = 1
 			use_type_hash = False
 			include_members = False
-			
+
 			# Hash type
 			hash.update('%' + DIE['tag'])
 
 			if DIE['tag'] == 'structure_type':
 				id = 'struct'
+				include_members = True
+			elif DIE['tag'] == 'class_type':
+				id = 'class'
 				include_members = True
 			elif DIE['tag'] == 'union_type':
 				id = 'union'
@@ -132,7 +147,7 @@ class DwarfVars:
 				id += '}'
 
 			if 'type' in DIE:
-				type_id, type_size, type_hash = self.get_type(DIE['type'], resolve_members)
+				type_id, type_size, type_hash = self.get_type(self.DIEs[DIE['unit']][DIE['type']], resolve_members)
 				id += '(' + type_id + ')' if len(id) > 0 else type_id
 				size = type_size
 				hash.update('#' + type_hash)
@@ -141,13 +156,13 @@ class DwarfVars:
 				id += '*'
 			elif DIE['tag'] == 'array_type':
 				for child in self.iter_children(DIE):
-					assert child['tag'] == 'subrange_type'
-					lower = child.get('lower_bound', 0)
-					upper = child.get('upper_bound', 0)
-					hash.update('[' + str(lower) + ':' + str(upper) + ']') 
-					subrange = upper - lower + 1
-					id += '[' + str(subrange) + ']'
-					factor *= subrange
+					if child['tag'] == 'subrange_type':
+						lower = child.get('lower_bound', 0)
+						upper = child.get('upper_bound', 0)
+						hash.update('[' + str(lower) + ':' + str(upper) + ']')
+						subrange = upper - lower + 1
+						id += '[' + str(subrange) + ']'
+						factor *= subrange
 
 			if 'byte_size' in DIE:
 				size = DIE['byte_size']
@@ -159,11 +174,14 @@ class DwarfVars:
 				id += '(' + enc + ')' if len(id) > 0 else enc
 
 			hash.update(':' + str(size) + '*' + str(factor))
-			DIE['identifier'] = id 
-			DIE['total_size'] = factor * size
-			DIE['hash'] = type_hash if use_type_hash else hash.hexdigest()
+			DIE[key_id] = id
+			if 'total_size' in DIE:
+				assert(DIE['total_size'] == factor * size)
+			else:
+				DIE['total_size'] = factor * size
+			DIE[key_hash] = type_hash if use_type_hash else hash.hexdigest()
 
-		return DIE['identifier'], DIE['total_size'], DIE['hash']
+		return DIE[key_id], DIE['total_size'], DIE[key_hash]
 
 
 	def get_vars(self, tls = False):
@@ -172,36 +190,37 @@ class DwarfVars:
 		else:
 			locaddr = regex.compile(r'^.*: addr (0x[0-9a-f]+)$')
 		variables = []
-		for ID, DIE in self.DIEs.items():
-			if DIE['tag'] == 'variable' and 'location' in DIE:
-				if loc := locaddr.match(DIE['location']):
-					addr = int(loc.group(1), 0)
-					typename, size, hash = self.get_type(DIE['type'])
-					variables.append({
-						'name': DIE['name'],
-						'value': addr,
-						'type': typename,
-						'size': size,
-						'external': True if 'external' in DIE and DIE['external'][:3] == 'yes' else False,
-						'hash': hash,
-						'source': DIE['decl']
-					})
+		for DIEs in self.DIEs:
+			for ID, DIE in DIEs.items():
+				if DIE['tag'] == 'variable' and 'location' in DIE and 'type' in DIE:
+					if loc := locaddr.match(DIE['location']):
+						addr = int(loc.group(1), 0)
+						typename, size, hash = self.get_type(self.DIEs[DIE['unit']][DIE['type']])
+						variables.append({
+							'name': DIE['name'],
+							'value': addr,
+							'type': typename,
+							'unit': DIE['unit'],
+							'size': size,
+							'external': True if 'external' in DIE and DIE['external'][:3] == 'yes' else False,
+							'hash': hash,
+							'source': DIE['decl'] if 'decl' in DIE else ''
+						})
 		return variables
 
 
-	def iter_children(self, DIE):
-		if isinstance(DIE, int):
-			DIE = self.DIEs[DIE]
+	def iter_children(self,  DIE):
 		if 'children' in DIE:
 			for CID in DIE['children']:
-				yield self.DIEs[CID]
+				yield self.DIEs[DIE['unit']][CID]
 
 
 	def iter_types(self):
-		for ID, DIE in self.DIEs.items():
-			type_tags = ['structure_type', 'union_type', 'enumeration_type']
-			if DIE['tag'] in type_tags:
-				yield self.get_type(DIE)
+		for DIEs in self.DIEs:
+			for ID, DIE in DIEs.items():
+				type_tags = ['structure_type', 'class_type', 'union_type', 'enumeration_type']
+				if DIE['tag'] in type_tags:
+					yield self.get_type(DIE)
 
 
 
@@ -225,7 +244,7 @@ if __name__ == '__main__':
 
 	dwarf = DwarfVars(args.file, aliases = args.aliases, names = args.names)
 	if args.extract == 'variables':
-		variables = dwarf.get_vars(args.tls)
+		variables = sorted(dwarf.get_vars(args.tls), key=lambda i: i['value'])
 		if args.json:
 			print(variables)
 		else:
@@ -240,4 +259,3 @@ if __name__ == '__main__':
 			full_hash.update(hash)
 			print(f"{id} {size} bytes # {hash}")
 		print(full_hash.hexdigest())
-
