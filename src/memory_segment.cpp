@@ -30,6 +30,17 @@ bool MemorySegment::map() {
 			// Create new shared memory
 			if ((target.fd = shmemfd()) == -1)
 				return false;
+			// This will zero the contents
+			if (auto ftruncate = Syscall::ftruncate(target.fd, target.page_size())) {
+				// Seal
+				if (auto fcntl = Syscall::fcntl(target.fd, F_ADD_SEALS, F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL); fcntl.failed()) {
+					LOG_WARNING << "Sealing shared memory at fd " << target.fd << " failed: " << fcntl.error_message() << endl;
+				}
+				LOG_DEBUG << "Created shared memory at fd " << target.fd << endl;
+			} else {
+				LOG_ERROR << "Setting shared memory size failed: " << ftruncate.error_message() << endl;
+				return false;
+			}
 		}
 		flags |= MAP_SHARED;
 		fd = target.fd;
@@ -103,13 +114,47 @@ int MemorySegment::shmemdup() {
 		int tmpfd = shmemfd();
 		if (tmpfd != -1) {
 			assert(target.available && target.fd != -1);
-			if (auto mmap = Syscall::mmap(NULL, target.page_size(), PROT_WRITE, MAP_SHARED, tmpfd, 0)) {
-				Memory::copy(mmap.value(), target.page_start(), target.page_size());
-				if (auto munmap = Syscall::munmap(mmap.value(), target.page_size()); munmap.failed())
-					LOG_WARNING << "Unmapping " << (void*)mmap.value() << " (" << target.page_size() << " Bytes) failed: " << munmap.error_message() << endl;
+			LOG_DEBUG << "Created memcopy at fd " << tmpfd << endl;
 
-				return tmpfd;
+			// Try fast copy
+			off_t off_target = 0;
+			off_t off_tmp = 0;
+			ssize_t len = target.page_size();
+			while (true) {
+				if (auto cfr = Syscall::copy_file_range(target.fd, &off_target, tmpfd, &off_tmp, len)) {
+					if ((len -= cfr.value()) <= 0) {
+						if (auto fcntl = Syscall::fcntl(tmpfd, F_ADD_SEALS, F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL); fcntl.failed()) {
+							LOG_WARNING << "Sealing shared memory failed: " << fcntl.error_message() << endl;
+						}
+						return tmpfd;
+					}
+				} else {
+					LOG_WARNING << "Copying file range of shared memory failed: " << cfr.error_message() << " -- switching to memcpy"<< endl;
+					break;
+				}
 			}
+
+			// This will zero the contents
+			if (auto ftruncate = Syscall::ftruncate(tmpfd, target.page_size())) {
+				// Seal
+				if (auto fcntl = Syscall::fcntl(tmpfd, F_ADD_SEALS, F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL); fcntl.failed()) {
+					LOG_WARNING << "Sealing shared memory failed: " << fcntl.error_message() << endl;
+				}
+				// Map
+				if (auto mmap = Syscall::mmap(NULL, target.page_size(), PROT_WRITE, MAP_SHARED, tmpfd, 0)) {
+					// Copy
+					Memory::copy(mmap.value(), target.page_start(), target.page_size());
+					// Unmap
+					if (auto munmap = Syscall::munmap(mmap.value(), target.page_size()); munmap.failed())
+						LOG_WARNING << "Unmapping " << (void*)mmap.value() << " (" << target.page_size() << " Bytes) failed: " << munmap.error_message() << endl;
+					return tmpfd;
+				} else {
+					LOG_ERROR << "Mapping of memfd failed: " << mmap.error_message() << endl;
+				}
+			} else {
+				LOG_ERROR << "Setting memfd size failed: " << ftruncate.error_message() << endl;
+			}
+
 			Syscall::close(tmpfd);
 		}
 	}
@@ -127,17 +172,9 @@ int MemorySegment::shmemfd() {
 	const char * shdata = shdatastr.str();
 
 	if (auto memfd = Syscall::memfd_create(shdata, MFD_CLOEXEC | MFD_ALLOW_SEALING)) {
-		// This will zero the contents
-		if (auto ftruncate = Syscall::ftruncate(memfd.value(), target.page_size())) {
-			if (auto fcntl = Syscall::fcntl(memfd.value(), F_ADD_SEALS, F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL); fcntl.failed())
-				LOG_ERROR << "Sealing shared memory of " << shdata << " failed: " << fcntl.error_message() << endl;
-			LOG_DEBUG << "Created memcopy " << shdata << " at fd " << memfd.value() << endl;
-			return memfd.value();
-		} else {
-			LOG_ERROR << "Setting memcopy size of " << shdata << " failed: " << ftruncate.error_message() << endl;
-		}
+		return memfd.value();
 	} else {
 		LOG_ERROR << "Creating memory file " << shdata << " failed: " << memfd.error_message() << endl;
+		return -1;
 	}
-	return -1;
 }
