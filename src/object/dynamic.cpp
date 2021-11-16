@@ -7,6 +7,36 @@
 #include "dynamic_resolve.hpp"
 #include "loader.hpp"
 
+ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, bool position_independent)
+  : ObjectExecutable{file, data},
+    dynamic_table{this->dynamic(file.flags.premapped == 1)},
+    dynamic_symbols{dynamic_table.get_symbol_table()},
+    dynamic_relocations{dynamic_table.get_relocations()},
+    dynamic_relocations_plt{dynamic_table.get_relocations_plt()},
+    version_needed{dynamic_table.get_version_needed()},
+    version_definition{dynamic_table.get_version_definition()} {
+	// Set Globale Offset Table Pointer
+	auto got = dynamic_table[Elf::DT_PLTGOT];
+	if (got.valid() && got.tag() == Elf::DT_PLTGOT)
+		global_offset_table = got.value();
+
+	// Check (set) soname
+	StrPtr soname(dynamic_table.get_soname());
+	if (!soname.empty() && soname != file.name) {
+		if (!file.name.empty())
+			LOG_WARNING << "Library file name (" << file.name << ") differs from soname (" << soname << ") -- using latter one!" << endl;
+		file.name = soname;
+	}
+
+	// Set base address
+	if (position_independent) {
+		// Base is not defined, hence
+		this->base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
+		LOG_DEBUG << "Set Base of " << file.filename << " to " << this->base << endl;
+	}
+}
+
+
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
 	// It is possible that multiple threads try to access an unresolved function, hence we have to use a mutex
 	file.loader.mutex.lock();
@@ -16,7 +46,7 @@ void * ObjectDynamic::dynamic_resolve(size_t index) const {
 }
 
 bool ObjectDynamic::preload() {
-	base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
+	//base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
 	return preload_segments()
 	    && preload_libraries();
 }
@@ -83,7 +113,7 @@ bool ObjectDynamic::fix() {
 }
 
 bool ObjectDynamic::prepare() {
-	LOG_INFO << "Prepare " << *this << endl;
+	LOG_INFO << "Prepare " << *this << " with " << global_offset_table << endl;
 	bool success = true;
 
 	// Perform initial relocations

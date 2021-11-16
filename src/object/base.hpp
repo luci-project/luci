@@ -41,7 +41,7 @@ struct Object : public Elf {
 		uint64_t hash = 0;
 	} data;
 
-	/*! \brief Begin offset of virtual memory area (for dynamic objects) */
+	/*! \brief Begin offset of virtual memory area (for position independent objects only) */
 	uintptr_t base = 0;
 
 	/*! \brief File relative address of global offset table (for dynamic objects) */

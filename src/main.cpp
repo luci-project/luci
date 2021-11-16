@@ -114,10 +114,10 @@ void build_info() {
 static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts & opts) {
 	// Logger
 	auto env_loglevel = Parser::string_as<int>(Environ::variable("LD_LOGLEVEL", true)) ;
-	cerr << env_loglevel << endl;
+
 	LOG.set(static_cast<Log::Level>(env_loglevel && env_loglevel.value() > opts.loglevel ? env_loglevel.value() : opts.loglevel));
 	build_info();  // should be first output
-	LOG_DEBUG << "Set log level to " << opts.loglevel << endl;
+	LOG_DEBUG << "Set log level to " << static_cast<int>(LOG.get()) << endl;
 
 	const char * logfile = opts.logfile == nullptr ? Environ::variable("LD_LOGFILE", true) : opts.logfile;
 	if (logfile != nullptr) {

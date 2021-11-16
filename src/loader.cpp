@@ -57,7 +57,7 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate) : d
 
 	// add self as dynamic exec
 	assert(luci_self != 0);
-	if ((self = open(sopath, static_flags, NAMESPACE_BASE, luci_self, Elf::ET_DYN)) == nullptr) {
+	if ((self = open(sopath, static_flags, NAMESPACE_BASE, luci_self)) == nullptr) {
 		LOG_ERROR << "Unable to load Luci (" << sopath << ")..." << endl;
 		assert(false);
 	}
@@ -271,7 +271,7 @@ bool Loader::prepare() {
 	auto random = Auxiliary::vector(Auxiliary::AT_RANDOM);
 	if (random.valid()) {
 		main_thread->setup_guards(random.a_un.a_ptr);
-		__stack_chk_guard = main_thread->stack_guard;
+		// TODO: __stack_chk_guard = main_thread->stack_guard;
 		LOG_DEBUG << "Stack Guard: " << (void*)main_thread->stack_guard << endl;
 		LOG_DEBUG << "Pointer Guard: " << (void*)main_thread->pointer_guard << endl;
 	} else {

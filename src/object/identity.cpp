@@ -265,10 +265,18 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 	Object * o = nullptr;
 	switch (type) {
 		case Elf::ET_EXEC:
-			o = new ObjectExecutable{*this, data};
+			// Take care for dynamic linked executables:
+			for (const auto &s : Elf(data.addr).segments)
+				if (s.type() == Elf::PT_DYNAMIC && (o = new ObjectDynamic{*this, data, false}) != nullptr) {
+					LOG_DEBUG << "Executable " << *this << " has dynamic section" << endl;
+					break;
+				}
+			if (o == nullptr) {
+				o = new ObjectExecutable{*this, data};
+			}
 			break;
 		case Elf::ET_DYN:
-			o = new ObjectDynamic{*this, data};
+			o = new ObjectDynamic{*this, data, true};
 			break;
 		case Elf::ET_REL:
 			o = new ObjectRelocatable{*this, data};
@@ -323,11 +331,11 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 
 	// Prepare
 	if (flags.initialized == 1) {
-		assert(o->file_previous != nullptr || o->base == data.addr);
+		assert(o->file_previous != nullptr || type == Elf::ET_EXEC || o->base == data.addr);
 		o->status = Object::STATUS_PREPARED;
 	}
 
-	LOG_INFO << "Successfully loaded " << path << endl;
+	LOG_INFO << "Successfully loaded " << path << " with base " << o->base << endl;
 
 	// Initialize GLIBC specific stuff
 	base = o->base;

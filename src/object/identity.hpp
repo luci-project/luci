@@ -39,8 +39,8 @@ struct ObjectIdentity {
 	/*! \brief Namespace for object */
 	const namespace_t ns;
 
-	// TODO: Padding size
-	void * padding[100] = {};
+	// Safe padding size
+	void * padding[140] = {};
 	/*** End of GLIBC stuff ***/
 
 	/*! \brief Loader */

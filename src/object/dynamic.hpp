@@ -14,28 +14,7 @@ struct ObjectDynamic : public ObjectExecutable {
 	/*! \brief
 	 * \param mapped Mapped to virtual memory location specified in segments
 	 */
-	ObjectDynamic(ObjectIdentity & file, const Object::Data & data)
-	  : ObjectExecutable{file, data},
-	    dynamic_table{this->dynamic(file.flags.premapped == 1)},
-	    dynamic_symbols{dynamic_table.get_symbol_table()},
-	    dynamic_relocations{dynamic_table.get_relocations()},
-	    dynamic_relocations_plt{dynamic_table.get_relocations_plt()},
-	    version_needed{dynamic_table.get_version_needed()},
-	    version_definition{dynamic_table.get_version_definition()}
-	{
-		// Set Globale Offset Table Pointer
-		auto got = dynamic_table[Elf::DT_PLTGOT];
-		if (got.valid() && got.tag() == Elf::DT_PLTGOT)
-			global_offset_table = got.value();
-
-		// Check (set) soname
-		StrPtr soname(dynamic_table.get_soname());
-		if (!soname.empty() && soname != file.name) {
-			if (!file.name.empty())
-				LOG_WARNING << "Library file name (" << file.name << ") differs from soname (" << soname << ") -- using latter one!" << endl;
-			file.name = soname;
-		}
-	}
+	ObjectDynamic(ObjectIdentity & file, const Object::Data & data, bool position_independent = true);
 
 	void* dynamic_resolve(size_t index) const override;
 

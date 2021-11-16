@@ -89,6 +89,6 @@ struct MemorySegment {
 	int shmemdup();
 
  private:
-	/*! \brief create sharedmemory fd for this segment */
+	/*! \brief create shared memory fd for this segment */
 	int shmemfd();
 };
