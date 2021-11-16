@@ -5,9 +5,16 @@
 #include <dlh/string.hpp>
 #include <dlh/auxiliary.hpp>
 
-// see https://github.com/jtracey/drow-loader/blob/master/glibc.c
-
-char rtld_global[3992];
+// results using dwarfdump -n globals [system / ld]
+char rtld_global[
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_AMD64)
+	3968
+#elif defined(COMPATIBILITY_UBUNTU_FOCAL_AMD64)
+	3992
+#else
+	0
+#endif
+];
 extern __attribute__ ((alias("rtld_global"), visibility("default"))) char * _rtld_global;
 
 // see glibc (2.31) sysdeps/generic/ldsodefs.h
@@ -29,9 +36,9 @@ struct rtld_global_ro {
 	int _dl_inhibit_cache = 0;
 
 	/* Copy of the content of `_dl_main_searchlist' at startup time.  */
-	struct {
+	struct r_scope_elem {
 		/* Array of maps for the scope.  */
-		/* struct link_map */ void **r_list;
+		void **r_list;
 		/* Number of entries in the scope.  */
 		unsigned int r_nlist;
 	} _dl_initial_searchlist;
@@ -51,95 +58,76 @@ struct rtld_global_ro {
 	/* Nonzero if runtime lookups should not update the .got/.plt.  */
 	int _dl_bind_not = 0;
 
-	/* Nonzero if references should be treated as weak during runtime
-	   linking.  */
+	/* Nonzero if references should be treated as weak during runtime linking.  */
 	int _dl_dynamic_weak = 0 ;
 
 	/* Default floating-point control word.  */
-	unsigned int _dl_fpu_control = 0x037f;
+	unsigned short _dl_fpu_control = 0x037f;
 
 	/* Expected cache ID.  */
-	int _dl_correct_cache_id= 0;
+	int _dl_correct_cache_id = 0;
 
 	/* Mask for hardware capabilities that are available.  */
 	uint64_t _dl_hwcap = 2;
 
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_AMD64)
+	/* Mask for important hardware capabilities we honour. */
+	uint64_t _dl_hwcap_mask = 0;
+#endif
+
 	/* Pointer to the auxv list supplied to the program at startup.  */
 	void *_dl_auxv = nullptr;
 
-
-	/* NB: When adding new fields, update sysdeps/x86/dl-diagnostics-cpu.c
-	   to print them.  */
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_AMD64)
 	struct cpu_features {
+		enum cpu_features_kind {
+			arch_kind_unknown = 0,
+			arch_kind_intel = 1,
+			arch_kind_amd =	2,
+			arch_kind_other = 3
+		} kind;
+		int max_cpuid;
+		struct cpuid_registers {
+			unsigned eax;
+			unsigned ebx;
+			unsigned ecx;
+			unsigned edx;
+		} cpuid[3];
+		unsigned family;
+		unsigned model;
+		unsigned long xsave_state_size;
+		unsigned feature;
+	} _dl_x86_cpu_features;
+#elif defined(COMPATIBILITY_UBUNTU_FOCAL_AMD64)
+ 	struct cpu_features {
+		struct cpuid_registers {
+			unsigned eax;
+			unsigned ebx;
+			unsigned ecx;
+			unsigned edx;
+		} cpuid[6];
+		unsigned feature[2];
 		struct cpu_features_basic {
 			enum cpu_features_kind {
 				arch_kind_unknown = 0,
-				arch_kind_intel,
-				arch_kind_amd,
-				arch_kind_zhaoxin,
-				arch_kind_other
+				arch_kind_intel = 1,
+				arch_kind_amd = 2,
+				arch_kind_other = 3
 			} kind;
 			int max_cpuid;
-			unsigned int family;
-			unsigned int model;
-			unsigned int stepping;
+			unsigned family;
+			unsigned model;
+			unsigned stepping;
 		} basic;
-		struct cpuid_feature_internal {
-			unsigned int cpuid_array[4];
-			unsigned int usable_array[4];
-		} features[1];
-		unsigned int preferred[1];
-		/* X86 micro-architecture ISA levels.  */
-		unsigned int isa_1;
-		/* The state size for XSAVEC or XSAVE.  The type must be unsigned long
-		 int so that we use
-		sub xsave_state_size_offset(%rip) %RSP_LP
-		 in _dl_runtime_resolve.  */
-		unsigned long int xsave_state_size;
-		/* The full state size for XSAVE when XSAVEC is disabled by
-		 GLIBC_TUNABLES=glibc.cpu.hwcaps=-XSAVEC
-		*/
-		unsigned int xsave_state_full_size;
-		/* Data cache size for use in memory and string routines, typically
-		 L1 size.  */
-		unsigned long int data_cache_size;
-		/* Shared cache size for use in memory and string routines, typically
-		 L2 or L3 size.  */
-		unsigned long int shared_cache_size;
-		/* Threshold to use non temporal store.  */
-		unsigned long int non_temporal_threshold;
-		/* Threshold to use "rep movsb".  */
-		unsigned long int rep_movsb_threshold;
-		/* Threshold to stop using "rep movsb".  */
-		unsigned long int rep_movsb_stop_threshold;
-		/* Threshold to use "rep stosb".  */
-		unsigned long int rep_stosb_threshold;
-		/* _SC_LEVEL1_ICACHE_SIZE.  */
-		unsigned long int level1_icache_size;
-		/* _SC_LEVEL1_ICACHE_LINESIZE.  */
-		unsigned long int level1_icache_linesize;
-		/* _SC_LEVEL1_DCACHE_SIZE.  */
-		unsigned long int level1_dcache_size;
-		/* _SC_LEVEL1_DCACHE_ASSOC.  */
-		unsigned long int level1_dcache_assoc;
-		/* _SC_LEVEL1_DCACHE_LINESIZE.  */
-		unsigned long int level1_dcache_linesize;
-		/* _SC_LEVEL2_CACHE_ASSOC.  */
-		unsigned long int level2_cache_size;
-		/* _SC_LEVEL2_DCACHE_ASSOC.  */
-		unsigned long int level2_cache_assoc;
-		/* _SC_LEVEL2_CACHE_LINESIZE.  */
-		unsigned long int level2_cache_linesize;
-		/* /_SC_LEVEL3_CACHE_SIZE.  */
-		unsigned long int level3_cache_size;
-		/* _SC_LEVEL3_CACHE_ASSOC.  */
-		unsigned long int level3_cache_assoc;
-		/* _SC_LEVEL3_CACHE_LINESIZE.  */
-		unsigned long int level3_cache_linesize;
-		/* /_SC_LEVEL4_CACHE_SIZE.  */
-		unsigned long int level4_cache_size;
+		unsigned long xsave_state_size;
+		unsigned xsave_state_full_size;
+		unsigned long data_cache_size;
+		unsigned long shared_cache_size;
+		unsigned long non_temporal_threshold;
 	} _dl_x86_cpu_features;
-
+	const char _dl_x86_hwcap_flags[3][9] = { "sse2", "x86_64", "avx512_1" };
+	const char _dl_x86_platforms[4][9] = { "i586", "i686", "haswell", "xeon_phi" };
+#endif
 
 	/* Names of shared object for which the RPATH should be ignored.  */
 	const char *_dl_inhibit_rpath = nullptr;
@@ -150,7 +138,7 @@ struct rtld_global_ro {
 	/* -1 if the dynamic linker should honor library load bias,
 	   0 if not, -2 use the default (honor biases for normal
 	   binaries, don't honor for PIEs).  */
-	intptr_t _dl_use_load_bias = 0;
+	uintptr_t _dl_use_load_bias = 0;
 
 	/* Name of the shared object to be profiled (if any).  */
 	const char *_dl_profile = 0;
@@ -168,9 +156,6 @@ struct rtld_global_ro {
 	   below.  */
 	/* struct r_search_path_elem */ void *_dl_init_all_dirs = nullptr;
 
-	/* Syscall handling improvements.  This is very specific to x86.  */
-	uintptr_t _dl_sysinfo;
-
 	/* The vsyscall page is a virtual DSO pre-mapped by the kernel.
 	   This points to its ELF header.  */
 	/* ElfW(Ehdr) */ void *_dl_sysinfo_dso;
@@ -179,11 +164,14 @@ struct rtld_global_ro {
 	   and this points to it.  */
 	/* struct link_map */ void *_dl_sysinfo_map;
 
+#if defined(COMPATIBILITY_UBUNTU_FOCAL_AMD64)
 	void * _dl_vdso_clock_gettime64;
 	void * _dl_vdso_gettimeofday;
 	void * _dl_vdso_time;
 	void * _dl_vdso_getcpu;
 	void * _dl_vdso_clock_getres_time64;
+#endif
+
 	/* Mask for more hardware capabilities that are available on some
 	   platforms.  */
 	uint64_t _dl_hwcap2;
@@ -193,10 +181,16 @@ struct rtld_global_ro {
 	   is that we can avoid exporting the functions and we do not jump
 	   PLT relocations in libc.so.  */
 	void (*_dl_debug_printf) (const char *, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_AMD64)
+	int (*_dl_catch_error) (const char **, const char **,  bool *, void (*) (void *), void *);
+	void (*_dl_signal_error) (int, const char *, const char *,const char *);
+#endif
 	void (*_dl_mcount) (intptr_t frompc, uintptr_t selfpc);
-	/* struct link_map */ void * (*_dl_lookup_symbol_x) (const char *, void *, const void **, void *[], const void *, int, int, void *);
-	void *(*_dl_open) (const char *file, int mode, const void *caller_dlopen,
-		     int nsid, int argc, char *argv[], char *env[]);
+	void * (*_dl_lookup_symbol_x) (const char *, void *, const void **, void *[], const void *, int, int, void *);
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_AMD64)
+	int (*_dl_check_caller) (const void *, int);
+#endif
+	void *(*_dl_open) (const char *file, int mode, const void *caller_dlopen, int nsid, int argc, char *argv[], char *env[]);
 	void (*_dl_close) (void *map);
 	void *(*_dl_tls_get_addr_soft) (void *);
 	int (*_dl_discover_osversion) (void);
@@ -205,6 +199,14 @@ struct rtld_global_ro {
 	/* struct audit_ifaces */ void *_dl_audit = nullptr;
 	unsigned int _dl_naudit = 0;
 } rtld_global_ro;
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_AMD64)
+static_assert(sizeof(rtld_global_ro) == 376, "Wrong size of rtld_global_ro for Debian Stretch (amd64)");
+#elif defined(COMPATIBILITY_UBUNTU_FOCAL_AMD64)
+static_assert(sizeof(rtld_global_ro) == 536, "Wrong size of rtld_global_ro for Ubuntu Focal (amd64)");
+#else
+#error No (known) compatibility mode specified
+#endif
+
 extern __attribute__((alias("rtld_global_ro"), visibility("default"))) struct rtld_global_ro _rtld_global_ro;
 
 __attribute__ ((visibility("default"))) int __libc_enable_secure = 0;
@@ -256,14 +258,13 @@ void init_globals(const Loader & loader) {
 		}
 	}
 
-	if (sysinfo != 0 && rtld_global_ro._dl_sysinfo_dso != nullptr)
-		rtld_global_ro._dl_sysinfo = sysinfo;
-
+#if defined(COMPATIBILITY_UBUNTU_FOCAL_AMD64)
 	rtld_global_ro._dl_vdso_clock_gettime64 = resolve(loader, "__vdso_clock_gettime");
 	rtld_global_ro._dl_vdso_gettimeofday = resolve(loader, "__vdso_gettimeofday");
 	rtld_global_ro._dl_vdso_time = resolve(loader, "__vdso_time");
 	rtld_global_ro._dl_vdso_getcpu = resolve(loader, "__vdso_getcpu");
 	rtld_global_ro._dl_vdso_clock_getres_time64 = resolve(loader, "__vdso_clock_getres");
+#endif
 }
 
 

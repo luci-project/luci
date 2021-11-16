@@ -6,16 +6,19 @@ TARGET_PATH = /opt/$(NAME)/ld-$(NAME).so
 
 SRCFOLDER = src
 BUILDDIR ?= .build
+COMPATIBILITY ?= $(shell bash -c 'source /etc/os-release ; echo "$${ID^^}_$${VERSION_CODENAME^^}"')
+PLATFORM ?= AMD64
 LIBBEAN = bean/libbean.a
 CXX = g++
 
 CFLAGS ?=
-CFLAGS += -ffunction-sections -fdata-sections -nostdlib
+CFLAGS += -ffreestanding -ffunction-sections -fdata-sections -nostdlib
 CFLAGS += -fno-jump-tables -fno-plt -fPIE
 ifdef NO_FPU
 CFLAGS += -mno-mmx -mno-sse -mgeneral-regs-only -DNO_FPU
 endif
 CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
+CFLAGS += -DCOMPATIBILITY_$(COMPATIBILITY)_$(PLATFORM)
 
 # Default Luci base address
 BASEADDRESS = 0x6ffff0000000
@@ -52,8 +55,8 @@ all: $(TARGET_PATH) $(LIBPATH_CONF)
 
 $(LIBBEAN):
 	@echo "GEN		$@"
-	#$(VERBOSE) $(MAKE) DIET=1 -C $(@D)
-	$(VERBOSE) $(MAKE) -C $(@D)
+	$(VERBOSE) $(MAKE) DIET=1 -C $(@D)
+	#$(VERBOSE) $(MAKE) -C $(@D)
 
 $(TARGET_PATH): $(notdir $(TARGET_PATH))
 	@echo "CP		$@"
