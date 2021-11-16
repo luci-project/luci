@@ -231,7 +231,7 @@ class DwarfVars:
 		return DIE[key_id], DIE['total_size'], DIE[key_hash]
 
 
-	def get_def(self, DIE, resolve_members = True, skip_const = False, offset = 0):
+	def get_def(self, DIE, resolve_members = True, skip_const = False):
 		size = 0
 		factor = 1
 		include_members = False
@@ -269,20 +269,19 @@ class DwarfVars:
 			cdef += ' { '
 			for child in self.iter_children(DIE):
 				if child['tag'] == 'member':
-					child_offset = offset
-					if 'data_member_location' in child:
-						child_offset += child['data_member_location']
-					child_cdef, child_size, child_factor = self.get_def(child, resolve_members, False, child_offset)
+					child_cdef, child_size, child_factor = self.get_def(child, resolve_members, False)
 					cdef += child_cdef
 					if child_factor != 1:
 						cdef += '[' + str(child_factor) + ']'
-					cdef += ';  /* offset ' + str(child_offset) + ' */'
+					cdef += '; '
+					if 'data_member_location' in child:
+						cdef += ' /* offset ' + str(child['data_member_location']) + ' */'
 				elif child['tag'] == 'enumerator':
 					cdef += child['name'] + ' = ' + str(child['const_value']) + ', '
 			cdef += '}'
 
 		if 'type' in DIE and (DIE['tag'] != 'typedef' or self.aliases):
-			type_cdef, type_size, factor = self.get_def(self.DIEs[DIE['unit']][DIE['type']], resolve_members, skip_const, offset)
+			type_cdef, type_size, factor = self.get_def(self.DIEs[DIE['unit']][DIE['type']], resolve_members, skip_const)
 			cdef += type_cdef
 			size = type_size
 
