@@ -3,6 +3,7 @@
 
 import os
 import sys
+import errno
 import regex
 import xxhash
 import argparse
@@ -11,10 +12,47 @@ import subprocess
 # TODO: Use pyelftools instead
 
 class DwarfVars:
-	def __init__(self, file, aliases = True, names = True):
+	def __init__(self, file, aliases = True, names = True, external_dbgsym = True, root = ''):
 		self.DIEs = []
 		self.aliases = aliases
 		self.names = names
+		self.file = os.path.realpath(file)
+		self.root = root
+		if not os.path.exists(self.file):
+			self.file = os.path.realpath(root + file)
+		if len(root) > 0 and self.filepath.startswith(root):
+			self.filepath = self.filepath[len(root):]
+		self.dbgsym = None
+
+		if not os.path.exists(root + self.file):
+			raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file)
+		elif self.parse(file):
+			self.dbgsym = file
+		elif external_dbgsym:
+			dbgsyms = []
+			# Debug symbols via Build ID
+			buildids = regex.compile(r'^\s*Build-ID: ([0-9a-f]+)$')
+			readelf = subprocess.Popen(['readelf', '-n', root + self.file], stdout=subprocess.PIPE)
+			while line := readelf.stdout.readline().decode('utf-8'):
+				if buildid := buildids.match(line):
+					dbgsyms.append(root + '/usr/lib/debug/.build-id/' + buildid.group(1)[:2] + '/' + buildid.group(1)[2:] + '.debug')
+			# Debug symbols via path
+			dbgsyms.append(root + self.file + '.debug')
+			dbgsyms.append(root + os.path.dirname(self.file) + '/.debug/' + os.path.basename(self.file) + '.debug')
+			dbgsyms.append(root + '/usr/lib/debug' + self.file + '.debug')
+			# Inoffical debug file names
+			dbgsyms.append(root + os.path.dirname(self.file) + '/.debug/' + os.path.basename(self.file))
+			dbgsyms.append(root + '/usr/lib/debug' + self.file)
+			for dbgsym in dbgsyms:
+				if os.path.exists(dbgsym) and self.parse(dbgsym):
+					self.dbgsym = dbgsym
+
+		# Not found:
+		if not self.dbgsym:
+			raise FileNotFoundError(errno.ENOENT, "No Debug Information available", file)
+
+
+	def parse(self, file):
 		entries = regex.compile(r'^<(\d+)><(0x[0-9a-f]+)(?:\+0x[0-9a-f]+)?><([^>]+)>(.*)$')
 		attribs = regex.compile(r' ([^<>]+)(<((?>[^<>]+|(?2)))>)')
 		hexvals = regex.compile(r'^[<]?(0x[0-9a-f]+|[0-9]+)(:? \(-[0-9]+\))?[>]?$')
@@ -60,7 +98,10 @@ class DwarfVars:
 				for attrib in attribs.finditer(entry.group(4)):
 					value = attrib.group(3)
 					if hexval := hexvals.match(value):
-						value = int(hexval.group(1), 0)
+						try:
+							value = int(hexval.group(1), 0)
+						except ValueError:
+							value = int(hexval.group(1))
 					DIE[attrib.group(1)] = value
 
 				# Reduce entries by combining declaration source
@@ -74,6 +115,7 @@ class DwarfVars:
 
 				DIE['unit'] = unit
 				self.DIEs[unit][ID] = DIE
+		return len(self.DIEs) > 0
 
 	def get_type(self, DIE, resolve_members = True):
 		if not resolve_members and 'children' in DIE:
@@ -128,6 +170,11 @@ class DwarfVars:
 				if len(id) > 0:
 					id += ' '
 				id += DIE['name']
+			elif 'linkage_name' in DIE and self.names:
+				hash.update('.' + DIE['linkage_name'])
+				if len(id) > 0:
+					id += ' '
+				id += DIE['linkage_name']
 
 			if include_members and resolve_members:
 				id += ' { '
@@ -143,7 +190,7 @@ class DwarfVars:
 						id += '; '
 					elif child['tag'] == 'enumerator':
 						hash.update('>' + child['name']+ '=' + str(child['const_value']))
-						id += child['name'] + ' = ' + str(child['const_value']) + '; '
+						id += child['name'] + ' = ' + str(child['const_value']) + ', '
 				id += '}'
 
 			if 'type' in DIE:
@@ -184,6 +231,89 @@ class DwarfVars:
 		return DIE[key_id], DIE['total_size'], DIE[key_hash]
 
 
+	def get_def(self, DIE, resolve_members = True, skip_const = False, offset = 0):
+		size = 0
+		factor = 1
+		include_members = False
+		cdef = ''
+
+		if DIE['tag'] == 'structure_type':
+			cdef = 'struct'
+			include_members = True
+		elif DIE['tag'] == 'class_type':
+			cdef = 'class'
+			include_members = True
+		elif DIE['tag'] == 'union_type':
+			cdef = 'union'
+			include_members = True
+		elif DIE['tag'] == 'enumeration_type':
+			cdef = 'enum'
+			include_members = True
+		elif DIE['tag'] == 'const_type':
+			if not skip_const:
+				cdef = 'const '
+				skip_const = True
+		elif DIE['tag'] == 'pointer_type':
+			resolve_members = False
+
+		name = None
+		if 'name' in DIE:
+			name = DIE['name']
+		elif 'linkage_name' in DIE:
+			name = DIE['linkage_name'];
+
+		if include_members and resolve_members:
+			if name:
+				cdef += ' ' + name
+				name = None
+			cdef += ' { '
+			for child in self.iter_children(DIE):
+				if child['tag'] == 'member':
+					child_offset = offset
+					if 'data_member_location' in child:
+						child_offset += child['data_member_location']
+					child_cdef, child_size, child_factor = self.get_def(child, resolve_members, False, child_offset)
+					cdef += child_cdef
+					if child_factor != 1:
+						cdef += '[' + str(child_factor) + ']'
+					cdef += ';  /* offset ' + str(child_offset) + ' */'
+				elif child['tag'] == 'enumerator':
+					cdef += child['name'] + ' = ' + str(child['const_value']) + ', '
+			cdef += '}'
+
+		if 'type' in DIE and (DIE['tag'] != 'typedef' or self.aliases):
+			type_cdef, type_size, factor = self.get_def(self.DIEs[DIE['unit']][DIE['type']], resolve_members, skip_const, offset)
+			cdef += type_cdef
+			size = type_size
+
+		if DIE['tag'] == 'pointer_type':
+			if not 'type' in DIE or len(cdef) == 0:
+				cdef += 'void'
+			cdef += '*'
+			factor = 1
+		elif DIE['tag'] == 'array_type':
+			for child in self.iter_children(DIE):
+				if child['tag'] == 'subrange_type':
+					factor *= child.get('upper_bound', 0) - child.get('lower_bound', 0) + 1
+
+		if name and self.names and (DIE['tag'] != 'typedef' or not self.aliases):
+			if len(cdef) > 0:
+				cdef += ' '
+			cdef += name
+			if factor != 1:
+				cdef += '[' + str(factor) + ']'
+				factor = 1
+
+		if 'byte_size' in DIE:
+			size = DIE['byte_size']
+
+		if 'total_size' in DIE:
+			assert(DIE['total_size'] == factor * size)
+		else:
+			DIE['total_size'] = factor * size
+
+		return cdef, DIE['total_size'], factor
+
 	def get_vars(self, tls = False):
 		if tls:
 			locaddr = regex.compile(r'^.*: const[0-9su]+ ([0-9a-f]+) GNU_push_tls_address$')
@@ -216,13 +346,21 @@ class DwarfVars:
 
 
 	def iter_types(self):
+		type_tags = ['structure_type', 'class_type', 'union_type', 'enumeration_type']
 		for DIEs in self.DIEs:
 			for ID, DIE in DIEs.items():
-				type_tags = ['structure_type', 'class_type', 'union_type', 'enumeration_type']
 				if DIE['tag'] in type_tags:
 					yield self.get_type(DIE)
 
-
+	def iter_globals(self):
+		type_tags = ['variable', 'structure_type', 'class_type', 'union_type', 'enumeration_type']
+		for unit, DIEs in enumerate(self.DIEs):
+			for ID, DIE in DIEs.items():
+				if DIE['tag'] in type_tags and ('name' in DIE or 'linkage_name' in DIE):
+					cdef, size, factor = self.get_def(DIE)
+					assert(factor == 1)
+					if size > 0:
+						yield cdef, size, DIE
 
 if __name__ == '__main__':
 	# Arguments
@@ -236,6 +374,7 @@ if __name__ == '__main__':
 	parser_var.add_argument('-t', '--tls', action='store_true', help='Extract TLS variables')
 	parser_var.add_argument('-j', '--json', action='store_true', help='Output as JSON')
 	parser_data = subparsers.add_parser('datatypes', help='All data types (struct, union, enum) from file')
+	parser_data = subparsers.add_parser('globals', help='All global data types')
 	args = parser.parse_args()
 
 	if not os.path.exists(args.file):
@@ -259,3 +398,6 @@ if __name__ == '__main__':
 			full_hash.update(hash)
 			print(f"{id} {size} bytes # {hash}")
 		print(full_hash.hexdigest())
+	elif args.extract == 'globals':
+		for cdef, size, DIE in dwarf.iter_globals():
+			print(f"{cdef};  // {size} bytes")

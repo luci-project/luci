@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 import sys
+import errno
 import xxhash
 import os.path
 import argparse
@@ -41,12 +43,125 @@ def sortuniq(symlist):
 			l = s
 			yield s
 
+class ElfVar:
+	def __init__(self, file, root='', dbgsym = True, dwarf = True):
+		# Find ELF file
+		if os.path.exists(file):
+			self.path = os.path.realpath(file)
+		elif os.path.exists(root + '/' + file):
+			self.path = os.path.realpath(root + '/' + file)
+		else:
+			raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file)
+		self.elf = ELFFile(f)
+
+		# Parse segments
+		self.segments = []
+		self.categories = set()
+		self.sec2seg = {}
+		for segment in self.elf.iter_segments():
+			if segment['p_type'] in [ 'PT_LOAD', 'PT_TLS' ]:
+				cat = ''
+				if segment['p_flags'] & P_FLAGS.PF_R != 0:
+					cat += 'R'
+				if segment['p_flags'] & P_FLAGS.PF_W != 0:
+					cat += 'W'
+				if segment['p_flags'] & P_FLAGS.PF_X != 0:
+					cat += 'X'
+				if segment['p_type'] == 'PT_TLS':
+					cat = 'TLS'
+				self.categories.add(cat)
+
+				self.segments.append({
+					'category': cat,
+					'value': segment['p_vaddr'],
+					'size': segment['p_memsz']
+				})
+				segidx = len(segments) - 1
+
+				for s in range(self.elf.num_sections()):
+					if segment.section_in_segment(self.elf.get_section(s)):
+						self.sec2seg[s] = segidx
+
+		# Get debug symbols
+		if self.elf.has_dwarf_info() and next(self.elf.get_dwarf_info().iter_CUs(), False):
+			self.dbgsym = self.path
+		else:
+			self.dbgsym = None
+			dbgsyms = []
+			if f.name in buildids:
+				dbgsyms.append(args.root + '/usr/lib/debug/.build-id/' + buildids[f.name][:2] + '/' + buildids[f.name][2:] + '.debug')
+			dbgsyms.append(args.root + filepath + '.debug')
+			dbgsyms.append(args.root + os.path.dirname(filepath) + '/.debug/' + os.path.basename(filepath) + '.debug')
+			dbgsyms.append(args.root + '/usr/lib/debug' + filepath + '.debug')
+			for dbgsym in dbgsyms:
+				if os.path.exists(dbgsym):
+					self.dbgsym = dbgsym
+					break
+
+		# Initialize members
+		self.symbols = []
+
+		self.buildid = None
+
+
+
+	def parse_symbols(self):
+		buildid = None
+
+
+		for section in self.elf.iter_sections():
+			if isinstance(section, SymbolTableSection):
+				for sym in section.iter_symbols():
+					if sym['st_shndx'] != 'SHN_UNDEF' and sym['st_info']['type'] in [ 'STT_OBJECT', 'STT_TLS' ] and sym['st_size'] > 0:
+						extern = True if sym['st_info']['bind'] == 'STB_GLOBAL' else False
+						segment = segments[sec2seg[sym['st_shndx']]]
+						assert(sym['st_value'] - segment['value'] + sym['st_size'] <= segment['size'])
+						self.symbols.append({
+							'name': sym.name,
+							'value': sym['st_value'] - segment['value'],
+							'size': sym['st_size'],
+							'align': sym['st_value'] % PAGE_SIZE,
+							'category': 'TLS' if sym['st_info']['type'] == 'STT_TLS' else segment['category'],
+							'external': True if sym['st_info']['bind'] == 'STB_GLOBAL' else False
+						})
+			elif isinstance(section, NoteSection):
+				for note in section.iter_notes():
+					if note['n_type'] == 'NT_GNU_BUILD_ID':
+						self.buildid = note['n_desc']
+
+
+	def parse_dwarf
+
+
+	def extern_dbgsym(self):
+
+				break
+
+		if f.name in dbgfiles:
+			dwarf = DwarfVars(dbgfiles[f.name], aliases = args.aliases, names = args.names)
+
+			# Prepare formatr of dwarf variables
+			dwarfsyms = dwarf.get_vars(tls = False)
+			for dvar in dwarfsyms:
+				for seg in seginfo:
+					if dvar['value'] >= seg['value'] and dvar['value'] + dvar['size'] <= seg['value'] + seg['size']:
+						dvar['align'] = dvar['value']  % PAGE_SIZE;
+						dvar['value'] = dvar['value'] - seg['value']
+						dvar['category'] = seg['category']
+
+			for dvar in dwarf.get_vars(tls = True):
+				dvar['align'] = dvar['value']  % PAGE_SIZE;
+				dvar['category'] = 'TLS'
+				dwarfsyms.append(dvar)
+
+
 if __name__ == '__main__':
 	# Arguments
 	parser = argparse.ArgumentParser(prog='PROG')
 	parser.add_argument('-a', '--aliases', action='store_true', help='Include aliases (typedefs)')
 	parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
-	parser.add_argument('-d', '--dwarf', action='store_true', help='use DWARF')
+	parser.add_argument('-d', '--dbgsym', action='store_true', help='use debug symbols')
+	parser.add_argument('-D', '--dwarf', action='store_true', help='use DWARF')
 	parser.add_argument('-r', '--root', help='Path prefix for debug symbol files', default='')
 	parser.add_argument('-w', '--writable', action='store_true', help='Ignore non-writable sections')
 	parser.add_argument('-i', '--identical', action='store_true', help='Check if hashes of input files are identical')
@@ -109,6 +224,7 @@ if __name__ == '__main__':
 						buildids[f.name] = note['n_desc']
 
 		seginfo.sort(key=functools.cmp_to_key(compare))
+		variables = []
 
 		if args.dwarf:
 			if elffile.has_dwarf_info() and next(elffile.get_dwarf_info().iter_CUs(), False):
@@ -142,7 +258,6 @@ if __name__ == '__main__':
 					dvar['category'] = 'TLS'
 					dwarfsyms.append(dvar)
 
-				variables = []
 				si = sortuniq(symbols)
 				di = sortuniq(dwarfsyms)
 
