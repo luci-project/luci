@@ -74,6 +74,7 @@ const char * __attribute__((weak)) build_dlh_flags() { return nullptr; }
 const char * __attribute__((weak)) build_luci_version() { return nullptr; }
 const char * __attribute__((weak)) build_luci_date() { return nullptr; }
 const char * __attribute__((weak)) build_luci_flags() { return nullptr; }
+const char * __attribute__((weak)) build_luci_compatibility() { return nullptr; }
 void build_info() {
 	LOG_INFO << "Luci";
 	if (build_luci_version() != nullptr)
@@ -82,7 +83,9 @@ void build_info() {
 		LOG_INFO_APPEND << " (built " << build_luci_date() << ')';
 	LOG_INFO_APPEND << endl;
 	if (build_luci_flags() != nullptr)
-		LOG_TRACE << "with flags: " << build_luci_flags() << endl;
+		LOG_TRACE << " with flags: " << build_luci_flags() << endl;
+	if (build_luci_compatibility() != nullptr)
+		LOG_DEBUG << " with glibc compatibility to " << build_luci_compatibility() << endl;
 
 	if (build_bean_version() != nullptr) {
 		LOG_DEBUG << "Using Bean " << build_bean_version();
@@ -92,12 +95,12 @@ void build_info() {
 			LOG_DEBUG_APPEND << " (built " << build_bean_date() << ')';
 		LOG_DEBUG_APPEND << endl;
 		if (build_bean_flags() != nullptr)
-			LOG_TRACE << "with flags: " << build_bean_flags() << endl;
+			LOG_TRACE << " with flags: " << build_bean_flags() << endl;
 	}
 	if (build_capstone_version() != nullptr) {
 		LOG_DEBUG << "Using Capstone " << build_capstone_version() << endl;
 		if (build_capstone_flags() != nullptr)
-			LOG_TRACE << "with flags: " << build_capstone_flags() << endl;
+			LOG_TRACE << " with flags: " << build_capstone_flags() << endl;
 	}
 
 	if (build_dlh_version() != nullptr) {
@@ -106,7 +109,7 @@ void build_info() {
 			LOG_DEBUG_APPEND << " (built " << build_dlh_date() << ')';
 		LOG_DEBUG_APPEND << endl;
 		if (build_dlh_flags() != nullptr)
-			LOG_TRACE << "with flags: " << build_dlh_flags() << endl;
+			LOG_TRACE << " with flags: " << build_dlh_flags() << endl;
 	}
 }
 

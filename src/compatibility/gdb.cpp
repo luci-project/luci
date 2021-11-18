@@ -3,31 +3,9 @@
 #include <dlh/assert.hpp>
 #include <dlh/log.hpp>
 
-/* Rendezvous structure used by the run-time dynamic linker to communicate
-   details of shared object loading to the debugger.  If the executable's
-   dynamic section has a DT_DEBUG element, the run-time linker sets that
-   element's value to the address where this structure can be found.  */
-struct RDebug{
-	int r_version;		/* Version number for this protocol.  */
+GDB::RDebug r_debug;
 
-	const ObjectIdentity *r_map;	/* Head of the chain of loaded objects.  */
-
-	/* This is the address of a function internal to the run-time linker,
-	   that will always be called when the linker begins to map in a
-	   library or unmap it, and again when the mapping change is complete.
-	   The debugger can set a breakpoint at this address if it wants to
-	   notice shared object mapping changes.  */
-	void (* r_brk)();
-
-	/* This state value describes the mapping change taking place when
-	   the `r_brk' address is called.  */
-
-	GDB::State r_state;
-
-	uintptr_t r_ldbase;  /* Base address the linker is loaded at.  */
-} r_debug;
-
-extern __attribute__ ((alias("r_debug"), visibility("default"))) RDebug _r_debug;
+extern __attribute__ ((alias("r_debug"), visibility("default"))) GDB::RDebug _r_debug;
 
 EXPORT void _dl_debug_state(void) {
 	asm volatile("nop" ::: "memory");

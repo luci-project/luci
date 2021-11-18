@@ -52,8 +52,137 @@ struct link_map {
 	char *l_name;  /* Absolute pathname where object was found */
 	void *l_ld;    /* Dynamic section of the shared object */
 	struct link_map *l_next, *l_prev; /* Chain of loaded objects */
+
+	// GLIBC specific
+	struct link_map *l_real;
+	GLIBC::DL::Lmid_t l_ns;
+
+	void *l_libname;
+
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
+	uintptr_t *l_info[76];
+#elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+	uintptr_t *l_info[77];
+#endif
+
+	const uintptr_t *l_phdr;
+	uintptr_t l_entry;
+	uint16_t l_phnum;
+	uint16_t l_ldnum;
+	struct r_scope_elem  {
+		struct link_map **r_list;
+		unsigned r_nlist;
+	} l_searchlist;
+	struct r_scope_elem l_symbolic_searchlist;
+	struct link_map *l_loader;
+	void *l_versions;
+	uint32_t l_nversions;
+	uint32_t l_nbuckets;
+	uint32_t l_gnu_bitmask_idxbits;
+	uint32_t l_gnu_shift;
+	const uint64_t *l_gnu_bitmask;
+	union {
+		const uint32_t *l_gnu_buckets;
+		const uint32_t *l_chain;
+	};
+	union {
+		const uint32_t *l_gnu_chain_zero;
+		const uint32_t *l_buckets;
+	};
+	uint32_t l_direct_opencount;
+	enum {
+		lt_executable,
+		lt_library,
+		lt_loaded
+	} l_type                           : 2;
+	uint32_t l_relocated               : 1;
+	uint32_t l_init_called             : 1;
+	uint32_t l_global                  : 1;
+	uint32_t l_reserved                : 2;
+	uint32_t l_phdr_allocated          : 1;
+	uint32_t l_soname_added            : 1;
+	uint32_t l_faked                   : 1;
+	uint32_t l_need_tls_init           : 1;
+	uint32_t l_auditing                : 1;
+	uint32_t l_audit_any_plt           : 1;
+	uint32_t l_removed                 : 1;
+	uint32_t l_contiguous              : 1;
+	uint32_t l_symbolic_in_local_scope : 1;
+	uint32_t l_free_initfini           : 1;
+
+#if defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+	uint16_t l_nodelete_active;
+	uint16_t l_nodelete_pending;
+	enum {
+		lc_unknown = 0,                       /* Unknown CET status.  */
+		lc_none    = 1 << 0,                  /* Not enabled with CET.  */
+		lc_ibt     = 1 << 1,                  /* Enabled with IBT.  */
+		lc_shstk   = 1 << 2,                  /* Enabled with STSHK.  */
+		lc_ibt_and_shstk = lc_ibt | lc_shstk  /* Enabled with both.  */
+	} l_cet;
+#endif
+
+	struct {
+		void **dirs;
+		int malloced;
+	} l_rpath_dirs;
+	void *l_reloc_result;
+	void *l_versyms;
+	const char *l_origin;
+	uintptr_t l_map_start;
+	uintptr_t l_map_end;
+	uintptr_t l_text_end;
+	struct r_scope_elem *l_scope_mem[4];
+	size_t l_scope_max;
+	struct r_scope_elem **l_scope;
+	struct r_scope_elem *l_local_scope[2];
+	struct r_file_id {
+		uint64_t dev;
+		uint64_t ino;
+	} l_file_id;
+	struct r_search_path_struct {
+		void **dirs;
+		int malloced;
+	} l_runpath_dirs;
+	struct link_map **l_initfini;
+	void *l_reldeps;
+	uint32_t l_reldepsmax;
+	uint32_t l_used;
+	uint32_t l_feature_1;
+	uint32_t l_flags_1;
+	uint32_t l_flags;
+	int l_idx;
+	struct link_map_machine {
+		uintptr_t plt;
+		uintptr_t gotplt;
+		void *tlsdesc_table;
+	} l_mach;
+	struct {
+		const uintptr_t *sym;
+		int type_class;
+		struct link_map *value;
+		const uintptr_t *ret;
+	} l_lookup_cache;
+	void *l_tls_initimage;
+	size_t l_tls_initimage_size;
+	size_t l_tls_blocksize;
+	size_t l_tls_align;
+	size_t l_tls_firstbyte_offset;
+	ptrdiff_t l_tls_offset;
+	size_t l_tls_modid;
+	size_t l_tls_dtor_count;
+	uintptr_t l_relro_addr;
+	size_t l_relro_size;
+	unsigned long long l_serial;
 };
 
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
+static_assert(sizeof(link_map) == 1136, "Wrong link_map size for Debian Stretch (amd64)");
+#elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+static_assert(sizeof(link_map) == 1152, "Wrong link_map size for Ubuntu Focal (amd64)");
+#else
+#error No (known) link_map compatibility mode specified
+#endif
 }  // namespace DL
 }  // namespace GLIBC
 

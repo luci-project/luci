@@ -2,14 +2,18 @@ VERBOSE = @
 
 NAME = luci
 
-TARGET_PATH = /opt/$(NAME)/ld-$(NAME).so
-
 SRCFOLDER = src
-BUILDDIR ?= .build
-COMPATIBILITY ?= $(shell bash -c 'source /etc/os-release ; echo "$${ID^^}_$${VERSION_CODENAME^^}"')
-PLATFORM ?= AMD64
+OS ?= $(shell bash -c 'source /etc/os-release ; echo "$${ID,,}"')
+OSVERSION ?= $(shell bash -c 'source /etc/os-release ; echo "$${VERSION_CODENAME,,}"')
+PLATFORM ?= x64
+BUILDDIR ?= .build-$(OS)-$(OSVERSION)-$(PLATFORM)
 LIBBEAN = bean/libbean.a
 CXX = g++
+
+# Compatibility macro name
+COMPATIBILITY = $(shell echo "COMPATIBILITY_$(OS)_$(OSVERSION)_$(PLATFORM)" | tr a-z A-Z)
+
+TARGET_PATH = /opt/$(NAME)/ld-$(NAME)-$(OS)-$(OSVERSION)-$(PLATFORM).so
 
 CFLAGS ?=
 CFLAGS += -ffreestanding -ffunction-sections -fdata-sections -nostdlib
@@ -18,7 +22,6 @@ ifdef NO_FPU
 CFLAGS += -mno-mmx -mno-sse -mgeneral-regs-only -DNO_FPU
 endif
 CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
-CFLAGS += -DCOMPATIBILITY_$(COMPATIBILITY)_$(PLATFORM)
 
 # Default Luci base address
 BASEADDRESS = 0x6ffff0000000
@@ -27,7 +30,7 @@ LIBADDRESS = 0x600000000000
 # Default config file path
 LIBPATH_CONF = /opt/$(NAME)/libpath.conf
 
-CXXFLAGS ?= -O0 -g -std=c++2a $(CFLAGS)
+CXXFLAGS ?= -Og -g -std=c++2a $(CFLAGS)
 CXXFLAGS += -I $(SRCFOLDER) -I $(dir $(LIBBEAN))/include/
 # Elfo ELF class should be virtual & reference to DLH
 CXXFLAGS += -DVIRTUAL -DUSE_DLH
@@ -69,18 +72,19 @@ $(notdir $(TARGET_PATH)): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
 $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"
 	@mkdir -p $(@D)
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -MM -MP -MT $(BUILDDIR)/$*.o -MF $@ $<
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -D$(COMPATIBILITY) -MM -MP -MT $(BUILDDIR)/$*.o -MF $@ $<
 
 $(BUILDDIR)/%.o : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "CXX		$@"
 	@mkdir -p $(@D)
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -D__MODULE__="$(NAME)" -c -o $@ $<
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -D__MODULE__="$(NAME)" -D$(COMPATIBILITY) -c -o $@ $<
 
 $(BUILDINFO): FORCE
 	@echo "CXX		$@"
 	@echo 'const char * build_$(NAME)_version() { return "$(shell git describe --dirty --always --tags)"; } ' \
 	'const char * build_$(NAME)_date() { return "$(shell date -R)"; }' \
-	'const char * build_$(NAME)_flags() { return "$(CXXFLAGS)"; }' | $(CXX) $(CXXFLAGS) -x c++ -c -o $@ -
+	'const char * build_$(NAME)_flags() { return "$(CXXFLAGS)"; }' \
+	'const char * build_$(NAME)_compatibility() { return "$(OS) $(OSVERSION) on $(PLATFORM) (macro $(COMPATIBILITY))"; }' | $(CXX) $(CXXFLAGS) -x c++ -c -o $@ -
 
 $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
 	$(VERBOSE) ./gen-libpath.sh $< | grep -v "i386\|i486\|i686\|lib32\|libx32" > $@
