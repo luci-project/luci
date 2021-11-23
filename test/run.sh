@@ -23,8 +23,8 @@ if [ ! -x "${RTLD}" ] ; then
 fi
 
 echo -e "\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM})\e[0m"
-echo "using $(RTLD)"
-ls -lisah "$(RTLD)"
+echo "using ${RTLD}"
+ls -lisah "${RTLD}"
 
 function check() {
 	if [ -f "$1" ] ; then
