@@ -23,6 +23,8 @@ if [ ! -x "${RTLD}" ] ; then
 fi
 
 echo -e "\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM})\e[0m"
+echo "using $(RTLD)"
+ls -lisah "$(RTLD)"
 
 function check() {
 	if [ -f "$1" ] ; then
@@ -46,6 +48,8 @@ for TEST in * ; do
 			echo "No executable file (${TEST}/${BINARY}) found" >&2
 			exit 1
 		fi
+
+		LD_LOGLEVEL=6 ${TEST}/${BINARY}
 
 		# Execute and capture stdout + stderr
 		STDOUT=$(mktemp)
