@@ -14,61 +14,61 @@ typedef char __rtld_lock_t[40];
 // results using dwarfdump -n globals [system / ld]
 struct rtld_global {
 	struct link_namespaces {
-		GLIBC::DL::link_map *_ns_loaded;	/* offset 0 */
-		uint32_t _ns_nloaded;	/* offset 8 */
-		GLIBC::DL::link_map::r_scope_elem *_ns_main_searchlist;	/* offset 16 */
-		uint32_t _ns_global_scope_alloc;	/* offset 24 */
-		uint32_t _ns_global_scope_pending_adds;	/* offset 28 */
+		GLIBC::DL::link_map *_ns_loaded;
+		uint32_t _ns_nloaded;
+		GLIBC::DL::link_map::r_scope_elem *_ns_main_searchlist;
+		uint32_t _ns_global_scope_alloc;
+		uint32_t _ns_global_scope_pending_adds;
 		struct unique_sym_table  {
-			__rtld_lock_t lock;	/* offset 0 */
-			void *entries;	/* offset 40 */
-			size_t size;		/* offset 48 */
-			size_t n_elements;	/* offset 56 */
-			void *free;		/* offset 64 */
-		} _ns_unique_sym_table;	/* offset 32 */
+			__rtld_lock_t lock;
+			void *entries;
+			size_t size;
+			size_t n_elements;
+			void *free;
+		} _ns_unique_sym_table;
 		GDB::RDebug _ns_debug;
-	} _dl_ns[16];			/* offset 0 */
-	size_t _dl_nns;		/* offset 2304 */
-	__rtld_lock_t _dl_load_lock;	/* offset 2312 */
-	__rtld_lock_t _dl_load_write_lock;	/* offset 2352 */
-	uint64_t _dl_load_adds;	/* offset 2392 */
-	GLIBC::DL::link_map *_dl_initfirst;	/* offset 2400 */
+	} _dl_ns[16];
+	size_t _dl_nns;
+	__rtld_lock_t _dl_load_lock;
+	__rtld_lock_t _dl_load_write_lock;
+	uint64_t _dl_load_adds;
+	GLIBC::DL::link_map *_dl_initfirst;
 #if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-	uint64_t _dl_cpuclock_offset;	/* offset 2408 */
+	uint64_t _dl_cpuclock_offset;
 #endif
-	GLIBC::DL::link_map *_dl_profile_map;	/* offset 2416 */
-	uint64_t _dl_num_relocations;	/* offset 2424 */
-	uint64_t _dl_num_cache_relocations;	/* offset 2432 */
-	void *_dl_all_dirs;	/* offset 2440 */
+	GLIBC::DL::link_map *_dl_profile_map;
+	uint64_t _dl_num_relocations;
+	uint64_t _dl_num_cache_relocations;
+	void *_dl_all_dirs;
 #if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-	void *(*_dl_error_catch_tsd) ();	/* offset 2448 */
+	void *(*_dl_error_catch_tsd) ();
 #endif
 	GLIBC::DL::link_map _dl_rtld_map;
 	struct auditstate {
-		uintptr_t cookie;		/* offset 0 */
-		uint32_t bindflags;	/* offset 8 */
+		uintptr_t cookie;
+		uint32_t bindflags;
 	} _dl_rtld_auditstate[16];
 
-	void (*_dl_rtld_lock_recursive)(void *);	/* offset 3848 */
-	void (*_dl_rtld_unlock_recursive)(void *);	/* offset 3856 */
+	void (*_dl_rtld_lock_recursive)(void *);
+	void (*_dl_rtld_unlock_recursive)(void *);
 #if defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-	uint32_t _dl_x86_feature_1[2];	/* offset 3864 */
-	uint64_t _dl_x86_legacy_bitmap[2];	/* offset 3872 */
+	uint32_t _dl_x86_feature_1[2];
+	uint64_t _dl_x86_legacy_bitmap[2];
 #endif
-	int (*_dl_make_stack_executable_hook)(void**);	/* offset 3888 */
-	uint32_t _dl_stack_flags;	/* offset 3896 */
-	uint32_t _dl_tls_dtv_gaps;	/* offset 3900 */
-	size_t _dl_tls_max_dtv_idx;	/* offset 3904 */
-	void *_dl_tls_dtv_slotinfo_list;	/* offset 3912 */
-	size_t _dl_tls_static_nelem;	/* offset 3920 */
-	size_t _dl_tls_static_size;	/* offset 3928 */
-	size_t _dl_tls_static_used;	/* offset 3936 */
-	size_t _dl_tls_static_align;	/* offset 3944 */
-	void *_dl_initial_dtv;	/* offset 3952 */
-	size_t _dl_tls_generation;	/* offset 3960 */
-	void (*_dl_init_static_tls)(GLIBC::DL::link_map *);	/* offset 3968 */
-	void (*_dl_wait_lookup_done)();	/* offset 3976 */
-	void *_dl_scope_free_list;	/* offset 3984 */
+	int (*_dl_make_stack_executable_hook)(void**);
+	uint32_t _dl_stack_flags;
+	uint32_t _dl_tls_dtv_gaps;
+	size_t _dl_tls_max_dtv_idx;
+	void *_dl_tls_dtv_slotinfo_list;
+	size_t _dl_tls_static_nelem;
+	size_t _dl_tls_static_size;
+	size_t _dl_tls_static_used;
+	size_t _dl_tls_static_align;
+	void *_dl_initial_dtv;
+	size_t _dl_tls_generation;
+	void (*_dl_init_static_tls)(GLIBC::DL::link_map *);
+	void (*_dl_wait_lookup_done)();
+	void *_dl_scope_free_list;
 } rtld_global;
 
 #if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)

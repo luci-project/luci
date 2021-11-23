@@ -11,17 +11,14 @@ LIBBEAN = bean/libbean.a
 CXX = g++
 
 # Compatibility macro name
-COMPATIBILITY = $(shell echo "COMPATIBILITY_$(OS)_$(OSVERSION)_$(PLATFORM)" | tr a-z A-Z)
+COMPATIBILITY_PREFIX = COMPATIBILITY
+COMPATIBILITY = $(shell echo "$(COMPATIBILITY_PREFIX)_$(OS)_$(OSVERSION)_$(PLATFORM)" | tr a-z A-Z)
 
-TARGET_PATH = /opt/$(NAME)/ld-$(NAME)-$(OS)-$(OSVERSION)-$(PLATFORM).so
+TARGET_FILE = ld-$(NAME)-$(OS)-$(OSVERSION)-$(PLATFORM).so
+TARGET_PATH = /opt/$(NAME)/$(TARGET_FILE)
 
-CFLAGS ?=
-CFLAGS += -ffreestanding -ffunction-sections -fdata-sections -nostdlib
-CFLAGS += -fno-jump-tables -fno-plt -fPIE
-ifdef NO_FPU
-CFLAGS += -mno-mmx -mno-sse -mgeneral-regs-only -DNO_FPU
-endif
-CFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
+CRFLAGS ?=
+
 
 # Default Luci base address
 BASEADDRESS = 0x6ffff0000000
@@ -30,13 +27,18 @@ LIBADDRESS = 0x600000000000
 # Default config file path
 LIBPATH_CONF = /opt/$(NAME)/libpath.conf
 
-CXXFLAGS ?= -Og -g -std=c++2a $(CFLAGS)
+CXXFLAGS ?= -Og -g -std=c++2a
 CXXFLAGS += -I $(SRCFOLDER) -I $(dir $(LIBBEAN))/include/
 # Elfo ELF class should be virtual & reference to DLH
 CXXFLAGS += -DVIRTUAL -DUSE_DLH
+# Disable FPU?
+ifdef NO_FPU
+CXXFLAGS += -mno-mmx -mno-sse -mgeneral-regs-only -DNO_FPU
+endif
 # Disable several CXX features
-CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit
-CXXFLAGS += -nostdlib -nostdinc
+CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-jump-tables -fno-plt -fPIE
+CXXFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
+CXXFLAGS += -ffreestanding -ffunction-sections -fdata-sections -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
 CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBADDRESS=$(LIBADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
 CXXFLAGS += -fvisibility=hidden
@@ -54,18 +56,22 @@ LDFLAGS = -pie -soname $(notdir $(TARGET_PATH)) --gc-sections -Ttext-segment=$(B
 SPACE = $(subst ,, )
 COMMA = ,
 
-all: $(TARGET_PATH) $(LIBPATH_CONF)
+install: $(TARGET_PATH) $(LIBPATH_CONF)
+
+build: $(TARGET_FILE)
+
+all:
+	@grep -r '$(COMPATIBILITY_PREFIX)' $(SRCFOLDER) | sed -ne 's/^.*defined($(COMPATIBILITY_PREFIX)_\([^_]*\)_\([^_]*\)_\([^)]*\)).*$$/\L\1 \2 \3/p' | sort -u | xargs -n3 sh -c 'echo "\e[1mBuilding luci for $$0 $$1 ($$2)\e[0m" ; $(MAKE) OS=$$0 OSVERSION=$$1 PLATFORM=$$2 build'
 
 $(LIBBEAN):
 	@echo "GEN		$@"
 	$(VERBOSE) $(MAKE) DIET=1 -C $(@D)
-	#$(VERBOSE) $(MAKE) -C $(@D)
 
-$(TARGET_PATH): $(notdir $(TARGET_PATH))
+$(TARGET_PATH): $(TARGET_FILE)
 	@echo "CP		$@"
 	$(VERBOSE) cp $< $@
 
-$(notdir $(TARGET_PATH)): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
+$(TARGET_FILE): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
 	@echo "LD		$@"
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) -L$(dir $(LIBBEAN)) -Wl,--whole-archive -l$(patsubst lib%.a,%,$(notdir $(LIBBEAN))) -Wl,--no-whole-archive -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
 
@@ -90,8 +96,8 @@ $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
 	$(VERBOSE) ./gen-libpath.sh $< | grep -v "i386\|i486\|i686\|lib32\|libx32" > $@
 
 clean::
-	$(VERBOSE) rm -f $(DEPFILES)
-	$(VERBOSE) test -d $(BUILDDIR) && rmdir $(BUILDDIR) || true
+	$(VERBOSE) rm -f $(DEPFILES) $(OBJECTS)
+	$(VERBOSE) test -d $(BUILDDIR) && rm -rf $(BUILDDIR) || true
 
 mrproper:: clean
 	$(VERBOSE) rm -f $(notdir $(TARGET_PATH))
@@ -100,10 +106,10 @@ $(BUILDDIR): ; @mkdir -p $@
 
 $(DEPFILES):
 
-ifneq ($(MAKECMDGOALS),clean)
+ifeq ($(filter-out all clean,$(MAKECMDGOALS)),$(MAKECMDGOALS))
 -include $(DEPFILES)
 endif
 
 FORCE:
 
-.PHONY: all clean mrproper
+.PHONY: install all clean mrproper

@@ -1,0 +1,31 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+  - build
+  - test
+
+build:
+  image: inf4/stubs:gcc-x64
+  stage: build
+  script:
+    - make all
+  artifacts:
+    paths:
+      - "ld-luci-*.so"
+
+test-debian-stretch:
+  image: debian:stretch
+  stage: test
+  dependencies: 
+    - build
+  script:
+    - ./test/run.sh
+
+test-ubuntu-focal:
+  image: ubuntu:focal
+  stage: test
+  dependencies: 
+    - build
+  script:
+    - ./test/run.sh
