@@ -5,7 +5,7 @@ source /etc/os-release
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null
 
-case $(uname -p) in
+case $(uname -m) in
 	x86_64)
 		PLATFORM="x64"
 		;;

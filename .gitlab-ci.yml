@@ -19,6 +19,8 @@ test-debian-stretch:
   stage: test
   dependencies: 
     - build
+  before_script:
+    - apt-get update && apt-get install -y g++ make
   script:
     - ./test/run.sh
 
@@ -27,5 +29,7 @@ test-ubuntu-focal:
   stage: test
   dependencies: 
     - build
+  before_script:
+    - apt-get update && apt-get install -y g++ make
   script:
     - ./test/run.sh
