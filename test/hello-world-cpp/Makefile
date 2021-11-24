@@ -1,13 +1,11 @@
-RTLD ?= /lib64/ld-linux-x86-64.so.2
+LD_PATH ?= /lib64/ld-linux-x86-64.so.2
 
 CXX ?= g++
-CXXFLAGS ?= -O2 -g -Wall -Wl,--dynamic-linker=$(RTLD)
+CXXFLAGS ?= -O2 -g -Wall -Wl,--dynamic-linker=$(LD_PATH)
 
-BINARY ?= run
+EXEC ?= run
 SOURCE = hw.cpp
 
 
-$(BINARY): $(SOURCE)
+$(EXEC): $(SOURCE)
 	$(CXX) $(CXXFLAGS) -o $@ $<
-
-

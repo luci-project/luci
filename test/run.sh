@@ -15,16 +15,20 @@ case $(uname -m) in
 		;;
 esac
 
-NAME="Luci"
-RTLD="$(readlink -f "../ld-${NAME,,}-${ID,,}-${VERSION_CODENAME,,}-${PLATFORM,,}.so")"
-if [ ! -x "${RTLD}" ] ; then
-	echo "Missing RTLD ${NAME} (${RTLD})" >&2
+LD_NAME="Luci"
+# Check dynamic linker/loader
+LD_PATH="$(readlink -f "../ld-${LD_NAME,,}-${ID,,}-${VERSION_CODENAME,,}-${PLATFORM,,}.so")"
+if [ ! -x "${LD_PATH}" ] ; then
+	echo "Missing RTLD ${LD_PATH} (${RTLD})" >&2
 	exit 1
 fi
+# generate config
+LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
+../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF"
+
 
 echo -e "\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM})\e[0m"
-echo "using ${RTLD}"
-ls -lisah "${RTLD}"
+echo "using ${LD_PATH}"
 
 function check() {
 	if [ -f "$1" ] ; then
@@ -37,24 +41,28 @@ function check() {
 	fi
 }
 
-BINARY="run"
+EXEC="run"
 for TEST in * ; do
 	if [ -d "${TEST}" ] ; then
 		echo -e "\n\e[1mTest ${TEST}\e[0m"
 		# Build
-		test -f "${TEST}/Makefile" &&  make RTLD="${RTLD}" BINARY="${BINARY}" -B -s -C "${TEST}"
+		test -f "${TEST}/Makefile" &&  make LD_PATH="${LD_PATH}" EXEC="${EXEC}" -B -s -C "${TEST}"
 		# Check executable
-		if [ ! -x "${TEST}/${BINARY}" ] ; then
-			echo "No executable file (${TEST}/${BINARY}) found" >&2
+		if [ ! -x "${TEST}/${EXEC}" ] ; then
+			echo "No executable file (${TEST}/${EXEC}) found" >&2
 			exit 1
 		fi
 
-		LD_LOGLEVEL=6 ${TEST}/${BINARY}
+		export LD_NAME
+		export LD_PATH
+		export LD_LIBRARY_CONF
+
+		LD_LOGLEVEL=6 ${TEST}/${EXEC}
 
 		# Execute and capture stdout + stderr
 		STDOUT=$(mktemp)
 		STDERR=$(mktemp)
-		"${TEST}/${BINARY}" >"$STDOUT" 2>"$STDERR"
+		"${TEST}/${EXEC}" >"$STDOUT" 2>"$STDERR"
 
 		# Compare stdout + stderr with example
 		check "${TEST}/.stdout" < "$STDOUT"
