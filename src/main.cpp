@@ -158,9 +158,22 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			loader->library_path_runtime = String::split(ld_library_path, ';');
 		}
 
-		LOG_DEBUG << "Adding contents of '" << opts.libpathconf << "' to library search path..." << endl;
-		loader->library_path_config += File::lines(opts.libpathconf);
-		LOG_DEBUG << "Config has " << loader->library_path_config.size() << " entries!" << endl;
+		// Library search path config
+		if (File::readable(opts.libpathconf)) {
+			LOG_DEBUG << "Adding contents of '" << opts.libpathconf << "' to library search path..." << endl;
+			loader->library_path_config += File::lines(opts.libpathconf);
+		}
+		char * ld_library_conf = Environ::variable("LD_LIBRARY_CONF", true);
+		if (ld_library_conf != nullptr && *ld_library_conf != '\0' && File::readable(ld_library_conf)) {
+			LOG_DEBUG << "Adding contents of '" << ld_library_conf << "' (from LD_LIBRARY_CONF) to library search path..." << endl;
+			loader->library_path_config += File::lines(ld_library_conf);
+		}
+		const auto libpathconf_size = loader->library_path_config.size();
+		if (libpathconf_size == 0) {
+			LOG_WARNING << "No library search path entries form library config!" << endl;
+		} else {
+			LOG_DEBUG << "Library config has " << loader->library_path_config.size() << " search path entries!" << endl;
+		}
 
 		// Preload Library
 		for (auto & preload : opts.preload) {
@@ -251,7 +264,9 @@ int main(int argc, char* argv[]) {
 
 		// Setup interpreter (luci)
 		uintptr_t luci_base = Auxiliary::vector(Auxiliary::AT_BASE).value();
-		Loader * loader = setup(luci_base == 0 ? BASEADDRESS : luci_base, STR(SOPATH), opts);
+		const char * sopath = STR(SOPATH);
+		const char * sopath_env = Environ::variable("LD_PATH", true);
+		Loader * loader = setup(luci_base == 0 ? BASEADDRESS : luci_base, sopath_env != nullptr && *sopath_env != '\0' ? sopath_env : sopath, opts);
 
 		// Load target binary
 		const char * bin = reinterpret_cast<const char *>(Auxiliary::vector(Auxiliary::AT_EXECFN).pointer());
