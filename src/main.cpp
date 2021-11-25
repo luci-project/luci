@@ -30,6 +30,7 @@ struct Opts {
 	const char * libpathconf{ STR(LIBPATH_CONF) };
 	Vector<const char *> preload{};
 	bool dynamicUpdate{};
+	bool dynamicWeak{};
 	bool bindNow{};
 	bool bindNot{};
 	bool showHelp{};
@@ -129,8 +130,9 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	}
 
 	// New Loader
-	auto env_dynamicupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC", true));
-	Loader * loader = new Loader(luci_base, luci_path, opts.dynamicUpdate || (env_dynamicupdate && env_dynamicupdate.value()));
+	auto env_dynamicupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_UPDATE", true));
+	auto env_dynamicweak = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_WEAK", true));
+	Loader * loader = new Loader(luci_base, luci_path, opts.dynamicUpdate || (env_dynamicupdate && env_dynamicupdate.value()), opts.dynamicWeak || (env_dynamicweak && env_dynamicweak.value()));
 	if (loader == nullptr) {
 		LOG_ERROR << "Unable to allocate loader" << endl;
 	} else {
@@ -138,6 +140,10 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			LOG_INFO << "Dynamic updates are enabled!" << endl;
 		} else {
 			LOG_DEBUG << "Dynamic updates are disabled!" << endl;
+		}
+
+		if (loader->dynamic_weak) {
+			LOG_INFO << "Weak references in shared library are supported (nonstandard)!" << endl;
 		}
 
 		// Flags
@@ -209,7 +215,8 @@ int main(int argc, char* argv[]) {
 				{'p',  "library-path", "DIR",   &Opts::libpath,       false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
 				{'c',  "library-conf", "FILE",  &Opts::libpathconf,   false, "library path configuration" },
 				{'P',  "preload",      "FILE",  &Opts::preload,       false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
-				{'d',  "dynamic",      nullptr, &Opts::dynamicUpdate, false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC to 1" },
+				{'u',  "update",       nullptr, &Opts::dynamicUpdate, false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
+				{'w',  "weak",         nullptr, &Opts::dynamicWeak,   false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
 				{'n',  "bind-now",     nullptr, &Opts::bindNow,       false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
 				{'N',  "bind-not",     nullptr, &Opts::bindNot,       false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
 				{'h',  "help",         nullptr, &Opts::showHelp,      false, "Show this help" }

@@ -22,7 +22,8 @@ void* observer_kickoff(void * ptr) {
 	return nullptr;
 }
 
-Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate) : dynamic_update(dynamicUpdate), next_namespace(NAMESPACE_BASE + 1) {
+Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, bool dynamicWeak)
+ : dynamic_update(dynamicUpdate), dynamic_weak(dynamicWeak), next_namespace(NAMESPACE_BASE + 1) {
 	default_flags.bind_global = 1;
 
 	if (dynamic_update) {

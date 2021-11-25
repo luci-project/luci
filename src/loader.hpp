@@ -15,6 +15,9 @@ struct Loader {
 	/*! \brief enable dynamic updates? */
 	const bool dynamic_update;
 
+	/*! \brief support dynamic weak definitions? */
+	const bool dynamic_weak;
+
 	/*! \brief default library path via argument / environment variable */
 	Vector<const char *> library_path_runtime;
 
@@ -48,7 +51,7 @@ struct Loader {
 	ObjectIdentity::Flags default_flags;
 
 	/*! \brief Constructor */
-	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false);
+	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false, bool dynamicWeak = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();

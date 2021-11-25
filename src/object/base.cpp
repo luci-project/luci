@@ -92,7 +92,8 @@ bool Object::has_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, con
 	if (tmp) {
 		assert(tmp->valid());
 		assert(tmp->bind() != Elf::STB_LOCAL); // should not be returned
-		bool strong = tmp->bind() != Elf::STB_WEAK;
+		// Weak dynamic linkage is only taken into account, if file.loader.dynamic_weak is set. Otherwise it is always strong.
+		bool strong = tmp->bind() != Elf::STB_WEAK || !file.loader.dynamic_weak;
 		if (strong || !result) {
 			result = tmp;
 			return strong;
