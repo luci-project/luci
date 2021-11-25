@@ -335,7 +335,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 		o->status = Object::STATUS_PREPARED;
 	}
 
-	LOG_INFO << "Successfully loaded " << path << " with base " << o->base << endl;
+	LOG_INFO << "Successfully loaded " << path << " with base " << (void*)(o->base) << endl;
 
 	// Initialize GLIBC specific stuff
 	base = o->base;

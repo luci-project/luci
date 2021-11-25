@@ -32,7 +32,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
 	if (position_independent) {
 		// Base is not defined, hence
 		this->base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
-		LOG_DEBUG << "Set Base of " << file.filename << " to " << this->base << endl;
+		LOG_DEBUG << "Set Base of " << file.filename << " to " << (void*)(this->base) << endl;
 	}
 }
 
