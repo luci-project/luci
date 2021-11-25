@@ -82,7 +82,7 @@ struct ObjectDynamic : public ObjectExecutable {
 
 		for (auto & v : version_definition)
 			if (v.version_index() == index && !v.base())
-				return  VersionedSymbol::Version{v.auxiliary()[0].name(), v.hash(), v.weak()};
+				return  VersionedSymbol::Version{v.auxiliary().at(0).name(), v.hash(), v.weak()};
 
 		return VersionedSymbol::Version{false};
 	}

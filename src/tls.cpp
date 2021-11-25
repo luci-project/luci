@@ -108,9 +108,9 @@ Thread * TLS::allocate(Thread * thread, bool set_fs) {
 	if (set_fs) {
 		auto set_fs = Syscall::arch_prctl(ARCH_SET_FS, reinterpret_cast<uintptr_t>(thread));
 		if (set_fs.success()) {
-			LOG_INFO << "Changed %fs of " << Syscall::gettid() << " to " << (void*)thread << endl;
+			LOG_INFO << "Changed %fs of ThreadID " << Syscall::gettid() << " to " << (void*)thread << endl;
 		} else {
-			LOG_WARNING << "Changing %fs of " << Syscall::gettid() << " to " << (void*)thread << " failed: " << set_fs.error_message() << endl;
+			LOG_WARNING << "Changing %fs of ThreadID " << Syscall::gettid() << " to " << (void*)thread << " failed: " << set_fs.error_message() << endl;
 		}
 	}
 

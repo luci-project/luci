@@ -53,16 +53,26 @@ for TEST in * ; do
 			exit 1
 		fi
 
+		# (Re)Set environment variables
 		export LD_NAME
 		export LD_PATH
 		export LD_LIBRARY_CONF
+		export LD_LOGLEVEL=6
 
-		LD_LOGLEVEL=6 ${TEST}/${EXEC}
 
 		# Execute and capture stdout + stderr
 		STDOUT=$(mktemp)
 		STDERR=$(mktemp)
-		"${TEST}/${EXEC}" >"$STDOUT" 2>"$STDERR"
+		if ! "${TEST}/${EXEC}" >"$STDOUT" 2>"$STDERR" ; then
+			EXITCODE=$?
+			echo "Execution of (${TEST}/${EXEC}) failed with exit code ${EXITCODE}" >&2
+			echo -e "\e[4mstdout\e[0m" >&2
+			cat "$STDOUT" >&2
+			echo -e "\n\e[4mstderr\e[0m" >&2
+			cat "$STDERR" >&2
+			rm "$STDOUT" "$STDERR"
+			exit ${EXITCODE}
+		fi
 
 		# Compare stdout + stderr with example
 		check "${TEST}/.stdout" < "$STDOUT"

@@ -16,7 +16,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
     version_needed{dynamic_table.get_version_needed()},
     version_definition{dynamic_table.get_version_definition()} {
 	// Set Globale Offset Table Pointer
-	auto got = dynamic_table[Elf::DT_PLTGOT];
+	auto got = dynamic_table.at(Elf::DT_PLTGOT);
 	if (got.valid() && got.tag() == Elf::DT_PLTGOT)
 		global_offset_table = got.value();
 
@@ -40,7 +40,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
 	// It is possible that multiple threads try to access an unresolved function, hence we have to use a mutex
 	file.loader.mutex.lock();
-	auto r = relocate(dynamic_relocations_plt[index], file.flags.bind_not == 0);
+	auto r = relocate(dynamic_relocations_plt.at(index), file.flags.bind_not == 0);
 	file.loader.mutex.unlock();
 	return r;
 }
@@ -113,7 +113,7 @@ bool ObjectDynamic::fix() {
 }
 
 bool ObjectDynamic::prepare() {
-	LOG_INFO << "Prepare " << *this << " with " << global_offset_table << endl;
+	LOG_INFO << "Prepare " << *this << " with " << (void*)global_offset_table << endl;
 	bool success = true;
 
 	// Perform initial relocations
@@ -232,7 +232,7 @@ bool ObjectDynamic::patchable() const {
 Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version) const {
 	auto found = dynamic_symbols.index(name, hash, gnu_hash, version_index(version));
 	if (found != Elf::STN_UNDEF) {
-		auto naked_sym = dynamic_symbols[found];
+		auto naked_sym = dynamic_symbols.at(found);
 /*
 		// In case we have multiple versions, check if it is mapped here or delegate to previous version (required for partial update)
 		if (file.loader.dynamic_update && file_previous != nullptr) {
