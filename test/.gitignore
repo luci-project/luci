@@ -1,2 +1,5 @@
 */run
+*.o
+*.a
+*.so
 libpath.conf

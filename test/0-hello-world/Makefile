@@ -8,4 +8,4 @@ SOURCE = hw.c
 
 
 $(EXEC): $(SOURCE)
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $^

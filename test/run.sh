@@ -58,6 +58,7 @@ for TEST in * ; do
 		export LD_PATH
 		export LD_LIBRARY_CONF
 		export LD_LOGLEVEL=6
+		export LD_LIBRARY_PATH=${TEST}
 
 
 		# Execute and capture stdout + stderr

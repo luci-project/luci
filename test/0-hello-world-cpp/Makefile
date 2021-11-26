@@ -8,4 +8,4 @@ SOURCE = hw.cpp
 
 
 $(EXEC): $(SOURCE)
-	$(CXX) $(CXXFLAGS) -o $@ $<
+	$(CXX) $(CXXFLAGS) -o $@ $^
