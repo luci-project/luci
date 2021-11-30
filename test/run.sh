@@ -1,11 +1,47 @@
 #!/bin/bash
 set -euo pipefail
 
-if [ $# -ge 1 ] ; then
-	COMPILER=$1
-else
-	COMPILER="GCC"
-fi
+# Default values
+COMPILER="GCC"
+LD_NAME="Luci"
+DEBUG_OUTPUT=false
+LD_LOGLEVEL=3
+LD_DYNAMIC_UPDATE=0
+EXEC="run"
+
+
+# Options
+while getopts "c:dhl:u" OPT; do
+	case "${OPT}" in
+		s)
+			COMPILER=${OPTARG}
+			;;
+		d)
+			DEBUG_OUTPUT=true
+			;;
+		l)
+			LD_LOGLEVEL=${OPTARG}
+			;;
+		u)
+			LD_DYNAMIC_UPDATE=1
+			;;
+		*)
+			echo "$0 [-c COMPILER] [-l LOGLEVEL] [-u] [TESTS]" >&2
+			echo >&2
+			echo "Parameters:" >&2
+			echo "	-c COMPILER  Use 'GCC' (default) or 'LLVM'" >&2
+			echo "	-l LOGLEVEL  Specify log level (default: 3)" >&2
+			echo "	-d           Debug: Print output" >&2
+			echo "	-h           Show this help" >&2
+			echo "	-u           Enable dynamic updates (disabled by default)" >&2
+			echo >&2
+			echo "If no TESTS are specified, alle tests in the directory are checked." >&2
+			exit 0
+			;;
+	esac
+done
+shift $((OPTIND-1))
+
 case $COMPILER in
 	GCC)
 		export CC=gcc
@@ -21,6 +57,11 @@ case $COMPILER in
 		;;
 esac
 
+TESTS="*"
+if [ $# -gt 0 ] ; then
+	TESTS=$@
+fi
+
 source /etc/os-release
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null
@@ -35,7 +76,6 @@ case $(uname -m) in
 		;;
 esac
 
-LD_NAME="Luci"
 # Check dynamic linker/loader
 LD_PATH="$(readlink -f "../ld-${LD_NAME,,}-${ID,,}-${VERSION_CODENAME,,}-${PLATFORM,,}.so")"
 if [ ! -x "${LD_PATH}" ] ; then
@@ -47,8 +87,11 @@ LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
 ../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF"
 
 
-echo -e "\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM}) with ${COMPILER}\e[0m"
+echo -e "\n\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM}) with ${COMPILER}\e[0m"
 echo "using ${LD_PATH}"
+if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
+	echo "with dynamic updates enabled"
+fi
 
 function check() {
 	if [ -f "$1" ] ; then
@@ -71,8 +114,8 @@ function skip() {
 	return 1
 }
 
-EXEC="run"
-for TEST in * ; do
+
+for TEST in ${TESTS} ; do
 	if [ -d "${TEST}" ] ; then
 		# Check if we should skip depending on variables
 		if skip "${TEST}" ; then
@@ -94,14 +137,22 @@ for TEST in * ; do
 		export LD_NAME
 		export LD_PATH
 		export LD_LIBRARY_CONF
-		export LD_LOGLEVEL=6
+		export LD_LOGLEVEL
+		export LD_DYNAMIC_UPDATE
 		export LD_LIBRARY_PATH=${TEST}
 
 
 		# Execute and capture stdout + stderr
 		STDOUT=$(mktemp)
 		STDERR=$(mktemp)
-		if ! "${TEST}/${EXEC}" >"$STDOUT" 2>"$STDERR" ; then
+		if ${DEBUG_OUTPUT} ; then
+			if ! "${TEST}/${EXEC}" 2> >(tee "$STDERR" >/dev/tty) > >(tee "$STDOUT" >/dev/tty) ; then
+				EXITCODE=$?
+				echo "Execution of (${TEST}/${EXEC}) failed with exit code ${EXITCODE}" >&2
+				rm "$STDOUT" "$STDERR"
+				exit ${EXITCODE}
+			fi
+		elif ! "${TEST}/${EXEC}" 2>"$STDERR" >"$STDOUT" ; then
 			EXITCODE=$?
 			echo "Execution of (${TEST}/${EXEC}) failed with exit code ${EXITCODE}" >&2
 			echo -e "\e[4mstdout\e[0m" >&2

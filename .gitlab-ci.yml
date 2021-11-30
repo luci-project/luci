@@ -21,7 +21,8 @@ test-debian-stretch-gcc:
   before_script:
     - apt-get update && apt-get install -y gcc g++ make
   script:
-    - ./test/run.sh GCC
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
 
 test-ubuntu-focal-gcc:
   image: ubuntu:focal
@@ -31,7 +32,8 @@ test-ubuntu-focal-gcc:
   before_script:
     - apt-get update && apt-get install -y gcc g++ make
   script:
-    - ./test/run.sh GCC
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
 
 test-debian-stretch-llvm:
   image: debian:stretch
@@ -41,7 +43,8 @@ test-debian-stretch-llvm:
   before_script:
     - apt-get update && apt-get install -y clang make
   script:
-    - ./test/run.sh LLVM
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
 
 test-ubuntu-focal-llvm:
   image: ubuntu:focal
@@ -51,4 +54,5 @@ test-ubuntu-focal-llvm:
   before_script:
     - apt-get update && apt-get install -y clang make
   script:
-    - ./test/run.sh LLVM
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
