@@ -1,0 +1,4 @@
+pre->child = 23
+pre->parent = 42
+post->child = -23
+post->parent = -42

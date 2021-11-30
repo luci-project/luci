@@ -1,0 +1,6 @@
+shared->init = 1337
+shared->child = 23
+shared->parent = 42
+private->init = -1337
+private->child = 0
+private->parent = -42

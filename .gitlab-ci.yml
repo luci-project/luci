@@ -13,22 +13,42 @@ build:
     paths:
       - "ld-luci-*.so"
 
-test-debian-stretch:
+test-debian-stretch-gcc:
   image: debian:stretch
   stage: test
-  dependencies: 
+  dependencies:
     - build
   before_script:
-    - apt-get update && apt-get install -y g++ make
+    - apt-get update && apt-get install -y gcc g++ make
   script:
-    - ./test/run.sh
+    - ./test/run.sh GCC
 
-test-ubuntu-focal:
+test-ubuntu-focal-gcc:
   image: ubuntu:focal
   stage: test
-  dependencies: 
+  dependencies:
     - build
   before_script:
-    - apt-get update && apt-get install -y g++ make
+    - apt-get update && apt-get install -y gcc g++ make
   script:
-    - ./test/run.sh
+    - ./test/run.sh GCC
+
+test-debian-stretch-llvm:
+  image: debian:stretch
+  stage: test
+  dependencies:
+    - build
+  before_script:
+    - apt-get update && apt-get install -y clang make
+  script:
+    - ./test/run.sh LLVM
+
+test-ubuntu-focal-llvm:
+  image: ubuntu:focal
+  stage: test
+  dependencies:
+    - build
+  before_script:
+    - apt-get update && apt-get install -y clang make
+  script:
+    - ./test/run.sh LLVM

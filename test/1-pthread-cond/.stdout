@@ -1,0 +1,11 @@
+foo: mutex locking...
+foo: mutex locked
+foo: waiting on condition variable
+main: mutex locking...
+main: mutex locked
+bar: mutex locking...
+main: mutex unlock
+bar: mutex locked
+bar: signaling condition variable
+bar: mutex unlock
+foo: mutex unlock

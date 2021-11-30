@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lib.h"
+#include "extern.h"
 
 int main() {
 	if (lorem_ipsum() != 23)

@@ -1,1 +1,0 @@
-../0-static-library/lib.h

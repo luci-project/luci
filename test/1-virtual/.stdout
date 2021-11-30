@@ -1,0 +1,25 @@
+1:
+base base 0
+derived base 65
+derived base 65
+derived derived 65
+base base 0
+
+A base 23
+derived base 65
+derived base 65
+derived derived 65
+A base 23
+
+B B 42
+derived B 65
+derived B 65
+derived derived 65
+B base 42
+
+derived derived 65
+derived derived 65
+derived derived 65
+derived derived 65
+derived base 65
+

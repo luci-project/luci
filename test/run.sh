@@ -1,6 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
+if [ $# -ge 1 ] ; then
+	COMPILER=$1
+else
+	COMPILER="GCC"
+fi
+case $COMPILER in
+	GCC)
+		export CC=gcc
+		export CXX=g++
+		;;
+	LLVM)
+		export CC=clang
+		export CXX=clang++
+		;;
+	*)
+		echo "Unsupported compiler ${COMPILER}" >&2
+		exit 1
+		;;
+esac
+
 source /etc/os-release
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null
@@ -27,7 +47,7 @@ LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
 ../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF"
 
 
-echo -e "\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM})\e[0m"
+echo -e "\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM}) with ${COMPILER}\e[0m"
 echo "using ${LD_PATH}"
 
 function check() {
