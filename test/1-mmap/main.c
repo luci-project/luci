@@ -1,8 +1,10 @@
 #define _GNU_SOURCE
+#include <fcntl.h>
 #include <stdio.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 struct Data {
@@ -10,8 +12,14 @@ struct Data {
 };
 
 int main() {
-
+#ifdef HAVE_MEMFD_CREATE
+	fprintf(stderr, "using memfd_create\n");
 	int memfd = memfd_create("mmaptest", MFD_CLOEXEC);
+#else
+	const char * memfile = "/tmp/mmaptest";
+	fprintf(stderr, "using regular file at '%s'\n", memfile);
+	int memfd = open(memfile, O_CREAT | O_RDWR | O_CLOEXEC | O_TRUNC, S_IRUSR | S_IWUSR);
+#endif
 	if (memfd == -1) {
 		perror("memfd");
 		return 1;
@@ -90,6 +98,5 @@ int main() {
 		perror("close");
 		return 1;
 	}
-
 	return 0;
 }
