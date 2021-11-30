@@ -61,10 +61,27 @@ function check() {
 	fi
 }
 
+function skip() {
+	SKIP=".skip"
+	for SKIPTEST in $1/${SKIP}{,-${ID,,}}{,-${VERSION_CODENAME}}{,-${PLATFORM}}{,-${COMPILER,,}} ; do
+		if [ -f "${SKIPTEST}" ] ; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 EXEC="run"
 for TEST in * ; do
 	if [ -d "${TEST}" ] ; then
+		# Check if we should skip depending on variables
+		if skip "${TEST}" ; then
+			echo -e "\n(skipping test ${TEST})" >&2
+			continue
+		fi
+
 		echo -e "\n\e[1mTest ${TEST}\e[0m"
+
 		# Build
 		test -f "${TEST}/Makefile" &&  make LD_PATH="${LD_PATH}" EXEC="${EXEC}" -B -s -C "${TEST}"
 		# Check executable
