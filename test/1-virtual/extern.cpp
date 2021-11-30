@@ -3,7 +3,9 @@
 #include "extern.h"
 
 struct Base {
-	int foo = 0;
+	int foo;
+
+	Base() : foo(0) {}
 
 	virtual const char * bar() {
 		return  "base";
@@ -15,9 +17,9 @@ struct Base {
 };
 
 struct A : virtual Base {
-	int a = 23;
+	int a;
 
-	A() {
+	A() : a(23) {
 		foo = a;
 	}
 
@@ -27,9 +29,9 @@ struct A : virtual Base {
 };
 
 struct B : virtual Base {
-	int b = 42;
+	int b;
 
-	B() {
+	B() : b(42) {
 		foo = b;
 	}
 
