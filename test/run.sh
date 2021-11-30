@@ -13,7 +13,7 @@ EXEC="run"
 # Options
 while getopts "c:dhl:u" OPT; do
 	case "${OPT}" in
-		s)
+		c)
 			COMPILER=${OPTARG}
 			;;
 		d)
