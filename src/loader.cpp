@@ -124,6 +124,9 @@ void Loader::observer() {
 				LOG_WARNING << "Notification event queue overflow!" << endl;
 			}
 			if (event->wd != -1) {
+				// TODO: 1 second delay is just a very dirty hack (in case of symlink delete - create)
+				Syscall::sleep(1);
+
 				// Get Object
 				mutex.lock();
 				for (auto & object_file : lookup)
