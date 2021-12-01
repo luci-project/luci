@@ -1,6 +1,7 @@
 */run
+*/run-*
 a.out
 *.o
-*.a
-*.so
+lib*.a
+lib*.so
 libpath.conf

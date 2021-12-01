@@ -1,11 +1,12 @@
-LD_PATH ?= /lib64/ld-linux-x86-64.so.2
+OPTLEVEL ?= 2
+CXXFLAGS += -O$(OPTLEVEL) -g -Wall
 
-CXX ?= g++
-CXXFLAGS ?= -O2 -g -Wall -Wl,--dynamic-linker=$(LD_PATH)
+ifdef LD_PATH
+	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
+endif
 
 EXEC ?= run
-SOURCE = hw.cpp
-
+SOURCE = $(wildcard *.cpp)
 
 $(EXEC): $(SOURCE)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^

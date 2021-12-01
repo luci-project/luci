@@ -1,11 +1,12 @@
-LD_PATH ?= /lib64/ld-linux-x86-64.so.2
+OPTLEVEL ?= 2
+CFLAGS += -O$(OPTLEVEL) -g -Wall
 
-CC ?= gcc
-CFLAGS ?= -O2 -g -Wall -Wl,--dynamic-linker=$(LD_PATH)
+ifdef LD_PATH
+	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
+endif
 
 EXEC ?= run
-SOURCE = hw.c
-
+SOURCE = $(wildcard *.c)
 
 $(EXEC): $(SOURCE)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^

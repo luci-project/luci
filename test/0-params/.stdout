@@ -1,0 +1,9 @@
+This program was called with 7. arguments:
+ - the 1. argument is '-f'
+ - the 2. argument is 'oo'
+ - the 3. argument is '--bar'
+ - the 4. argument is '23'
+ - the 5. argument is 'Baz !'
+ - the 6. argument is '?'
+The environment variable 'PARAM_TEST_NAME' is set to 'Pneumonoultramicroscopicsilicovolcanoconiosis'
+The auxilary vector of type 'AT_PHENT' is set to 56

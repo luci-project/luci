@@ -1,8 +1,9 @@
-LD_PATH ?= /lib64/ld-linux-x86-64.so.2
+OPTLEVEL ?= 2
+CFLAGS += -O$(OPTLEVEL) -g -Wall -fPIC
 
-CC ?= gcc
-CFLAGS ?= -O2 -g -Wall -fPIC
-LDFLAGS ?= -Wl,--dynamic-linker=$(LD_PATH)
+ifdef LD_PATH
+	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
+endif
 
 EXEC ?= run
 LIBS ?= extern nested

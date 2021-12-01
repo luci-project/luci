@@ -91,22 +91,28 @@ echo -e "\n\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM}) with 
 echo "using ${LD_PATH}"
 if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
 	echo "with dynamic updates enabled"
+	UPDATEFLAG='update'
+else
+	UPDATEFLAG='static'
 fi
 
 function check() {
-	if [ -f "$1" ] ; then
-		echo "Checking $1" ;
-		if [ -x "$1" ] ; then
-			"./$1"
-		else
-			diff -B -w -u "$1" -
+	for file in $1{-${ID,,},}{-${VERSION_CODENAME},}{-${PLATFORM},}{-${COMPILER,,},}{-${UPDATEFLAG},} ; do
+		if [ -f "$file" ] ; then
+			echo "Checking $file" ;
+			if [ -x "$file" ] ; then
+				"./$file"
+			else
+				diff -B -w -u "$file" -
+			fi
+			return
 		fi
-	fi
+	done
 }
 
 function skip() {
 	SKIP=".skip"
-	for SKIPTEST in $1/${SKIP}{,-${ID,,}}{,-${VERSION_CODENAME}}{,-${PLATFORM}}{,-${COMPILER,,}} ; do
+	for SKIPTEST in $1/${SKIP}{,-${ID,,}}{,-${VERSION_CODENAME}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}} ; do
 		if [ -f "${SKIPTEST}" ] ; then
 			return 0
 		fi
@@ -115,6 +121,7 @@ function skip() {
 }
 
 
+TESTDIR="$(pwd)"
 for TEST in ${TESTS} ; do
 	if [ -d "${TEST}" ] ; then
 		# Check if we should skip depending on variables
@@ -139,22 +146,24 @@ for TEST in ${TESTS} ; do
 		export LD_LIBRARY_CONF
 		export LD_LOGLEVEL
 		export LD_DYNAMIC_UPDATE
-		export LD_LIBRARY_PATH=${TEST}
+		export LD_LIBRARY_PATH=$(readlink -f "${TEST}")
 
 
 		# Execute and capture stdout + stderr
 		STDOUT=$(mktemp)
 		STDERR=$(mktemp)
+
+		cd "${TEST}"
 		if ${DEBUG_OUTPUT} ; then
-			if ! "${TEST}/${EXEC}" 2> >(tee "$STDERR" >/dev/tty) > >(tee "$STDOUT" >/dev/tty) ; then
+			if ! stdbuf -oL -eL "./${EXEC}" 2> >(tee "$STDERR" >/dev/tty) > >(tee "$STDOUT" >/dev/tty) ; then
 				EXITCODE=$?
-				echo "Execution of (${TEST}/${EXEC}) failed with exit code ${EXITCODE}" >&2
+				echo "Execution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE}" >&2
 				rm "$STDOUT" "$STDERR"
 				exit ${EXITCODE}
 			fi
-		elif ! "${TEST}/${EXEC}" 2>"$STDERR" >"$STDOUT" ; then
+		elif ! "./${EXEC}" 2>"$STDERR" >"$STDOUT" ; then
 			EXITCODE=$?
-			echo "Execution of (${TEST}/${EXEC}) failed with exit code ${EXITCODE}" >&2
+			echo "Execution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE}" >&2
 			echo -e "\e[4mstdout\e[0m" >&2
 			cat "$STDOUT" >&2
 			echo -e "\n\e[4mstderr\e[0m" >&2
@@ -162,6 +171,7 @@ for TEST in ${TESTS} ; do
 			rm "$STDOUT" "$STDERR"
 			exit ${EXITCODE}
 		fi
+		cd "${TESTDIR}"
 
 		# Compare stdout + stderr with example
 		check "${TEST}/.stdout" < "$STDOUT"

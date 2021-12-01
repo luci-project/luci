@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include "answer.h"
 
@@ -8,7 +9,6 @@ const int buf_len = 10;
 
 static bool ask() {
 	puts("What is the answer to life the universe and everything?");
-
 
 	char a[buf_len];
 	if (answer(a, 10) > 0) {
@@ -21,7 +21,13 @@ static bool ask() {
 }
 
 int main() {
-	bool result = ask();
-	
-	return result ? EXIT_SUCCESS : EXIT_FAILURE;
+	sleep(2);
+	for (int i = 0; i < 3; i++) {
+		printf("Question %d: ", i);
+		bool answered = ask();
+		puts(answered ? "Ok!" : "What?");
+		sleep(4);
+	}
+
+	return 0;
 }
