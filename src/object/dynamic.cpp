@@ -163,7 +163,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 		VersionedSymbol need_symbol(dynamic_symbols[need_symbol_index], get_version(need_symbol_version_index));
 		// COPY Relocations have a defined symbol with the same name
 		Loader::ResolveSymbolMode mode = relocator.is_copy() ? Loader::RESOLVE_EXCEPT_OBJECT : (file.flags.bind_deep == 1 ? Loader::RESOLVE_OBJECT_FIRST : Loader::RESOLVE_DEFAULT);
-		if (auto symbol =  file.loader.resolve_symbol(need_symbol, file.ns, &file, mode)) {
+		if (auto symbol = file.loader.resolve_symbol(need_symbol, file.ns, &file, mode)) {
 			relocations.emplace_back(reloc, symbol.value());
 			auto & symobj = symbol->object();
 			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << endl;

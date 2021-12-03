@@ -11,8 +11,7 @@ EXEC ?= run
 LIB ?= extern
 
 $(EXEC): main.c lib$(LIB).so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< -L$(LIBDIR) -l$(LIB)
+	$(CC) $(CFLAGS) -o $@ $< -L$(LIBDIR) -l$(LIB) $(LDFLAGS)
 
 lib%.so: %.c
-	$(CC) $(CFLAGS) -fPIC -shared -o $@ $<
-	readelf -D -s "$@" | grep " localized" | grep " IFUNC " > /dev/null
+	$(CC) $(CFLAGS) -shared -o $@ $<

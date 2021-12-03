@@ -8,11 +8,10 @@ ifdef LD_PATH
 endif
 
 EXEC ?= run
-LIB ?= extern
+LIBS ?= one two three four five
 
-$(EXEC): main.c lib$(LIB).so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< -L$(LIBDIR) -l$(LIB)
+$(EXEC): main.c $(addsuffix .so,$(addprefix lib,$(LIBS)))
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -L$(LIBDIR) -l$(word 1,$(LIBS))
 
 lib%.so: %.c
 	$(CC) $(CFLAGS) -fPIC -shared -o $@ $<
-	readelf -D -s "$@" | grep " localized" | grep " IFUNC " > /dev/null

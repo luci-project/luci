@@ -1,5 +1,7 @@
 OPTLEVEL ?= 2
 CFLAGS += -O$(OPTLEVEL) -g -Wall
+LIBDIR = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+LDFLAGS ?= -Wl,-rpath=$(LIBDIR) -ldl
 
 ifdef LD_PATH
 	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
@@ -17,7 +19,7 @@ $(EXEC): $(BIN) $(SHARED_LIBS)
 	@chmod +x $@
 
 $(BIN): question.c lib$(LIB).so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< -L. -l$(LIB)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< -L$(LIBDIR) -l$(LIB)
 
 lib%.so: $(SHARED_LIBS)
 	ln -f -s $< $@

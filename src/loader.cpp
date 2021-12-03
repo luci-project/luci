@@ -151,6 +151,7 @@ void Loader::observer() {
 
 
 ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags flags, const Vector<const char *> & rpath, const Vector<const char *> & runpath, namespace_t ns, bool load) {
+	assert(filename != nullptr);
 	StrPtr path(filename);
 	auto name = path.find_last('/');
 	if (ns != NAMESPACE_NEW)
@@ -217,7 +218,7 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 }
 
 ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, namespace_t ns, bool load) {
-	auto o = library(file, flags, {}, {}, ns, load);
+	ObjectIdentity * o = file == nullptr ? target : library(file, flags, {}, {}, ns, load);
 	if (o != nullptr) {
 		// Update flags
 		o->flags.bind_now = flags.bind_now;  // TODO: if change to true, resolve all relocations
@@ -225,13 +226,13 @@ ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, 
 		o->flags.bind_deep = flags.bind_deep;
 		o->flags.persistent = flags.persistent;
 
-		if (!o->prepare()) {
+		if (load && !o->prepare()) {
 			LOG_WARNING << "Preparation of " << o << " failed!" << endl;
 			o = nullptr;
 		}
 	}
 
-	if (o != nullptr && !o->initialize()){
+	if (load && o != nullptr && !o->initialize()) {
 		LOG_WARNING << "Initialization of " << o << " failed!" << endl;
 		o = nullptr;
 	}
@@ -299,6 +300,7 @@ bool Loader::prepare() {
 
 bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer, size_t stack_size) {
 	assert(file != nullptr);
+	target = file;
 	Object * start = file->current;
 	assert(start != nullptr);
 	assert(start->file_previous == nullptr);
@@ -342,6 +344,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 
 bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	assert(file != nullptr);
+	target = file;
 	Object * start = file->current;
 	assert(start != nullptr);
 	assert(start->file_previous == nullptr);

@@ -178,7 +178,18 @@ static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, con
 	}
 
 	if (r && r->valid()) {
-		return reinterpret_cast<void*>(r->object().base + r->value());
+		void * fptr = reinterpret_cast<void*>(r->object().base + r->value());
+		// Handle ifunc
+		if (r->type() == Elf::STT_GNU_IFUNC) {
+			typedef void* (*indirect_t)();
+			indirect_t func = reinterpret_cast<indirect_t>(fptr);
+			void* target = func();
+			LOG_TRACE << "Symbol " << symbol << " = ifunc " << fptr << " --> " << target << endl;
+			return target;
+		} else {
+			LOG_TRACE << "Symbol " << symbol << " --> " << fptr << endl;
+			return fptr;
+		}
 	} else {
 		error_msg = "Symbol not found!";
 		LOG_WARNING << "dl[v]sym for " << symbol << " failed: " << error_msg << endl;

@@ -36,6 +36,9 @@ struct Loader {
 	/*! \brief loader object */
 	ObjectIdentity * self;
 
+	/*! \brief object for main program */
+	ObjectIdentity * target = nullptr;
+
 	/*! \brief mutex */
 	mutable Mutex mutex;
 

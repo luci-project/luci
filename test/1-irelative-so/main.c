@@ -2,8 +2,8 @@
 
 #include "extern.h"
 
-enum LANG language = NO;
+enum LANG language = ES;
 
 int main() {
-	printf("%s!\n", localized());
+	printlang();
 }

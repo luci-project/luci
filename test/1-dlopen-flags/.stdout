@@ -1,0 +1,116 @@
+
+Loaded with library 'one'
+_alpha: one:_alpha!
+_beta: one:_beta!
+_gamma: one:_gamma!
+_delta: one:_delta -> one:_alpha!
+_epsilon: one:_epsilon -> one:_beta!
+_zeta: one:_zeta -> one:_gamma!
+(no _eta)
+_theta: main:_theta -> one:_gamma!
+(no _iota)
+(no _kappa)
+_lambda: main:_lambda -> main:_theta -> one:_gamma!
+
+Default symbols:
+_alpha: one:_alpha!
+_beta: one:_beta!
+_gamma: one:_gamma!
+_delta: one:_delta -> one:_alpha!
+_epsilon: one:_epsilon -> one:_beta!
+_zeta: one:_zeta -> one:_gamma!
+(no _eta)
+(no _theta)
+(no _iota)
+(no _kappa)
+(no _lambda)
+
+Dynamically loaded libtwo.so
+two_delta: two:_delta -> one:_alpha!
+two_eta: two:_eta -> one:_delta -> one:_alpha!
+
+Default symbols:
+_alpha: one:_alpha!
+_beta: one:_beta!
+_gamma: one:_gamma!
+_delta: one:_delta -> one:_alpha!
+_epsilon: one:_epsilon -> one:_beta!
+_zeta: one:_zeta -> one:_gamma!
+(no _eta)
+(no _theta)
+(no _iota)
+(no _kappa)
+(no _lambda)
+
+Dynamically loaded libthree.so
+three_delta: three:_delta -> one:_alpha!
+three_eta: three:_eta -> one:_delta -> one:_alpha!
+
+Default symbols:
+_alpha: one:_alpha!
+_beta: one:_beta!
+_gamma: one:_gamma!
+_delta: one:_delta -> one:_alpha!
+_epsilon: one:_epsilon -> one:_beta!
+_zeta: one:_zeta -> one:_gamma!
+(no _eta)
+(no _theta)
+(no _iota)
+(no _kappa)
+(no _lambda)
+libthree.so is already loaded.
+
+Default symbols:
+_alpha: one:_alpha!
+_beta: one:_beta!
+_gamma: one:_gamma!
+_delta: one:_delta -> one:_alpha!
+_epsilon: one:_epsilon -> one:_beta!
+_zeta: one:_zeta -> one:_gamma!
+_eta: three:_eta -> one:_delta -> one:_alpha!
+_theta: three:_theta -> one:_epsilon -> one:_beta!
+(no _iota)
+(no _kappa)
+(no _lambda)
+
+Dynamically loaded libfour.so
+four_delta: four:_delta -> one:_alpha!
+four_eta: four:_eta -> four:_delta -> one:_alpha!
+four_iota: four:_iota -> four:_zeta -> one:_gamma!
+
+Default symbols:
+_alpha: one:_alpha!
+_beta: one:_beta!
+_gamma: one:_gamma!
+_delta: one:_delta -> one:_alpha!
+_epsilon: one:_epsilon -> one:_beta!
+_zeta: one:_zeta -> one:_gamma!
+_eta: three:_eta -> one:_delta -> one:_alpha!
+_theta: three:_theta -> one:_epsilon -> one:_beta!
+(no _iota)
+(no _kappa)
+(no _lambda)
+
+Checking libs:
+libone.so is already loaded.
+libtwo.so is already loaded.
+libthree.so is already loaded.
+libfour.so is already loaded.
+libfive.so is not loaded (yet).
+
+Dynamically loaded libfive.so
+five_eta: five:_eta -> one:_delta -> one:_alpha!
+five_iota: five:_iota -> five:_zeta -> one:_gamma!
+
+Default symbols:
+_alpha: one:_alpha!
+_beta: one:_beta!
+_gamma: one:_gamma!
+_delta: one:_delta -> one:_alpha!
+_epsilon: one:_epsilon -> one:_beta!
+_zeta: one:_zeta -> one:_gamma!
+_eta: three:_eta -> one:_delta -> one:_alpha!
+_theta: three:_theta -> one:_epsilon -> one:_beta!
+_iota: five:_iota -> five:_zeta -> one:_gamma!
+_kappa: five:_kappa -> five:_eta -> one:_delta -> one:_alpha!
+(no _lambda)
