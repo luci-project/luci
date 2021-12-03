@@ -41,7 +41,9 @@ test-debian-stretch-llvm:
   dependencies:
     - build
   before_script:
-    - apt-get update && apt-get install -y clang make
+    - apt-get update && apt-get install -y clang-11 make
+    - update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
+    - update-alternatives --install /usr/bin/cc cc /usr/bin/clang 110 --slave /usr/bin/c++ c++ /usr/bin/clang++
   script:
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u

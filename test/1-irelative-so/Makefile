@@ -1,5 +1,5 @@
 OPTLEVEL ?= 0
-CFLAGS += -O$(OPTLEVEL) -g -Wall
+CFLAGS += -O$(OPTLEVEL) -g -Wall -Wno-unused-function
 LIBDIR = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 LDFLAGS ?= -Wl,-rpath=$(LIBDIR) -ldl
 

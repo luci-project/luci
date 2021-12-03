@@ -35,8 +35,12 @@ static const char * (* resolve(void))(void) {
 }
 
 // Generate relocation with type IRELATIVE
-static const char * localized(void) __attribute__((noinline,ifunc("resolve")));
+static const char * localized(void) __attribute__((ifunc("resolve")));
 
 void printlang() {
 	puts(localized());
+}
+
+void printflang() {
+	printf("Localized: %s\n", localized());
 }
