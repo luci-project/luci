@@ -38,10 +38,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
 
 
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
-	// It is possible that multiple threads try to access an unresolved function, hence we have to use a mutex
-	file.loader.mutex.lock();
 	auto r = relocate(dynamic_relocations_plt.at(index), file.flags.bind_not == 0);
-	file.loader.mutex.unlock();
 	return r;
 }
 

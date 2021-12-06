@@ -283,6 +283,7 @@ namespace RTLD {
 
 #if defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
 static void * resolve(const Loader & loader, const char * name) {
+	GuardedReader _{loader.lookup_sync};
 	auto sym = loader.resolve_symbol(name);
 	return sym ? reinterpret_cast<void*>(sym->object().base + sym->value()) : nullptr;
 }

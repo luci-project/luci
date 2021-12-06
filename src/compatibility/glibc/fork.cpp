@@ -16,6 +16,9 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
+	// Prevent modifications during fork
+	loader->lookup_sync.read_lock();
+
 	HashMap<int,int> replace_fd;
 	if (loader->dynamic_update) {
 		for (auto & i: loader->lookup)
@@ -35,7 +38,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 	pid_t child = 0;
 	int r = -1;
 	if (auto clone = Syscall::clone(CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | SIGCHLD, 0, NULL, &child, 0)) {
-		if ((r = clone.value()) == 0) {
+		if (clone.success() && (r = clone.value()) == 0) {
 			// Remap
 			int remaps = 0;
 			for (auto & i: loader->lookup)
@@ -64,7 +67,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 				Syscall::close(f.value);
 		}
 	}
-
+	loader->lookup_sync.read_unlock();
 
 #ifndef NO_FPU
 	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );

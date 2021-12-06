@@ -24,6 +24,7 @@ EXPORT ObjectIdentity *_dl_find_dso_for_object(uintptr_t addr) {
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
+	GuardedReader _{loader->lookup_sync};
 	auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
 	if (o != nullptr)
 		return &(o->file);

@@ -4,6 +4,7 @@
 #include <dlh/container/vector.hpp>
 #include <dlh/container/tree.hpp>
 #include <dlh/container/list.hpp>
+#include <dlh/rwlock.hpp>
 #include <dlh/mutex.hpp>
 #include <dlh/thread.hpp>
 
@@ -39,8 +40,8 @@ struct Loader {
 	/*! \brief object for main program */
 	ObjectIdentity * target = nullptr;
 
-	/*! \brief mutex */
-	mutable Mutex mutex;
+	/*! \brief synchronize lookup access */
+	mutable RWLock lookup_sync;
 
 	/*! \brief thread local storage */
 	TLS tls;

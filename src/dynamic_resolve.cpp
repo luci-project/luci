@@ -1,3 +1,6 @@
+#include "dynamic_resolve.hpp"
+
+#include "loader.hpp"
 #include "object/base.hpp"
 
 extern "C" __attribute__((__used__)) void * __dlresolve(const Object & o, size_t index) {
@@ -7,7 +10,13 @@ extern "C" __attribute__((__used__)) void * __dlresolve(const Object & o, size_t
 	alignas(64) uint8_t buf[4096] = {};
 	asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );
 #endif
+	auto loader = Loader::instance();
+	assert(loader != nullptr);
+
+	// It is possible that multiple threads try to access an unresolved function, hence we have to synchronize it
+	loader->lookup_sync.write_lock();
 	auto r = o.dynamic_resolve(index);
+	loader->lookup_sync.write_unlock();
 #ifndef NO_FPU
 	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );
 #endif

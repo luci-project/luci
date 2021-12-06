@@ -41,6 +41,7 @@ EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
 	objflags.persistent = (flags & GLIBC::DL::RTLD_NODELETE) != 0;
 	objflags.bind_deep = (flags & GLIBC::DL::RTLD_DEEPBIND) != 0;
 
+	GuardedWriter _{loader->lookup_sync};
 	auto r = loader->dlopen(filename, objflags, lmid, (flags & GLIBC::DL::RTLD_NOLOAD) == 0);
 	if (r == nullptr) {
 		error_msg = "Unable to open shared object!";
@@ -85,6 +86,7 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
+	GuardedReader _{loader->lookup_sync};
 	auto o = reinterpret_cast<const ObjectIdentity *>(handle);
 	if (!loader->is_loaded(o)) {
 		error_msg = "Invalid handle for dlinfo!";
@@ -129,6 +131,7 @@ EXPORT int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int fla
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
+	GuardedReader _{loader->lookup_sync};
 	auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
 	if (o == nullptr)
 		return 0;
@@ -148,7 +151,6 @@ EXPORT int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int fla
 		info->dli_sname = nullptr;
 		info->dli_saddr = 0;
 	}
-
 	return 1;
 }
 
@@ -161,6 +163,7 @@ static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, con
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
+	GuardedReader _{loader->lookup_sync};
 	Optional<VersionedSymbol> r;
 	if (handle == RTLD_DEFAULT || handle == RTLD_NEXT) {
 		auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(caller));
