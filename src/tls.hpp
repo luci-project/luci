@@ -2,6 +2,7 @@
 
 #include <dlh/log.hpp>
 #include <dlh/math.hpp>
+#include <dlh/mutex.hpp>
 #include <dlh/thread.hpp>
 #include <dlh/syscall.hpp>
 #include <dlh/container/vector.hpp>
@@ -50,6 +51,9 @@ struct TLS {
 	/*! \brief List of modules */
 	Vector<Module> modules;
 
+	/*! \brief Synchronization */
+	Mutex lock;
+
 	/*! \brief Add new module (object) with tls
 	 * \param object Object with TLS
 	 * \param size Size of TLS block in memory
@@ -60,6 +64,7 @@ struct TLS {
 	 * \return module ID of TLS block
 	 */
 	size_t add_module(const ObjectIdentity & object, size_t size, size_t align, uintptr_t image, size_t image_size, intptr_t & offset) {
+		Guarded _{lock};
 		assert(size > 0);
 		if (gen == 0) {
 			initial_count++;
@@ -120,6 +125,8 @@ struct TLS {
 			// Set current generation and size
 			dtv_gen = this->gen;
 		}
+
+		Guarded _{lock};
 
 		// Lazy alloc
 		assert(module_id <= dtv_module_size(thread->dtv));

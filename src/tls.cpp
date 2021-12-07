@@ -19,6 +19,8 @@ void TLS::dtv_setup(Thread * thread) {
 		assert(false);
 	}
 
+	Guarded _{lock};
+
 	// Initialize array
 	uintptr_t start = reinterpret_cast<uintptr_t>(thread);
 	assert(start >= initial_size);
@@ -41,6 +43,8 @@ void TLS::dtv_setup(Thread * thread) {
 }
 
 size_t TLS::dtv_allocate(Thread * thread) {
+	Guarded _{lock};
+
 	size_t new_size = Math::max(modules.size() * 2, 16U);
 	size_t n = new_size + dtv_magic_offset + 1;
 	void * ptr;
@@ -64,6 +68,8 @@ size_t TLS::dtv_allocate(Thread * thread) {
 }
 
 void TLS::dtv_free(Thread * thread) {
+	Guarded _{lock};
+
 	auto count = dtv_module_size(thread->dtv);
 	assert(count >= initial_count);
 	for (size_t i = initial_count; i < count; i++)
