@@ -9,21 +9,24 @@
 #include <dlh/file.hpp>
 #include <dlh/log.hpp>
 
-#include "object/base.hpp"
-#include "compatibility/gdb.hpp"
-#include "compatibility/glibc/rtld/dl.hpp"
 #include "compatibility/glibc/rtld/global.hpp"
+#include "compatibility/glibc/rtld/dl.hpp"
+#include "compatibility/gdb.hpp"
+#include "object/base.hpp"
 #include "process.hpp"
 
+
 static Loader * _instance = nullptr;
+
 
 void* observer_kickoff(void * ptr) {
 	reinterpret_cast<Loader *>(ptr)->observer();
 	return nullptr;
 }
 
-Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, bool dynamicWeak)
- : dynamic_update(dynamicUpdate), dynamic_weak(dynamicWeak), next_namespace(NAMESPACE_BASE + 1) {
+
+Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, bool dynamicDlUpdate, bool dynamicWeak, bool tracing)
+ : dynamic_update(dynamicUpdate), dynamic_dlupdate(dynamicUpdate && dynamicDlUpdate), dynamic_weak(dynamicWeak), tracing(tracing), next_namespace(NAMESPACE_BASE + 1) {
 	default_flags.bind_global = 1;
 
 	if (dynamic_update) {
@@ -69,6 +72,7 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, boo
 	_instance = this;
 }
 
+
 Loader::~Loader() {
 	_instance = nullptr;
 
@@ -82,6 +86,7 @@ Loader::~Loader() {
 
 	lookup.clear();
 }
+
 
 ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags flags, const Vector<const char *> & rpath, const Vector<const char *> & runpath, namespace_t ns, bool load) {
 	assert(filename != nullptr);
@@ -112,6 +117,7 @@ ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags fl
 	return nullptr;
 }
 
+
 ObjectIdentity * Loader::open(const char * filename, const char * directory, ObjectIdentity::Flags flags, namespace_t ns) {
 	auto filename_len = String::len(filename);
 	auto directory_len = String::len(directory);
@@ -122,6 +128,7 @@ ObjectIdentity * Loader::open(const char * filename, const char * directory, Obj
 
 	return open(path, flags, ns);
 }
+
 
 ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags, namespace_t ns, uintptr_t addr, Elf::ehdr_type type) {
 	// Does file contain a valid full path or do we have a memory address?
@@ -150,6 +157,7 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 	return nullptr;
 }
 
+
 ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, namespace_t ns, bool load) {
 	ObjectIdentity * o = file == nullptr ? target : library(file, flags, {}, {}, ns, load);
 	if (o != nullptr) {
@@ -173,6 +181,7 @@ ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, 
 	return o;
 }
 
+
 bool Loader::relocate(bool update) {
 	// Prepare
 	for (auto & o : reverse(lookup))
@@ -180,12 +189,15 @@ bool Loader::relocate(bool update) {
 			return false;
 
 	// Optional: Update relocations
-	if (update)
+	if (update) {
 		// TODO: Unmap if relro
 		for (auto & o : reverse(lookup))
 			if (!o.update())
 				return false;
-
+		// update dlsym trampolines
+		if (dynamic_dlupdate)
+			dlsyms.update();
+	}
 
 	// Protect memory (TODO: for relro)
 	for (auto & o : reverse(lookup))
@@ -194,6 +206,7 @@ bool Loader::relocate(bool update) {
 
 	return true;
 }
+
 
 extern uintptr_t __stack_chk_guard;
 bool Loader::prepare() {
@@ -230,6 +243,7 @@ bool Loader::prepare() {
 
 	return true;
 }
+
 
 bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer, size_t stack_size) {
 	assert(file != nullptr);
@@ -275,6 +289,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	return true;
 }
 
+
 bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	assert(file != nullptr);
 	target = file;
@@ -310,6 +325,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 
 	return true;
 }
+
 
 Optional<VersionedSymbol> Loader::resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version, namespace_t ns, const ObjectIdentity * obj, ResolveSymbolMode mode) const {
 	assert(obj != nullptr || mode == RESOLVE_DEFAULT);
@@ -366,12 +382,14 @@ Optional<VersionedSymbol> Loader::resolve_symbol(const char * name, uint32_t has
 	return best_result;
 }
 
+
 Optional<VersionedSymbol> Loader::resolve_symbol(uintptr_t addr, namespace_t ns) const {
 	auto o = resolve_object(addr, ns);
 	if (o != nullptr)
 		return o->resolve_symbol(addr);
 	return {};
 }
+
 
 Object * Loader::resolve_object(uintptr_t addr, namespace_t ns) const {
 	for (const auto & object_file : lookup)
@@ -382,6 +400,7 @@ Object * Loader::resolve_object(uintptr_t addr, namespace_t ns) const {
 						return o;
 	return nullptr;
 }
+
 
 uintptr_t Loader::next_address() const {
 	uintptr_t start = 0, end = 0, next = 0;
@@ -404,6 +423,7 @@ bool Loader::is_loaded(const ObjectIdentity * ptr) const {
 			return true;
 	return false;
 }
+
 
 Loader * Loader::instance() {
 	/* Callbacks like dladdr cannot determine the current instance theirself - hence we need this function.

@@ -36,8 +36,10 @@ struct VersionedSymbol : Elf::Symbol {
 	} version;
 
 	VersionedSymbol(const Elf::Symbol & sym, const char * version_name = nullptr, bool version_weak = false);
-
+	VersionedSymbol(const Elf::Symbol & sym, const Version & version, uint32_t hash, uint32_t gnu_hash);
 	VersionedSymbol(const Elf::Symbol & sym, const Version & version);
+	VersionedSymbol(const VersionedSymbol & other) = default;
+	VersionedSymbol(VersionedSymbol && other) = default;
 
 	bool operator==(const VersionedSymbol & o) const;
 
@@ -57,7 +59,11 @@ struct VersionedSymbol : Elf::Symbol {
 		return _gnu_hash_value.value();
 	}
 
+	/*! \brief Object this symbol belongs to */
 	const Object & object() const;
+
+	/*! \brief Pointer to target (resolve ifunc) */
+	void * pointer() const;
 
  private:
 	mutable Optional<uint32_t> _hash_value;

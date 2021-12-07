@@ -245,7 +245,7 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const char * name, uint3
 */
 		if (naked_sym.section_index() != SHN_UNDEF && naked_sym.bind() != Elf::STB_LOCAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
 			auto symbol_version_index = dynamic_symbols.version(found);
-			return VersionedSymbol{naked_sym, get_version(symbol_version_index)};
+			return VersionedSymbol{naked_sym, get_version(symbol_version_index), hash, gnu_hash};
 		}
 	}
 	return {};

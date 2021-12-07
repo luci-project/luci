@@ -133,7 +133,7 @@ for TEST in ${TESTS} ; do
 		echo -e "\n\e[1mTest ${TEST}\e[0m"
 
 		# Build
-		test -f "${TEST}/Makefile" &&  make LD_PATH="${LD_PATH}" EXEC="${EXEC}" -B -s -C "${TEST}"
+		test -f "${TEST}/Makefile" && make LD_PATH="${LD_PATH}" EXEC="${EXEC}" -B -s -C "${TEST}"
 		# Check executable
 		if [ ! -x "${TEST}/${EXEC}" ] ; then
 			echo "No executable file (${TEST}/${EXEC}) found" >&2

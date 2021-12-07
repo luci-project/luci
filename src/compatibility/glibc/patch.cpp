@@ -69,11 +69,13 @@ class Patch {
 static bool redirect_fork_syscall(uint8_t * addr, size_t size, uintptr_t arg) {
 	for (size_t i = 0; i < size; i++) {
 		uint8_t * a = addr + i;
+		// Find fork syscall instructions
 		if (a[0] == 0xbf && a[1] == 0x11 && a[2] == 0x00 && a[3] == 0x20 && a[4] == 0x01 &&  // mov    $0x1200011,%edi
 		    a[5] == 0xb8 && a[6] == 0x38 && a[7] == 0x00 && a[8] == 0x00 && a[9] == 0x00 &&  // mov    $0x38,%eax
 		    a[10] == 0x0f && a[11] == 0x05) {                                        // syscall
 
-			// movabs $replace, %rax
+			// Replace with call to replacement function
+			// movabs $arg, %rax
 			*(a++) = 0x48;
 			*(a++) = 0xb8;
 			*(a++) = (arg >> 0) & 0xff;

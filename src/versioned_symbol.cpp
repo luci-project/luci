@@ -8,6 +8,11 @@ VersionedSymbol::VersionedSymbol(const Elf::Symbol & sym, const char * version_n
 	assert(sym.valid());
 }
 
+VersionedSymbol::VersionedSymbol(const Elf::Symbol & sym, const Version & version, uint32_t hash, uint32_t gnu_hash)
+ : Elf::Symbol(sym), version(version), _hash_value(hash), _gnu_hash_value(gnu_hash) {
+	assert(sym.valid());
+}
+
 VersionedSymbol::VersionedSymbol(const Elf::Symbol & sym, const Version & version)
  : Elf::Symbol(sym), version(version) {
 	assert(sym.valid());
@@ -22,6 +27,17 @@ bool VersionedSymbol::operator==(const VersionedSymbol & o) const {
 
 const Object & VersionedSymbol::object() const {
 	return reinterpret_cast<const Object &>(this->_elf);
+}
+
+void * VersionedSymbol::pointer() const {
+	void * fptr = reinterpret_cast<void*>(object().base + value());
+	// Handle ifunc
+	if (type() == Elf::STT_GNU_IFUNC) {
+		typedef void* (*indirect_t)();
+		indirect_t func = reinterpret_cast<indirect_t>(fptr);
+		return func();
+	}
+	return fptr;
 }
 
 BufferStream& operator<<(BufferStream& bs, const VersionedSymbol & s) {

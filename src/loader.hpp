@@ -10,14 +10,21 @@
 
 #include "object/identity.hpp"
 #include "versioned_symbol.hpp"
+#include "trampoline.hpp"
 #include "tls.hpp"
 
 struct Loader {
 	/*! \brief enable dynamic updates? */
 	const bool dynamic_update;
 
+	/*! \brief enable dynamic updates of functionens using the dl* interface? */
+	const bool dynamic_dlupdate;
+
 	/*! \brief support dynamic weak definitions? */
 	const bool dynamic_weak;
+
+	/*! \brief enable tracing? */
+	const bool tracing;
 
 	/*! \brief default library path via argument / environment variable */
 	Vector<const char *> library_path_runtime;
@@ -46,6 +53,9 @@ struct Loader {
 	/*! \brief thread local storage */
 	TLS tls;
 
+	/*! \brief Trampoline to dynamically loaded symbols (using dlsym) - for dynamic_dlupdate */
+	Trampoline dlsyms;
+
 	/*! \brief start arguments & environment pointer*/
 	int argc = 0;
 	const char ** argv = nullptr;
@@ -55,7 +65,7 @@ struct Loader {
 	ObjectIdentity::Flags default_flags;
 
 	/*! \brief Constructor */
-	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false, bool dynamicWeak = false);
+	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false, bool dynamicDlUpdate = false, bool dynamicWeak = false, bool tracing = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();

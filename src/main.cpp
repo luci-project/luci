@@ -10,8 +10,8 @@
 #include <dlh/macro.hpp>
 #include <dlh/file.hpp>
 #include <dlh/log.hpp>
-#include "object/base.hpp"
 
+#include "object/base.hpp"
 #include "loader.hpp"
 
 #ifndef LIBPATH_CONF
@@ -30,9 +30,11 @@ struct Opts {
 	const char * libpathconf{ STR(LIBPATH_CONF) };
 	Vector<const char *> preload{};
 	bool dynamicUpdate{};
+	bool dynamicDlUpdate{};
 	bool dynamicWeak{};
 	bool bindNow{};
 	bool bindNot{};
+	bool tracing{};
 	bool showHelp{};
 };
 
@@ -131,8 +133,14 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 
 	// New Loader
 	auto env_dynamicupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_UPDATE", true));
+	auto env_dynamicdlupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_DLUPDATE", true));
 	auto env_dynamicweak = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_WEAK", true));
-	Loader * loader = new Loader(luci_base, luci_path, opts.dynamicUpdate || (env_dynamicupdate && env_dynamicupdate.value()), opts.dynamicWeak || (env_dynamicweak && env_dynamicweak.value()));
+	auto env_tracing = Parser::string_as<bool>(Environ::variable("LD_TRACING", true));
+	Loader * loader = new Loader(luci_base, luci_path,
+	   opts.dynamicUpdate || (env_dynamicupdate && env_dynamicupdate.value()),
+	   opts.dynamicDlUpdate || (env_dynamicdlupdate && env_dynamicdlupdate.value()),
+	   opts.dynamicWeak || (env_dynamicweak && env_dynamicweak.value()),
+	   opts.tracing || (env_tracing && env_tracing.value()));
 	if (loader == nullptr) {
 		LOG_ERROR << "Unable to allocate loader" << endl;
 	} else {
@@ -209,17 +217,19 @@ int main(int argc, char* argv[]) {
 	if (base == BASEADDRESS) {
 		// Available commandline options
 		auto args = Parser::Arguments<Opts>({
-				/* short & long name,  argument, element            required, help text,  optional validation function */
-				{'l',  "log",          "LEVEL", &Opts::loglevel,      false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
-				{'f',  "logfile",      "FILE",  &Opts::logfile,       false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
-				{'p',  "library-path", "DIR",   &Opts::libpath,       false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
-				{'c',  "library-conf", "FILE",  &Opts::libpathconf,   false, "library path configuration" },
-				{'P',  "preload",      "FILE",  &Opts::preload,       false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
-				{'u',  "update",       nullptr, &Opts::dynamicUpdate, false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
-				{'w',  "weak",         nullptr, &Opts::dynamicWeak,   false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
-				{'n',  "bind-now",     nullptr, &Opts::bindNow,       false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
-				{'N',  "bind-not",     nullptr, &Opts::bindNot,       false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
-				{'h',  "help",         nullptr, &Opts::showHelp,      false, "Show this help" }
+				/* short & long name,  argument, element              required, help text,  optional validation function */
+				{'l',  "log",          "LEVEL", &Opts::loglevel,        false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
+				{'f',  "logfile",      "FILE",  &Opts::logfile,         false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
+				{'p',  "library-path", "DIR",   &Opts::libpath,         false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
+				{'c',  "library-conf", "FILE",  &Opts::libpathconf,     false, "library path configuration" },
+				{'P',  "preload",      "FILE",  &Opts::preload,         false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
+				{'u',  "update",       nullptr, &Opts::dynamicUpdate,   false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
+				{'U',  "dlupdate",     nullptr, &Opts::dynamicDlUpdate, false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1 " },
+				{'T',  "tracing",      nullptr, &Opts::tracing,         false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
+				{'w',  "weak",         nullptr, &Opts::dynamicWeak,     false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
+				{'n',  "bind-now",     nullptr, &Opts::bindNow,         false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
+				{'N',  "bind-not",     nullptr, &Opts::bindNot,         false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
+				{'h',  "help",         nullptr, &Opts::showHelp,        false, "Show this help" }
 			},
 			File::executable,
 			[](const char *) -> bool { return true; }

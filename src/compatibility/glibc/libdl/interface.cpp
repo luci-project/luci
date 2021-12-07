@@ -144,6 +144,7 @@ EXPORT int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int fla
 	auto sym = o->resolve_symbol(reinterpret_cast<uintptr_t>(addr));
 	if (sym) {
 		info->dli_sname = sym->name();
+		// TODO: How to handle loader->dynamicDlUpdate ?
 		info->dli_saddr = o->base + sym->value();
 		if (flags == GLIBC::DL::RTLD_DL_SYMENT)
 			*extra_info = (void *)(sym->_data);
@@ -181,17 +182,18 @@ static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, con
 	}
 
 	if (r && r->valid()) {
-		void * fptr = reinterpret_cast<void*>(r->object().base + r->value());
-		// Handle ifunc
-		if (r->type() == Elf::STT_GNU_IFUNC) {
-			typedef void* (*indirect_t)();
-			indirect_t func = reinterpret_cast<indirect_t>(fptr);
-			void* target = func();
-			LOG_TRACE << "Symbol " << symbol << " = ifunc " << fptr << " --> " << target << endl;
-			return target;
+		// Assert the object is from the latest update
+		assert(r->object().file.current == &(r->object()));
+		auto ptr = r->pointer();
+		// Use trampolines
+		if (ptr != nullptr && loader->dynamic_dlupdate && (r->type() == Elf::STT_FUNC || r->type() == Elf::STT_GNU_IFUNC)) {
+			auto tptr = loader->dlsyms.set(r.value());
+			LOG_TRACE <<  "Symbol " << symbol  << " using trampoline " << tptr << " --> " << ptr << endl;
+			assert(tptr != nullptr);
+			return tptr;
 		} else {
-			LOG_TRACE << "Symbol " << symbol << " --> " << fptr << endl;
-			return fptr;
+			LOG_TRACE << "Symbol " << symbol << " --> " << ptr << endl;
+			return ptr;
 		}
 	} else {
 		error_msg = "Symbol not found!";

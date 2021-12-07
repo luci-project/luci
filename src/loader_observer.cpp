@@ -50,7 +50,7 @@ void Loader::observer() {
 				Syscall::sleep(1);
 
 				// Get Object
-				GuardedWriter _(lookup_sync);
+				GuardedWriter _{lookup_sync};
 				for (auto & object_file : lookup)
 					if (event->wd == object_file.wd) {
 						LOG_DEBUG << "Notification for file modification in " << object_file.path << endl;
