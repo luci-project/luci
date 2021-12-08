@@ -166,6 +166,7 @@ ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, 
 		o->flags.bind_global = flags.bind_global;
 		o->flags.bind_deep = flags.bind_deep;
 		o->flags.persistent = flags.persistent;
+		o->flags.updatable = dynamic_dlupdate;
 
 		if (load && !o->prepare()) {
 			LOG_WARNING << "Preparation of " << o << " failed!" << endl;

@@ -35,7 +35,7 @@ EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
-	ObjectIdentity::Flags objflags;
+	ObjectIdentity::Flags objflags = loader->default_flags;
 	objflags.bind_now = (flags & GLIBC::DL::RTLD_NOW) != 0;
 	objflags.bind_global = (flags & GLIBC::DL::RTLD_GLOBAL) != 0;
 	objflags.persistent = (flags & GLIBC::DL::RTLD_NODELETE) != 0;

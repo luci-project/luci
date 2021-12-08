@@ -183,7 +183,7 @@ void Trampoline::update() {
 			assert(addrs_index <= addrs.size());
 			page = addrs[addrs_index];
 			// unprotect current page
-			protect(page, false);
+			protect(page, true);
 		}
 		set_trampoline(page, i);
 	}

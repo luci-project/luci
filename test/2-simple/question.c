@@ -21,12 +21,13 @@ static bool ask() {
 }
 
 int main() {
-	sleep(2);
 	for (int i = 0; i < 3; i++) {
+		if (i != 0)
+			sleep(4);
+
 		printf("Question %d: ", i);
 		bool answered = ask();
 		puts(answered ? "Ok!" : "What?");
-		sleep(4);
 	}
 
 	return 0;
