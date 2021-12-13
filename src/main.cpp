@@ -131,16 +131,20 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		LOG.output(logfile);
 	}
 
+	// Tracing
+	auto env_tracing = Parser::string_as<bool>(Environ::variable("LD_TRACING", true));
+	if (opts.tracing || (env_tracing && env_tracing.value())) {
+		LOG_ERROR << "Tracing not implemented yet!" << endl;
+	}
+
 	// New Loader
 	auto env_dynamicupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_UPDATE", true));
 	auto env_dynamicdlupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_DLUPDATE", true));
 	auto env_dynamicweak = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_WEAK", true));
-	auto env_tracing = Parser::string_as<bool>(Environ::variable("LD_TRACING", true));
 	Loader * loader = new Loader(luci_base, luci_path,
 	   opts.dynamicUpdate || (env_dynamicupdate && env_dynamicupdate.value()),
 	   opts.dynamicDlUpdate || (env_dynamicdlupdate && env_dynamicdlupdate.value()),
-	   opts.dynamicWeak || (env_dynamicweak && env_dynamicweak.value()),
-	   opts.tracing || (env_tracing && env_tracing.value()));
+	   opts.dynamicWeak || (env_dynamicweak && env_dynamicweak.value()));
 	if (loader == nullptr) {
 		LOG_ERROR << "Unable to allocate loader" << endl;
 	} else {

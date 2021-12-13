@@ -6,11 +6,11 @@
 #include <dlh/log.hpp>
 
 static void observer_signal(int signum) {
-	LOG_INFO << "Observer ends (Signal " << signum << ")" << endl;
+	LOG_INFO << "inotify observer ends (Signal " << signum << ")" << endl;
 	Syscall::exit(EXIT_SUCCESS);
 }
 
-void Loader::observer() {
+void Loader::observer_loop() {
 	// Set signal handler
 	struct sigaction action;
 	Memory::set(&action, 0, sizeof(struct sigaction));

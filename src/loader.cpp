@@ -18,23 +18,21 @@
 
 static Loader * _instance = nullptr;
 
-
-void* observer_kickoff(void * ptr) {
-	reinterpret_cast<Loader *>(ptr)->observer();
+void* kickoff_observer(void * ptr) {
+	reinterpret_cast<Loader *>(ptr)->observer_loop();
 	return nullptr;
 }
 
-
-Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, bool dynamicDlUpdate, bool dynamicWeak, bool tracing)
- : dynamic_update(dynamicUpdate), dynamic_dlupdate(dynamicUpdate && dynamicDlUpdate), dynamic_weak(dynamicWeak), tracing(tracing), next_namespace(NAMESPACE_BASE + 1) {
+Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, bool dynamicDlUpdate, bool dynamicWeak)
+ : dynamic_update(dynamicUpdate), dynamic_dlupdate(dynamicUpdate && dynamicDlUpdate), dynamic_weak(dynamicWeak), next_namespace(NAMESPACE_BASE + 1) {
 	default_flags.bind_global = 1;
 
 	if (dynamic_update) {
 		default_flags.updatable = 1;
 		if (auto inotify = Syscall::inotify_init(IN_CLOEXEC)) {
 			inotifyfd = inotify.value();
-			if (Thread::create(&observer_kickoff, this, true) == nullptr) {
-				LOG_ERROR << "Creating background thread failed" << endl;
+			if (Thread::create(&kickoff_observer, this, true) == nullptr) {
+				LOG_ERROR << "Creating inotify observer background thread failed" << endl;
 			} else {
 				LOG_INFO << "Created observer background thread" << endl;
 			}

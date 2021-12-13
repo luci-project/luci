@@ -23,9 +23,6 @@ struct Loader {
 	/*! \brief support dynamic weak definitions? */
 	const bool dynamic_weak;
 
-	/*! \brief enable tracing? */
-	const bool tracing;
-
 	/*! \brief default library path via argument / environment variable */
 	Vector<const char *> library_path_runtime;
 
@@ -65,7 +62,7 @@ struct Loader {
 	ObjectIdentity::Flags default_flags;
 
 	/*! \brief Constructor */
-	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false, bool dynamicDlUpdate = false, bool dynamicWeak = false, bool tracing = false);
+	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false, bool dynamicDlUpdate = false, bool dynamicWeak = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
@@ -123,7 +120,7 @@ struct Loader {
 	static Loader * instance();
 
  private:
-	friend void* observer_kickoff(void * ptr);
+	friend void* kickoff_observer(void * ptr);
 	friend struct ObjectIdentity;
 
 	/*! \brief Next Namespace */
@@ -135,8 +132,8 @@ struct Loader {
 	/*! \brief Descriptor for inotify */
 	int inotifyfd;
 
-	/*! \brief observer method */
-	void observer();
+	/*! \brief inotify observer method */
+	void observer_loop();
 
 	/*! \brief relocate all loaded files for execution */
 	bool relocate(bool update = false);
