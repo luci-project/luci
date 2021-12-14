@@ -1,217 +1,217 @@
 Foo example
 ===========
 
-[1m[Run 0, foo_inc() = 23][0m
+[Run 0, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 1
 
-[1m[Run 1, foo_inc() = 23][0m
+[Run 1, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 2
 
-[1m[Run 2, foo_inc() = 23][0m
+[Run 2, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 3
 
-[1m[Run 3, foo_inc() = 23][0m
+[Run 3, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)
 	call = 4
 
-[1m[Run 4, foo_inc() = 23][0m
+[Run 4, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 5
 
-[1m[Run 5, foo_inc() = 23][0m
+[Run 5, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 6
 
-[1m[Run 6, foo_inc() = 23][0m
+[Run 6, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 7
 
-[1m[Run 7, foo_inc() = 23][0m
+[Run 7, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)
 	call = 8
 
-[1m[Run 8, foo_inc() = 23][0m
+[Run 8, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 9
 
-[1m[Run 9, foo_inc() = 23][0m
+[Run 9, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 10
 
-[1m[Run 10, foo_inc() = 23][0m
+[Run 10, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 11
 
-[1m[Run 11, foo_inc() = 23][0m
+[Run 11, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)
 	call = 12
 
-[1m[Run 12, foo_inc() = 23][0m
+[Run 12, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 13
 
-[1m[Run 13, foo_inc() = 23][0m
+[Run 13, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 14
 
-[1m[Run 14, foo_inc() = 23][0m
+[Run 14, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 15
 
-[1m[Run 15, foo_inc() = 23][0m
+[Run 15, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)
 	call = 16
 
-[1m[Run 16, foo_inc() = 23][0m
+[Run 16, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 17
 
-[1m[Run 17, foo_inc() = 23][0m
+[Run 17, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 18
 
-[1m[Run 18, foo_inc() = 23][0m
+[Run 18, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 19
 
-[1m[Run 19, foo_inc() = 23][0m
+[Run 19, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)
 	call = 20
 
-[1m[Run 20, foo_inc() = 23][0m
+[Run 20, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 21
 
-[1m[Run 21, foo_inc() = 23][0m
+[Run 21, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 22
 
-[1m[Run 22, foo_inc() = 23][0m
+[Run 22, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 23
 
-[1m[Run 23, foo_inc() = 23][0m
+[Run 23, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)
 	call = 24
 
-[1m[Run 24, foo_inc() = 23][0m
+[Run 24, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 25
 
-[1m[Run 25, foo_inc() = 23][0m
+[Run 25, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 26
 
-[1m[Run 26, foo_inc() = 23][0m
+[Run 26, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 27
 
-[1m[Run 27, foo_inc() = 23][0m
+[Run 27, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)
 	call = 28
 
-[1m[Run 28, foo_inc() = 23][0m
+[Run 28, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 29
 
-[1m[Run 29, foo_inc() = 23][0m
+[Run 29, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 30
 
-[1m[Run 30, foo_inc() = 23][0m
+[Run 30, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 31
 
-[1m[Run 31, foo_inc() = 23][0m
+[Run 31, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)
 	call = 32
 
-[1m[Run 32, foo_inc() = 23][0m
+[Run 32, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = one (3)
 	call = 33
 
-[1m[Run 33, foo_inc() = 23][0m
+[Run 33, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = two (3)
 	call = 34
 
-[1m[Run 34, foo_inc() = 23][0m
+[Run 34, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = three (5)
 	call = 35
 
-[1m[Run 35, foo_inc() = 23][0m
+[Run 35, foo_inc() = 23]
 Foo (Version 0):
 	var = 23
 	value = (null) (0)

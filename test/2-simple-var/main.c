@@ -10,7 +10,7 @@ int main(int argc, char **argv) {
 	puts("===========");
 
 	for (size_t i = 0; i < 4 * 9; i++) {
-		printf("\n\e[1m[Run %zu, foo_inc() = %d]\e[0m\n", i, foo_inc());
+		printf("\n[Run %zu, foo_inc() = %d]\n", i, foo_inc());
 		foo_show(msgs[i % 4]);
 		sleep(2);
 	}
