@@ -1,0 +1,224 @@
+Foo example
+===========
+
+[Run 0, foo_inc() = 23]
+Foo (Version 0):
+	var = 23
+	value = one (3)
+	call = 1
+
+[Run 1, foo_inc() = 23]
+Foo (Version 0):
+	var = 23
+	value = two (3)
+	call = 2
+
+[Run 2, foo_inc() = 23]
+Foo (Version 0):
+	var = 23
+	value = three (5)
+	call = 3
+
+[Run 3, foo_inc() = 23]
+Foo (Version 0):
+	var = 23
+	value = (null) (0)
+	call = 4
+
+[Run 4, foo_inc() = 24]
+Foo (Version 1):
+	var = 24
+	value = one (3)
+	call = 5
+
+[Run 5, foo_inc() = 25]
+Foo (Version 1):
+	var = 25
+	value = two (3)
+	call = 6
+
+[Run 6, foo_inc() = 26]
+Foo (Version 1):
+	var = 26
+	value = three (5)
+	call = 7
+
+[Run 7, foo_inc() = 27]
+Foo (Version 1):
+	var = 27
+	value = (null) (0)
+	call = 8
+
+[Run 8, foo_inc() = 28]
+Foo (Version 2):
+ - var = 28
+ - value = one (3)
+ - call = 9
+
+[Run 9, foo_inc() = 29]
+Foo (Version 2):
+ - var = 29
+ - value = two (3)
+ - call = 10
+
+[Run 10, foo_inc() = 30]
+Foo (Version 2):
+ - var = 30
+ - value = three (5)
+ - call = 11
+
+[Run 11, foo_inc() = 31]
+Foo (Version 2):
+ - var = 31
+ - value = (null) (0)
+ - call = 12
+
+[Run 12, foo_inc() = 32]
+Foo (Version 3):
+ - var = 32
+ - value = one (3)
+ - call = 13
+
+[Run 13, foo_inc() = 33]
+Foo (Version 3):
+ - var = 33
+ - value = two (3)
+ - call = 14
+
+[Run 14, foo_inc() = 34]
+Foo (Version 3):
+ - var = 34
+ - value = three (5)
+ - call = 15
+
+[Run 15, foo_inc() = 35]
+Foo (Version 3):
+ - var = 35
+ - value = (null) (0)
+ - call = 16
+
+[Run 16, foo_inc() = 36]
+Foo (Version 3):
+ - var = 36
+ - value = one (3)
+ - call = 17
+
+[Run 17, foo_inc() = 37]
+Foo (Version 3):
+ - var = 37
+ - value = two (3)
+ - call = 18
+
+[Run 18, foo_inc() = 38]
+Foo (Version 3):
+ - var = 38
+ - value = three (5)
+ - call = 19
+
+[Run 19, foo_inc() = 39]
+Foo (Version 3):
+ - var = 39
+ - value = (null) (0)
+ - call = 20
+
+[Run 20, foo_inc() = 40]
+Foo (Version 5):
+ - var = 40
+ - newconst = 42
+ - value = one (3)
+ - call = 21
+
+[Run 21, foo_inc() = 41]
+Foo (Version 5):
+ - var = 41
+ - newconst = 42
+ - value = two (3)
+ - call = 22
+
+[Run 22, foo_inc() = 42]
+Foo (Version 5):
+ - var = 42
+ - newconst = 42
+ - value = three (5)
+ - call = 23
+
+[Run 23, foo_inc() = 43]
+Foo (Version 5):
+ - var = 43
+ - newconst = 42
+ - value = (null) (0)
+ - call = 24
+
+[Run 24, foo_inc() = 44]
+Foo (Version 6):
+ - var = 44
+ - value = one (3)
+ - call = 25
+
+[Run 25, foo_inc() = 45]
+Foo (Version 6):
+ - var = 45
+ - value = two (3)
+ - call = 26
+
+[Run 26, foo_inc() = 46]
+Foo (Version 6):
+ - var = 46
+ - value = three (5)
+ - call = 27
+
+[Run 27, foo_inc() = 47]
+Foo (Version 6):
+ - var = 47
+ - value = [UNDEFINED] (0)
+ - call = 28
+
+[Run 28, foo_inc() = 48]
+Foo (Version 7):
+ - var = 48
+ - value = one (3)
+ - call = 29
+
+[Run 29, foo_inc() = 49]
+Foo (Version 7):
+ - var = 49
+ - value = two (3)
+ - call = 30
+
+[Run 30, foo_inc() = 50]
+Foo (Version 7):
+ - var = 50
+ - value = three (5)
+ - call = 31
+
+[Run 31, foo_inc() = 51]
+Foo (Version 7):
+ - var = 51
+ - value = [UNDEFINED] (0)
+ - call = 32
+
+[Run 32, foo_inc() = 52]
+Foo (Version 7):
+ - var = 52
+ - value = one (3)
+ - call = 33
+
+[Run 33, foo_inc() = 53]
+Foo (Version 7):
+ - var = 53
+ - value = two (3)
+ - call = 34
+
+[Run 34, foo_inc() = 54]
+Foo (Version 7):
+ - var = 54
+ - value = three (5)
+ - call = 35
+
+[Run 35, foo_inc() = 55]
+Foo (Version 7):
+ - var = 55
+ - value = [UNDEFINED] (0)
+ - call = 36
+
+===========
