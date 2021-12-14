@@ -9,9 +9,13 @@ build:
     GIT_SUBMODULE_STRATEGY: recursive
   script:
     - make all
+    - make -C bean/elfo
+    - make -C bean
   artifacts:
     paths:
       - "ld-luci-*.so"
+      - "bean/elfo/elfo-*"
+      - "bean/example-*"
 
 test-debian-stretch-gcc:
   image: debian:stretch

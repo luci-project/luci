@@ -4,6 +4,7 @@ set -euo pipefail
 # Default values
 COMPILER="GCC"
 LD_NAME="Luci"
+LD_PATH_SHORT="/opt/luci/ld-luci.so"
 DEBUG_OUTPUT=false
 LD_LOGLEVEL=3
 LD_DYNAMIC_UPDATE=0
@@ -11,7 +12,7 @@ EXEC="run"
 
 
 # Options
-while getopts "c:dhl:u" OPT; do
+while getopts "c:dhl:r:u" OPT; do
 	case "${OPT}" in
 		c)
 			COMPILER=${OPTARG}
@@ -22,6 +23,9 @@ while getopts "c:dhl:u" OPT; do
 		l)
 			LD_LOGLEVEL=${OPTARG}
 			;;
+		r)
+			LD_PATH_SHORT=${OPTARG}
+			;;
 		u)
 			LD_DYNAMIC_UPDATE=1
 			;;
@@ -30,7 +34,8 @@ while getopts "c:dhl:u" OPT; do
 			echo >&2
 			echo "Parameters:" >&2
 			echo "	-c COMPILER  Use 'GCC' (default) or 'LLVM'" >&2
-			echo "	-l LOGLEVEL  Specify log level (default: 3)" >&2
+			echo "	-l LOGLEVEL  Specify log level (default: $LD_LOGLEVEL)" >&2
+			echo "	-r PATH      (Short) Path for RTLD (default: $LD_PATH_SHORT)" >&2
 			echo "	-d           Debug: Print output" >&2
 			echo "	-h           Show this help" >&2
 			echo "	-u           Enable dynamic updates (disabled by default)" >&2
@@ -82,6 +87,12 @@ if [ ! -x "${LD_PATH}" ] ; then
 	echo "Missing RTLD ${LD_PATH} (${RTLD})" >&2
 	exit 1
 fi
+if [ -n "${LD_PATH_SHORT}" -a "${LD_PATH}" != "${LD_PATH_SHORT}" ] ; then
+	mkdir -p "$(dirname "${LD_PATH_SHORT}")"
+	ln -s -f "${LD_PATH}" "${LD_PATH_SHORT}"
+	LD_PATH="${LD_PATH_SHORT}"
+fi
+
 # generate config
 LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
 ../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF"
