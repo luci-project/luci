@@ -7,15 +7,23 @@ build:
   stage: build
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
-  before_script:
-    - apt-get update && apt-get install -y python3 python3-pyparsing
   script:
     - make all
-    - make -C bean/elfo
-    - make -C bean
   artifacts:
     paths:
       - "ld-luci-*.so"
+
+fetch-artifacts:
+  image: busybox
+  stage: build
+  script:
+    - mkdir -p bean/elfo
+    - 'wget -O elfo-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/13125/jobs/artifacts/master/download?job=build-test"'
+    - unzip -jo elfo-artifacts.zip -d bean/elfo
+    - 'wget -O bean-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/13236/jobs/artifacts/master/download?job=build"'
+    - unzip bean-artifacts.zip -d bean
+  artifacts:
+    paths:
       - "bean/elfo/elfo-*"
       - "bean/example-*"
 
