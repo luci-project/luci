@@ -39,7 +39,6 @@ test-debian-stretch-gcc:
   before_script:
     - apt-get update && apt-get install -y gcc g++ make
   script:
-    - find .
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
 

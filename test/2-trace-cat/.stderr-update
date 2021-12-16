@@ -11,7 +11,7 @@ cat - | grep '^!' | sed -e 's/([0-9a-fx,]\+)/(...)/g' -e 's/^!open(.*\(tow[em]\.
 !read(...) = 2339;
 !read(...) = 2339;
 !read(...) = 0;
-!sleep(...);d
+!sleep(...);
 !close(...) = 0;
 EOT
 ) -
