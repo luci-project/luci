@@ -152,6 +152,7 @@ for TEST in ${TESTS} ; do
 		fi
 
 		# (Re)Set environment variables
+		export LC_ALL=C
 		export LD_NAME
 		export LD_PATH
 		export LD_LIBRARY_CONF
