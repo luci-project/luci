@@ -14,7 +14,7 @@ $(EXEC): main.o $(addsuffix .so,$(addprefix lib,$(LIBS)))
 	$(CXX) $(LDFLAGS) -o $@ $< -L$(LIBDIR) $(addprefix -l,$(LIBS))
 
 %.o: %.c
-	$(CXX) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 lib%.so: %.o
 	$(CXX) -shared -o $@ $<
