@@ -82,6 +82,14 @@ class ElfVar:
 					if segment.section_in_segment(self.elf.get_section(s)):
 						self.sec2seg[s] = segidx
 
+		# Get build ID
+		self.buildid = None
+		for section in self.elf.iter_sections():
+			if isinstance(section, NoteSection):
+				for note in section.iter_notes():
+					if note['n_type'] == 'NT_GNU_BUILD_ID':
+						self.buildid = note['n_desc']
+
 		# Get debug symbols
 		if self.elf.has_dwarf_info() and next(self.elf.get_dwarf_info().iter_CUs(), False):
 			self.dbgsym = self.path
@@ -98,17 +106,8 @@ class ElfVar:
 					self.dbgsym = dbgsym
 					break
 
-		# Initialize members
-		self.symbols = []
-
-		self.buildid = None
-
-
-
-	def parse_symbols(self):
-		buildid = None
-
-
+	def symbols(self):
+		symbols = []
 		for section in self.elf.iter_sections():
 			if isinstance(section, SymbolTableSection):
 				for sym in section.iter_symbols():
@@ -116,7 +115,7 @@ class ElfVar:
 						extern = True if sym['st_info']['bind'] == 'STB_GLOBAL' else False
 						segment = segments[sec2seg[sym['st_shndx']]]
 						assert(sym['st_value'] - segment['value'] + sym['st_size'] <= segment['size'])
-						self.symbols.append({
+						symbols.append({
 							'name': sym.name,
 							'value': sym['st_value'] - segment['value'],
 							'size': sym['st_size'],
@@ -124,13 +123,26 @@ class ElfVar:
 							'category': 'TLS' if sym['st_info']['type'] == 'STT_TLS' else segment['category'],
 							'external': True if sym['st_info']['bind'] == 'STB_GLOBAL' else False
 						})
-			elif isinstance(section, NoteSection):
-				for note in section.iter_notes():
-					if note['n_type'] == 'NT_GNU_BUILD_ID':
-						self.buildid = note['n_desc']
+		return symbols
 
+	def symbols_dwarf(self):
+		dwarf = DwarfVars(dbgfiles[f.name], aliases = args.aliases, names = args.names)
 
-	def parse_dwarf
+		# Prepare formatr of dwarf variables
+		dwarfsyms = dwarf.get_vars(tls = False)
+		for dvar in dwarfsyms:
+			for seg in seginfo:
+				if dvar['value'] >= seg['value'] and dvar['value'] + dvar['size'] <= seg['value'] + seg['size']:
+					dvar['align'] = dvar['value']  % PAGE_SIZE;
+					dvar['value'] = dvar['value'] - seg['value']
+					dvar['category'] = seg['category']
+
+		for dvar in dwarf.get_vars(tls = True):
+			dvar['align'] = dvar['value']  % PAGE_SIZE;
+			dvar['category'] = 'TLS'
+			dwarfsyms.append(dvar)
+
+		return dwarfsyms
 
 
 	def extern_dbgsym(self):
