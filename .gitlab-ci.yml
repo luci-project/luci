@@ -7,8 +7,6 @@ build-luci:
   stage: build
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
-  before_script:
-    - find .
   script:
     - make all
   artifacts:
