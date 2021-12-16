@@ -2,7 +2,7 @@ stages:
   - build
   - test
 
-build:
+build-luci:
   image: inf4/stubs:gcc-x64
   stage: build
   variables:
@@ -32,7 +32,8 @@ test-debian-stretch-gcc:
   image: debian:stretch
   stage: test
   dependencies:
-    - build
+    - build-luci
+    - fetch-artifacts
   before_script:
     - apt-get update && apt-get install -y gcc g++ make
   script:
@@ -44,7 +45,8 @@ test-ubuntu-focal-gcc:
   image: ubuntu:focal
   stage: test
   dependencies:
-    - build
+    - build-luci
+    - fetch-artifacts
   before_script:
     - apt-get update && apt-get install -y gcc g++ make
   script:
@@ -55,7 +57,8 @@ test-debian-stretch-llvm:
   image: debian:stretch
   stage: test
   dependencies:
-    - build
+    - build-luci
+    - fetch-artifacts
   before_script:
     - apt-get update && apt-get install -y clang-11 make
     - update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
@@ -68,7 +71,8 @@ test-ubuntu-focal-llvm:
   image: ubuntu:focal
   stage: test
   dependencies:
-    - build
+    - build-luci
+    - fetch-artifacts
   before_script:
     - apt-get update && apt-get install -y clang make
   script:
