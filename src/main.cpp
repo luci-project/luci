@@ -64,6 +64,23 @@ static uintptr_t base_from_phdr(void * phdr_ptr, long int entries = 1) {
 	return base;
 }
 
+
+// Helper to prevent multiple entries in list (slow, but its academic work)
+static void vector_append_unique(Vector<const char *> &dest, const char * src) {
+	bool in_dest = false;
+	for (auto & d : dest)
+		if (String::compare(src, d) == 0) {
+			in_dest = true;
+			break;
+		}
+	if (!in_dest)
+		dest.push_back(src);
+}
+static void vector_append_unique(Vector<const char *> &dest, Vector<const char *> &&src) {
+	for (auto & s : src)
+		vector_append_unique(dest, s);
+}
+
 // Show build info
 const char * __attribute__((weak)) build_elfo_version() { return nullptr; }
 const char * __attribute__((weak)) build_bean_version() { return nullptr; }
@@ -167,24 +184,24 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		// Library search path
 		for (auto & libpath : opts.libpath) {
 			LOG_DEBUG << "Add '" << libpath << "' (from --library-path) to library search path..." << endl;
-			loader->library_path_runtime.push_back(libpath);
+			vector_append_unique(loader->library_path_runtime, libpath);
 		}
 
 		char * ld_library_path = Environ::variable("LD_LIBRARY_PATH", true);
 		if (ld_library_path != nullptr && *ld_library_path != '\0') {
 			LOG_DEBUG << "Add '" << ld_library_path<< "' (from LD_LIBRARY_PATH) to library search path..." << endl;
-			loader->library_path_runtime = String::split(ld_library_path, ';');
+			vector_append_unique(loader->library_path_runtime, String::split(ld_library_path, ';'));
 		}
 
 		// Library search path config
 		if (File::readable(opts.libpathconf)) {
 			LOG_DEBUG << "Adding contents of '" << opts.libpathconf << "' to library search path..." << endl;
-			loader->library_path_config += File::lines(opts.libpathconf);
+			vector_append_unique(loader->library_path_config, File::lines(opts.libpathconf));
 		}
 		char * ld_library_conf = Environ::variable("LD_LIBRARY_CONF", true);
 		if (ld_library_conf != nullptr && *ld_library_conf != '\0' && File::readable(ld_library_conf)) {
 			LOG_DEBUG << "Adding contents of '" << ld_library_conf << "' (from LD_LIBRARY_CONF) to library search path..." << endl;
-			loader->library_path_config += File::lines(ld_library_conf);
+			vector_append_unique(loader->library_path_config, File::lines(ld_library_conf));
 		}
 		const auto libpathconf_size = loader->library_path_config.size();
 		if (libpathconf_size == 0) {
