@@ -166,20 +166,25 @@ for TEST in ${TESTS} ; do
 		STDERR=$(mktemp)
 
 		cd "${TEST}"
+		SECONDS=0
 		if ${DEBUG_OUTPUT} ; then
-			if ! stdbuf -oL -eL "./${EXEC}" 2> >(tee "$STDERR" >/dev/tty) > >(tee "$STDOUT" >/dev/tty) ; then
+			if stdbuf -oL -eL "./${EXEC}" 2> >(tee "$STDERR" >/dev/tty) > >(tee "$STDOUT" >/dev/tty) ; then
+				echo "(finished after ${SECONDS}s)"
+			else
 				EXITCODE=$?
-				echo "Execution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE}" >&2
+				echo -e "\e[31mExecution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
 				rm "$STDOUT" "$STDERR"
 				exit ${EXITCODE}
 			fi
-		elif ! "./${EXEC}" 2>"$STDERR" >"$STDOUT" ; then
+		elif "./${EXEC}" 2>"$STDERR" >"$STDOUT" ; then
+			echo "(finished after ${SECONDS}s)"
+		else
 			EXITCODE=$?
-			echo "Execution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE}" >&2
 			echo -e "\e[4mstdout\e[0m" >&2
 			cat "$STDOUT" >&2
 			echo -e "\n\e[4mstderr\e[0m" >&2
 			cat "$STDERR" >&2
+			echo -e "\e[31mExecution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
 			rm "$STDOUT" "$STDERR"
 			exit ${EXITCODE}
 		fi
