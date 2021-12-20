@@ -10,7 +10,7 @@ endif
 
 EXEC ?= run
 
-$(EXEC): main.c libfoo.so libbar.so libbaz.so
+$(EXEC): main.o libfoo.so libbar.so libbaz.so
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lfoo -lbar
 
 %.o: %.c

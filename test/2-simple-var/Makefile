@@ -1,5 +1,5 @@
 OPTLEVEL ?= 2
-CFLAGS += -O$(OPTLEVEL) -g -Wall
+CFLAGS += -O$(OPTLEVEL) -g -Wall -fPIC
 LIBDIR = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 LDFLAGS ?= -Wl,-rpath=$(LIBDIR)
 
@@ -26,6 +26,6 @@ lib%.so: $(SHARED_LIBS)
 	ln -f -s $< $@
 
 lib$(LIB)-%.so: $(LIB).c Makefile
-	$(CC) $(CFLAGS) -DVERSION=$* -fPIC --shared -o $@ $<
+	$(CC) $(CFLAGS) -DVERSION=$* -shared -o $@ $<
 
 FORCE:

@@ -9,6 +9,6 @@ $(EXEC): $(BIN) $(MAKEFILE_LIST)
 
 $(BIN): /bin/bash
 	cp $< $@
-	$(DIR)/../../bean/elfo/elfo-setinterp $@ $(LD_PATH)
+	if [ -n "$(LD_PATH)" ] ; then $(DIR)/../../bean/elfo/elfo-setinterp $@ $(LD_PATH) ; fi
 
 FORCE:
