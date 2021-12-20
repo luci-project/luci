@@ -183,7 +183,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 			*(tmpfilename++) = '\0';
 			success = File::absolute(tmp, buffer, PATH_MAX, bufferlen);
 		}
-		if (success) {
+		if (success && File::exists(tmpfilename)) {
 			if (bufferlen > 0)
 				buffer[bufferlen++] = '/';
 			String::copy(buffer + bufferlen, tmpfilename, PATH_MAX - bufferlen);
