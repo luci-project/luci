@@ -57,6 +57,9 @@ struct Object : public Elf {
 	/*! \brief Symbol dependencies to other objects */
 	Vector<ObjectIdentity *> dependencies;
 
+	/*! \brief lookup paths */
+	Vector<const char *> rpath, runpath;
+
 	/*! \brief Segments to be loaded in memory */
 	Vector<MemorySegment> memory_map;
 

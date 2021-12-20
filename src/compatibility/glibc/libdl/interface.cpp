@@ -96,19 +96,64 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 
 	switch(request) {
 		case RTLD_DI_LMID:
+			if (info == nullptr) {
+				error_msg = "Null pointer parameter!";
+				return -1;
+			}
 			*((GLIBC::DL::Lmid_t*)info) = o->ns;
 			return 0;
 		case RTLD_DI_LINKMAP:
+			if (info == nullptr) {
+				error_msg = "Null pointer parameter!";
+				return -1;
+			}
 			*((const ObjectIdentity**)info) = o;
 			return 0;
-		case RTLD_DI_SERINFO:
-			error_msg = "Request RTLD_DI_SERINFO not implemented (yet)!";
-			LOG_WARNING << "dlinfo failed: " << error_msg << endl;
-			return -1;
+
 		case RTLD_DI_SERINFOSIZE:
-			error_msg = "Request RTLD_DI_SERINFOSIZE not implemented (yet)!";
-			LOG_WARNING << "dlinfo failed: " << error_msg << endl;
-			return -1;
+			if (info == nullptr) {
+				error_msg = "Null pointer parameter!";
+				return -1;
+			} else {
+				reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_cnt = 0;
+				size_t cnt = 0;
+				size_t len = 0;
+				for (const auto & path : { o->current->rpath, loader->library_path_runtime, o->current->runpath, loader->library_path_config, loader->library_path_default }) {
+					for (auto & dir : path) {
+						cnt++;
+						len += String::len(dir) + 1;
+					}
+				}
+				reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_cnt = cnt;
+				reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_size = sizeof(GLIBC::DL::Serinfo) + cnt * sizeof(GLIBC::DL::Serinfo::Serpath) + len;
+				return 0;
+			}
+		case RTLD_DI_SERINFO:
+			if (info == nullptr) {
+				error_msg = "Null pointer parameter!";
+				return -1;
+			} else {
+				size_t buf_pos = sizeof(GLIBC::DL::Serinfo) + reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_cnt * sizeof(GLIBC::DL::Serinfo::Serpath);
+				size_t lib = 0;
+				for (const auto & path : { o->current->rpath, loader->library_path_runtime, o->current->runpath, loader->library_path_config, loader->library_path_default }) {
+					for (auto & dir : path) {
+						size_t len = String::len(dir) + 1;
+						if (reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_cnt <= lib) {
+							error_msg = "Info buffer too small for number of libraries!";
+							return -1;
+						}
+						if (reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_size < buf_pos + len) {
+							error_msg = "Info buffer too small for path strings!";
+							return -1;
+						}
+						reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_serpath[lib].dls_name = String::copy(reinterpret_cast<char*>(info) + buf_pos, dir);
+						reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_serpath[lib].dls_flags = 0;  // TODO
+						lib++;
+						buf_pos += len;
+					}
+				}
+				return 0;
+			}
 		case RTLD_DI_ORIGIN:
 			*((const char**)info) = o->path.str;
 			return 0;

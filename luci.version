@@ -13,6 +13,11 @@ GLIBC_2.3 {
 	local: *;
 };
 
+GLIBC_2.3.3 {
+	global: dlinfo; dladdr1;
+	local: *;
+};
+
 GLIBC_2.3.4 {
 	global: dlmopen;
 	local: *;

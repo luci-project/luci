@@ -47,6 +47,15 @@ const Lmid_t LM_ID_BASE = 0;
 const Lmid_t LM_ID_NEWLN = -1;
 static_assert(LM_ID_BASE == NAMESPACE_BASE && LM_ID_NEWLN == NAMESPACE_NEW, "Namespace constants have wrong value");
 
+struct Serinfo{
+	size_t dls_size;           /* Size in bytes of the whole buffer */
+	unsigned int dls_cnt;      /* Number of elements in 'dls_serpath' */
+	struct Serpath {
+		char *dls_name;            /* Name of library search path directory */
+		unsigned int dls_flags;    /* Indicates where this directory came from */
+	} dls_serpath[0];    /* Actually longer, 'dls_cnt' elements */
+};
+
 struct link_map {
 	uintptr_t l_addr;  /* Difference between the address in the ELF file and the address in memory */
 	char *l_name;  /* Absolute pathname where object was found */

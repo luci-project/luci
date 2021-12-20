@@ -52,7 +52,7 @@ bool ObjectDynamic::preload_libraries() {
 	bool success = true;
 
 	// load needed libaries
-	Vector<const char *> libs, rpath, runpath;
+	Vector<const char *> libs;
 	for (auto &dyn: dynamic_table) {
 		switch (dyn.tag()) {
 			case Elf::DT_NEEDED:
@@ -60,11 +60,11 @@ bool ObjectDynamic::preload_libraries() {
 				break;
 
 			case Elf::DT_RPATH:
-				rpath.emplace_back(dyn.string());
+				this->rpath.emplace_back(dyn.string());
 				break;
 
 			case Elf::DT_RUNPATH:
-				rpath.emplace_back(dyn.string());
+				this->runpath.emplace_back(dyn.string());
 				break;
 
 			default:
@@ -88,7 +88,7 @@ bool ObjectDynamic::preload_libraries() {
 				skip = true;
 			}
 		if (!skip) {
-			auto o = file.loader.library(lib, flags, rpath, runpath, file.ns);
+			auto o = file.loader.library(lib, flags, this->rpath, this->runpath, file.ns);
 			if (o == nullptr) {
 				LOG_WARNING << "Unresolved dependency: " << lib << endl;
 				success = false;
