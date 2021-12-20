@@ -306,6 +306,15 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	this->argv = reinterpret_cast<const char **>(stack_pointer) + 1;
 	this->envp = this->argv + this->argc + 1;
 
+	// Reorder environment variables (skip empty [consumed] entries)
+	{
+		size_t curr = 0;
+		for (size_t e = 0; this->envp[e] != nullptr; e++)
+			if (*(this->envp[curr] = this->envp[e]) != '\0')
+				curr++;
+		this->envp[curr] = nullptr;
+	}
+
 	// Binary has to be first in list
 	lookup.extract(file);
 	lookup.push_front(file);
