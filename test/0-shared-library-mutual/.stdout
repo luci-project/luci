@@ -1,0 +1,45 @@
+#!/bin/bash
+
+CONTENT=$(cat - )
+declare -A PTR
+PTRCNT=1
+for ADDR in $(echo "$CONTENT" | sed -ne 's/^.*\(0x[0-9a-f]*\).*$/\1/p') ; do
+	if [ -z "${PTR[$ADDR]+exist}" ] ; then
+		PTR[$ADDR]="P$(( PTRCNT++ ))"
+	fi
+done
+
+for ADDR in "${!PTR[@]}" ; do
+	CONTENT="${CONTENT//$ADDR/${PTR[$ADDR]}}"
+done
+
+echo "$CONTENT" | exec diff -B -w -u <(cat << EOT
+extern_init: setting foo @ P1 to 42
+[main_init]
+foo @ P1 = 42
+bar @ P2 = 23
+extern_foo: foo @ P1
+extern_foo(): 42
+extern_bar: bar @ P2
+extern_bar(): 23
+nested_foo: foo @ P1
+extern_nested_foo(): 42
+nested_bar: bar @ P2
+extern_nested_bar(): 23
+foo *= -1
+[main]
+foo @ P1 = -42
+bar @ P2 = 23
+extern_foo: foo @ P1
+extern_foo(): -42
+extern_bar: bar @ P2
+extern_bar(): 23
+nested_foo: foo @ P1
+extern_nested_foo(): -42
+nested_bar: bar @ P2
+extern_nested_bar(): 23
+EOT
+) -
+
+
+
