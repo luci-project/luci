@@ -6,13 +6,14 @@ COMPILER="GCC"
 LD_NAME="Luci"
 LD_PATH_SHORT="/opt/luci/ld-luci.so"
 DEBUG_OUTPUT=false
+LD_SYSTEM=false
 LD_LOGLEVEL=3
 LD_DYNAMIC_UPDATE=0
 EXEC="run"
 
 
 # Options
-while getopts "c:dhl:r:u" OPT; do
+while getopts "c:dhl:r:uR" OPT; do
 	case "${OPT}" in
 		c)
 			COMPILER=${OPTARG}
@@ -29,6 +30,9 @@ while getopts "c:dhl:r:u" OPT; do
 		u)
 			LD_DYNAMIC_UPDATE=1
 			;;
+		R)
+			LD_SYSTEM=true
+			;;
 		*)
 			echo "$0 [-c COMPILER] [-l LOGLEVEL] [-u] [TESTS]" >&2
 			echo >&2
@@ -39,6 +43,7 @@ while getopts "c:dhl:r:u" OPT; do
 			echo "	-d           Debug: Print output" >&2
 			echo "	-h           Show this help" >&2
 			echo "	-u           Enable dynamic updates (disabled by default)" >&2
+			echo "	-R           use default (system) RTLD, incompatible with updates" >&2
 			echo >&2
 			echo "If no TESTS are specified, alle tests in the directory are checked." >&2
 			exit 0
@@ -82,15 +87,24 @@ case $(uname -m) in
 esac
 
 # Check dynamic linker/loader
-LD_PATH="$(readlink -f "../ld-${LD_NAME,,}-${ID,,}-${VERSION_CODENAME,,}-${PLATFORM,,}.so")"
-if [ ! -x "${LD_PATH}" ] ; then
-	echo "Missing RTLD ${LD_PATH} (${RTLD})" >&2
-	exit 1
-fi
-if [ -n "${LD_PATH_SHORT}" -a "${LD_PATH}" != "${LD_PATH_SHORT}" ] ; then
-	mkdir -p "$(dirname "${LD_PATH_SHORT}")"
-	ln -s -f "${LD_PATH}" "${LD_PATH_SHORT}"
-	LD_PATH="${LD_PATH_SHORT}"
+if $LD_SYSTEM ; then
+	LD_NAME="Linux"
+	LD_PATH="/lib64/ld-linux-x86-64.so.2"
+	if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
+		echo "System RTLD does not support updates" >&2
+		exit 1
+	fi
+else
+	LD_PATH="$(readlink -f "../ld-${LD_NAME,,}-${ID,,}-${VERSION_CODENAME,,}-${PLATFORM,,}.so")"
+	if [ ! -x "${LD_PATH}" ] ; then
+		echo "Missing RTLD ${LD_PATH} (${RTLD})" >&2
+		exit 1
+	fi
+	if [ -n "${LD_PATH_SHORT}" -a "${LD_PATH}" != "${LD_PATH_SHORT}" ] ; then
+		mkdir -p "$(dirname "${LD_PATH_SHORT}")"
+		ln -s -f "${LD_PATH}" "${LD_PATH_SHORT}"
+		LD_PATH="${LD_PATH_SHORT}"
+	fi
 fi
 
 # generate config
@@ -99,7 +113,7 @@ LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
 
 
 echo -e "\n\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM}) with ${COMPILER}\e[0m"
-echo "using ${LD_PATH}"
+echo "using ${LD_NAME} RTLD at ${LD_PATH}"
 if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
 	echo "with dynamic updates enabled"
 	UPDATEFLAG='update'
@@ -123,7 +137,7 @@ function check() {
 
 function skip() {
 	SKIP=".skip"
-	for SKIPTEST in $1/${SKIP}{,-${ID,,}}{,-${VERSION_CODENAME}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}} ; do
+	for SKIPTEST in $1/${SKIP}{,-${ID,,}}{,-${VERSION_CODENAME}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}} ; do
 		if [ -f "${SKIPTEST}" ] ; then
 			return 0
 		fi
@@ -136,7 +150,7 @@ TESTDIR="$(pwd)"
 for TEST in ${TESTS} ; do
 	if [ -d "${TEST}" ] ; then
 		# Check if we should skip depending on variables
-		if skip "${TEST}" ; then
+		if  [ "$TESTS" = "*" ] && skip "${TEST}" ; then
 			echo -e "\n(skipping test ${TEST})" >&2
 			continue
 		fi
@@ -196,5 +210,8 @@ for TEST in ${TESTS} ; do
 
 		# Remove files
 		rm "$STDOUT" "$STDERR"
+	elif [ "$TESTS" != "*" ] ; then
+		echo "Test '$TEST' does not exist!" >&2
+		exit 1
 	fi
 done
