@@ -12,7 +12,7 @@ build-luci:
   artifacts:
     paths:
       - "ld-luci-*.so"
-  retry: 3
+  retry: 1
 
 fetch-artifacts:
   image: busybox
@@ -28,7 +28,7 @@ fetch-artifacts:
     paths:
       - "bean/elfo/elfo-*"
       - "bean/example-*"
-  retry: 3
+  retry: 1
 
 test-debian-stretch-gcc:
   image: debian:stretch
@@ -42,7 +42,7 @@ test-debian-stretch-gcc:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 5
+  retry: 2
 
 test-ubuntu-focal-gcc:
   image: ubuntu:focal
@@ -55,7 +55,7 @@ test-ubuntu-focal-gcc:
   script:
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 5
+  retry: 2
 
 test-debian-stretch-llvm:
   image: debian:stretch
@@ -70,7 +70,7 @@ test-debian-stretch-llvm:
   script:
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 5
+  retry: 2
 
 test-ubuntu-focal-llvm:
   image: ubuntu:focal
@@ -83,4 +83,4 @@ test-ubuntu-focal-llvm:
   script:
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 5
+  retry: 2
