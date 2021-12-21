@@ -1,5 +1,5 @@
 OPTLEVEL ?= 2
-CFLAGS += -O$(OPTLEVEL) -g -Wall -pie
+CFLAGS += -O$(OPTLEVEL) -g -Wall -fPIC -pie
 
 ifdef LD_PATH
 	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
