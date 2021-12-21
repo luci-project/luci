@@ -115,6 +115,8 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 				error_msg = "Null pointer parameter!";
 				return -1;
 			} else {
+				GuardedReader _{loader->lookup_sync};
+
 				reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_cnt = 0;
 				size_t cnt = 0;
 				size_t len = 0;
@@ -133,6 +135,8 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 				error_msg = "Null pointer parameter!";
 				return -1;
 			} else {
+				GuardedReader _{loader->lookup_sync};
+
 				size_t buf_pos = sizeof(GLIBC::DL::Serinfo) + reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_cnt * sizeof(GLIBC::DL::Serinfo::Serpath);
 				size_t lib = 0;
 				for (const auto & path : { o->current->rpath, loader->library_path_runtime, o->current->runpath, loader->library_path_config, loader->library_path_default }) {
