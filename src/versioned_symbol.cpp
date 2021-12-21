@@ -3,8 +3,8 @@
 #include "object/identity.hpp"
 #include "object/base.hpp"
 
-VersionedSymbol::VersionedSymbol(const Elf::Symbol & sym, const char * version_name, bool version_weak)
- : Elf::Symbol(sym), version(version_name, version_weak) {
+VersionedSymbol::VersionedSymbol(const Elf::Symbol & sym, const char * version_name, bool version_weak, const char * version_file)
+ : Elf::Symbol(sym), version(version_name, version_weak, version_file) {
 	assert(sym.valid());
 }
 

@@ -55,17 +55,30 @@ struct ObjectDynamic : public ObjectExecutable {
 		if (!version.valid) {
 			//return Elf::VER_NDX_LOCAL;
 		} else if (version.name != nullptr) {
-			for (auto & v : version_definition)
-				if (v.hash() == version.hash && !v.base()) {
-					const char * n = v.auxiliary()[0].name();
-					if (n == version.name || strcmp(n, version.name) == 0)
-						return v.version_index();
-				}
 
+			// Version Definition Section
+			bool skip_version_definition = false;
+			if (version.file != nullptr)
+				for (auto & v : version_definition)
+					if (v.base()) {
+						skip_version_definition = version.hash != v.hash() || strcmp(v.auxiliary().at(0).name(), version.file) != 0;
+						break;
+					}
+			if (!skip_version_definition)
+				for (auto & v : version_definition)
+					if (v.hash() == version.hash && !v.base()) {
+						const char * n = v.auxiliary()[0].name();
+						if (n == version.name || strcmp(n, version.name) == 0)
+							return v.version_index();
+					}
+
+			// Version Dependency Section
 			for (auto & v : version_needed)
-				for (auto & aux : v.auxiliary())
-					if (aux.hash() == version.hash && (aux.name() == version.name || strcmp(aux.name(), version.name) == 0))
-						return aux.version_index();
+				if (version.file == nullptr || strcmp(v.file(), version.file) == 0)
+					for (auto & aux : v.auxiliary())
+						if (aux.hash() == version.hash && (aux.name() == version.name || strcmp(aux.name(), version.name) == 0))
+							return aux.version_index();
+
 		}
 
 		return Elf::VER_NDX_GLOBAL;
@@ -75,14 +88,23 @@ struct ObjectDynamic : public ObjectExecutable {
 		if (index == Elf::VER_NDX_GLOBAL)
 			return VersionedSymbol::Version{true};
 
+		// Version Dependency Section
 		for (auto & v : version_needed)
 			for (auto & aux : v.auxiliary())
 				if (aux.version_index() == index)
-					return VersionedSymbol::Version{aux.name(), aux.hash(), aux.weak()};
+					return VersionedSymbol::Version{aux.name(), aux.hash(), aux.weak(), v.file()};
 
+		// Version Definition Section
+		const char * file = nullptr;
+		uint32_t filehash = 0;
+		for (auto & v : version_definition)
+			if (v.base()) {
+				file = v.auxiliary().at(0).name();
+				filehash = v.hash();
+			}
 		for (auto & v : version_definition)
 			if (v.version_index() == index && !v.base())
-				return  VersionedSymbol::Version{v.auxiliary().at(0).name(), v.hash(), v.weak()};
+				return VersionedSymbol::Version{v.auxiliary().at(0).name(), v.hash(), v.weak(), file, filehash};
 
 		return VersionedSymbol::Version{false};
 	}

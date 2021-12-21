@@ -21,21 +21,25 @@ struct VersionedSymbol : Elf::Symbol {
 
 	const struct Version {
 		const char * name;
-		uint32_t hash;
+		const char * file;
+		uint32_t hash, filehash;
 		bool valid, weak;
 
 		bool operator==(const Version & that) const {
-			return this->valid && that.valid && this->hash == that.hash && (this->name == that.name || strcmp(this->name, that.name) == 0);
+			return this->valid && that.valid
+			    && this->hash == that.hash
+			    && (this->name == that.name || String::compare(this->name, that.name) == 0)
+			    && (this->file == nullptr || that.file == nullptr || this->file == that.file || (this->filehash == that.filehash && String::compare(this->file, that.file) == 0));
 		}
 
-		Version(const char * name, uint32_t hash, bool weak = false) : name(name), hash(hash), valid(true), weak(weak) {}
-
-		Version(const char * name, bool weak = false) : Version(name, ELF_Def::hash(name), weak) {}
-
-		Version(bool valid = true) : name(nullptr), hash(0), valid(valid), weak(false) {}
+		Version(const char * name, uint32_t hash, bool weak, const char * file, uint32_t filehash) : name(name), file(file), hash(hash), filehash(file == nullptr ? 0 : filehash), valid(true), weak(weak) {}
+		Version(const char * name, uint32_t hash, bool weak, const char * file) : Version(name, hash, weak, file, file == nullptr ? 0 : ELF_Def::hash(file)) {}
+		Version(const char * name, uint32_t hash, bool weak = false) : Version(name, hash, weak, nullptr) {}
+		Version(const char * name, bool weak = false, const char * file = nullptr) : Version(name, ELF_Def::hash(name), weak, file) {}
+		Version(bool valid = true) : name(nullptr), file(nullptr), hash(0), filehash(0), valid(valid), weak(false) {}
 	} version;
 
-	VersionedSymbol(const Elf::Symbol & sym, const char * version_name = nullptr, bool version_weak = false);
+	VersionedSymbol(const Elf::Symbol & sym, const char * version_name = nullptr, bool version_weak = false, const char * version_file = nullptr);
 	VersionedSymbol(const Elf::Symbol & sym, const Version & version, uint32_t hash, uint32_t gnu_hash);
 	VersionedSymbol(const Elf::Symbol & sym, const Version & version);
 	VersionedSymbol(const VersionedSymbol & other) = default;

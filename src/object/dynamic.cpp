@@ -263,6 +263,7 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(uintptr_t addr) const {
 
 bool ObjectDynamic::initialize() {
 	// use mapped memory (due to relocations)
+	LOG_DEBUG << "Initialize " << *this << endl;
 	dynamic_table.init(file.loader.argc, file.loader.argv, file.loader.envp, base);
 	return true;
 }
