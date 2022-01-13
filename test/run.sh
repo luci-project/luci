@@ -111,6 +111,9 @@ fi
 LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
 ../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF"
 
+if $DEBUG_OUTPUT ; then
+	make -C ../tools stdlog
+fi
 
 echo -e "\n\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM}) with ${COMPILER}\e[0m"
 echo "using ${LD_NAME} RTLD at ${LD_PATH}"
@@ -182,7 +185,7 @@ for TEST in ${TESTS} ; do
 		cd "${TEST}"
 		SECONDS=0
 		if ${DEBUG_OUTPUT} ; then
-			if stdbuf -oL -eL "./${EXEC}" 2> >(tee "$STDERR" >/dev/tty) > >(tee "$STDOUT" >/dev/tty) ; then
+			if ../../tools/stdlog -t -e "$STDERR" -e- -o "$STDOUT" -o- "./${EXEC}" ; then
 				echo "(finished after ${SECONDS}s)"
 			else
 				EXITCODE=$?

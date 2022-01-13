@@ -1,7 +1,7 @@
 OPTLEVEL ?= 2
 CFLAGS += -O$(OPTLEVEL) -g -Wall
 LIBDIR = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-LDFLAGS ?= -Wl,-rpath=$(LIBDIR) -ldl
+LDFLAGS ?= -Wl,-rpath=$(LIBDIR)
 
 ifdef LD_PATH
 	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
