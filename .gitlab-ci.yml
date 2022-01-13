@@ -53,6 +53,7 @@ test-ubuntu-focal-gcc:
   before_script:
     - apt-get update && apt-get install -y gcc g++ make
   script:
+    - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
   retry: 2
@@ -68,6 +69,7 @@ test-debian-stretch-llvm:
     - update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
     - update-alternatives --install /usr/bin/cc cc /usr/bin/clang 110 --slave /usr/bin/c++ c++ /usr/bin/clang++
   script:
+    - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
   retry: 2
@@ -81,6 +83,7 @@ test-ubuntu-focal-llvm:
   before_script:
     - apt-get update && apt-get install -y clang make
   script:
+    - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
   retry: 2
