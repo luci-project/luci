@@ -171,7 +171,7 @@ static void write_all(int fd, const void *buf, size_t count) {
 }
 
 
-static void redirect(int from, target_t * to, size_t tos) {
+static void redirect(int from, target_t * to, size_t tos, bool ignore_read_error) {
 	time_t ts = 0;
 	struct tm *tm = NULL;
 	struct tm *tr = NULL;
@@ -224,16 +224,16 @@ static void redirect(int from, target_t * to, size_t tos) {
 				write_all(to[t].fd, buf, len);
 			}
 		}
-		if (len == -1 && errno != EWOULDBLOCK)
+		if (!ignore_read_error && len == -1 && errno != EWOULDBLOCK)
 			errno_message("read failed");
 	}
 }
 
 
-static bool epoll_handle(int from, target_t * to, size_t tos, uint32_t event) {
+static bool epoll_handle(int from, target_t * to, size_t tos, uint32_t event, bool ignore_read_error) {
 	switch (event) {
 		case EPOLLIN:
-			redirect(from, to, tos);
+			redirect(from, to, tos, ignore_read_error);
 			return true;
 
 		case EPOLLERR:
@@ -601,13 +601,13 @@ int main(int argc, char * argv[]) {
 				verbose_message("Event %d from fd %d.", events[n].events, events[n].data.fd);
 				bool deregister = true;
 				if (events[n].data.fd == STDIN_FILENO) {
-					deregister = !epoll_handle(STDIN_FILENO, stream[STREAM_IN], stream_len[STREAM_IN], events[n].events);
+					deregister = !epoll_handle(STDIN_FILENO, stream[STREAM_IN], stream_len[STREAM_IN], events[n].events, false);
 					if (deregister)
 						close(master[STREAM_IN]);
 				} else if (events[n].data.fd == master[STREAM_OUT]) {
-					deregister = !epoll_handle(master[STREAM_OUT], stream[STREAM_OUT], stream_len[STREAM_OUT], events[n].events);
+					deregister = !epoll_handle(master[STREAM_OUT], stream[STREAM_OUT], stream_len[STREAM_OUT], events[n].events, false);
 				} else if (events[n].data.fd == master[STREAM_ERROR]) {
-					deregister = !epoll_handle(master[STREAM_ERROR], stream[STREAM_ERROR], stream_len[STREAM_ERROR], events[n].events);
+					deregister = !epoll_handle(master[STREAM_ERROR], stream[STREAM_ERROR], stream_len[STREAM_ERROR], events[n].events, false);
 				} else if (events[n].data.fd == childfd) {
 					verbose_message("Child process exit notification");
 					active = false;
@@ -624,6 +624,9 @@ int main(int argc, char * argv[]) {
 		int status;
 		if (waitpid(pid, &status, 0) == -1 )
 			errno_message("Waiting for PID %d failed", pid);
+
+		epoll_handle(master[STREAM_OUT], stream[STREAM_OUT], stream_len[STREAM_OUT], EPOLLIN, true);
+		epoll_handle(master[STREAM_ERROR], stream[STREAM_ERROR], stream_len[STREAM_ERROR], EPOLLIN, true);
 
 		if (WIFEXITED(status)) {
 			int exitcode = WEXITSTATUS(status);
