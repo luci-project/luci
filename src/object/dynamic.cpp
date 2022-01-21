@@ -2,6 +2,7 @@
 
 #include <elfo/elf_rel.hpp>
 #include <dlh/log.hpp>
+#include <dlh/string.hpp>
 
 #include "compatibility/glibc/patch.hpp"
 #include "dynamic_resolve.hpp"
@@ -48,6 +49,15 @@ bool ObjectDynamic::preload() {
 	    && preload_libraries();
 }
 
+
+void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
+	size_t dir_len = this->file.path.len - this->file.name.len - 1;
+	char dir[dir_len + 1] = {};
+	// TODO: Here we allocate space which is never freed yet
+	for (auto s : String::split_inplace(String::replace(str, "$ORIGIN", String::copy(dir, this->file.path.c_str(), dir_len)), ":"))
+		vec.emplace_back(s);
+}
+
 bool ObjectDynamic::preload_libraries() {
 	bool success = true;
 
@@ -60,11 +70,11 @@ bool ObjectDynamic::preload_libraries() {
 				break;
 
 			case Elf::DT_RPATH:
-				this->rpath.emplace_back(dyn.string());
+				addpath(this->rpath, dyn.string());
 				break;
 
 			case Elf::DT_RUNPATH:
-				this->runpath.emplace_back(dyn.string());
+				addpath(this->runpath, dyn.string());
 				break;
 
 			default:

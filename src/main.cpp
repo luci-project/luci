@@ -190,7 +190,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		char * ld_library_path = Environ::variable("LD_LIBRARY_PATH", true);
 		if (ld_library_path != nullptr && *ld_library_path != '\0') {
 			LOG_DEBUG << "Add '" << ld_library_path<< "' (from LD_LIBRARY_PATH) to library search path..." << endl;
-			vector_append_unique(loader->library_path_runtime, String::split(ld_library_path, ';'));
+			vector_append_unique(loader->library_path_runtime, String::split_inplace(ld_library_path, ';'));
 		}
 
 		// Library search path config
@@ -219,7 +219,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		char * preload = Environ::variable("LD_PRELOAD", true);
 		if (preload != nullptr && *preload != '\0') {
 			LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)..." << endl;
-			for (auto & lib : String::split(preload, ';'))
+			for (auto & lib : String::split_inplace(preload, ';'))
 				loader->library(lib);
 		}
 	}

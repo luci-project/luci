@@ -173,7 +173,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 		auto pathlen = String::len(path) + 1;
 		char tmp[pathlen];
 		String::copy(tmp, path, pathlen);
-		auto tmpfilename = String::find_last(tmp, '/');
+		auto tmpfilename = const_cast<char*>(String::find_last(tmp, '/'));
 		size_t bufferlen;
 		bool success;
 		if (tmpfilename == nullptr) {
