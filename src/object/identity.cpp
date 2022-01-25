@@ -132,9 +132,9 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 	return o;
 }
 
-bool ObjectIdentity::watch(bool force) {
+bool ObjectIdentity::watch(bool force, bool close_existing) {
 	if (flags.updatable == 1 && (wd == -1 || force)) {
-		if (wd != -1) {
+		if (wd != -1 && close_existing) {
 			if (auto inotify = Syscall::inotify_rm_watch(loader.inotifyfd, wd)) {
 				LOG_DEBUG << "Remove old watch for modifications at " << this->path << endl;
 			} else if (force) {

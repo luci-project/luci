@@ -61,6 +61,8 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 				Syscall::close(f.key);
 			// Set own Thread ID
 			Thread::self()->tid = child;
+			// Start observer thread
+			loader->start_observer();
 		} else if (loader->dynamic_update) {
 			// Close (childs) shared memory file descriptors
 			for (auto & f : replace_fd)

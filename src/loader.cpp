@@ -23,22 +23,14 @@ void* kickoff_observer(void * ptr) {
 	return nullptr;
 }
 
+
 Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, bool dynamicDlUpdate, bool dynamicWeak)
  : dynamic_update(dynamicUpdate), dynamic_dlupdate(dynamicUpdate && dynamicDlUpdate), dynamic_weak(dynamicWeak), next_namespace(NAMESPACE_BASE + 1) {
 	default_flags.bind_global = 1;
 
 	if (dynamic_update) {
 		default_flags.updatable = 1;
-		if (auto inotify = Syscall::inotify_init(IN_CLOEXEC)) {
-			inotifyfd = inotify.value();
-			if (Thread::create(&kickoff_observer, this, true) == nullptr) {
-				LOG_ERROR << "Creating inotify observer background thread failed" << endl;
-			} else {
-				LOG_INFO << "Created observer background thread" << endl;
-			}
-		} else {
-			LOG_ERROR << "Initializing inotify failed: " << inotify.error_message() << endl;
-		}
+		start_observer();
 	} else {
 		default_flags.immutable_source = 1;
 	}
@@ -439,4 +431,28 @@ Loader * Loader::instance() {
 	   but maybe in the future we can use PID to match the correct one
 	*/
 	return _instance;
+}
+
+
+bool Loader::start_observer() {
+	if (dynamic_update) {
+		if (auto inotify = Syscall::inotify_init(IN_CLOEXEC)) {
+			//Syscall::close(inotifyfd);
+			inotifyfd = inotify.value();
+			for (auto & object_file : lookup)
+				object_file.watch(true, false);
+
+			if (Thread::create(&kickoff_observer, this, true) == nullptr) {
+				LOG_ERROR << "Creating inotify observer background thread failed" << endl;
+			} else {
+				LOG_INFO << "Created observer background thread" << endl;
+				return true;
+			}
+		} else {
+			LOG_ERROR << "Initializing inotify failed: " << inotify.error_message() << endl;
+		}
+	} else {
+		LOG_WARNING << "Not starting observer thread since there are no dynamic updates" << endl;
+	}
+	return false;
 }

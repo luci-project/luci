@@ -119,6 +119,9 @@ struct Loader {
 	/*! \brief get instance for current process */
 	static Loader * instance();
 
+	/*! \brief Start observer thread */
+	bool start_observer();
+
  private:
 	friend void* kickoff_observer(void * ptr);
 	friend struct ObjectIdentity;
