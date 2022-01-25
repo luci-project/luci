@@ -270,12 +270,13 @@ static void init_target(target_t * target, char * file, bool append) {
 		if (file[0] == '-') {
 			target->file = "[STDOUT]";
 			target->fd = STDOUT_FILENO;
-			passthrough_stdout = false;
 		} else {
 			target->file = "[STDERR]";
 			target->fd = STDERR_FILENO;
-			passthrough_stderr = false;
 		}
+
+		passthrough_stdout = false;
+		passthrough_stderr = false;
 
 		if (fstat(target->fd, &target->stat) != 0)
 			errno_message("fstat");
