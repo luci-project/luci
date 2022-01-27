@@ -5,20 +5,30 @@
 #include <dlh/container/vector.hpp>
 #include <dlh/stream/output.hpp>
 #include <dlh/parser/arguments.hpp>
+#include <dlh/parser/config.hpp>
 #include <dlh/auxiliary.hpp>
-#include <dlh/environ.hpp>
 #include <dlh/macro.hpp>
 #include <dlh/file.hpp>
 #include <dlh/log.hpp>
 
 #include "object/base.hpp"
+#include "build_info.hpp"
 #include "loader.hpp"
 
+#ifndef LUCIDIR
+#define LUCIDIR "/opt/luci/"
+#endif
 #ifndef LIBPATH_CONF
-#error Macro config LIBPATH_CONF missing
+#warning LIBPATH_CONF is not set
+#define LIBPATH_CONF LUCIDIR "libpath.conf"
+#endif
+#ifndef LDLUCI_CONF
+#warning LDLUCI_CONF is not set
+#define LDLUCI_CONF LUCIDIR "ld-luci.conf"
 #endif
 #ifndef SOPATH
-#error Macro config SOPATH missing
+#warning SOPATH is not set
+#define SOPATH LUCIDIR "ld-luci.so"
 #endif
 
 
@@ -26,8 +36,10 @@
 struct Opts {
 	int loglevel{Log::WARNING};
 	const char * logfile{};
+	bool logfileAppend{};
 	Vector<const char *> libpath{};
 	const char * libpathconf{ STR(LIBPATH_CONF) };
+	const char * luciconf{ STR(LDLUCI_CONF) };
 	Vector<const char *> preload{};
 	bool dynamicUpdate{};
 	bool dynamicDlUpdate{};
@@ -35,6 +47,7 @@ struct Opts {
 	bool bindNow{};
 	bool bindNot{};
 	bool tracing{};
+	bool showVersion{};
 	bool showHelp{};
 };
 
@@ -81,87 +94,48 @@ static void vector_append_unique(Vector<const char *> &dest, Vector<const char *
 		vector_append_unique(dest, s);
 }
 
-// Show build info
-const char * __attribute__((weak)) build_elfo_version() { return nullptr; }
-const char * __attribute__((weak)) build_bean_version() { return nullptr; }
-const char * __attribute__((weak)) build_bean_date() { return nullptr; }
-const char * __attribute__((weak)) build_bean_flags() { return nullptr; }
-const char * __attribute__((weak)) build_capstone_version() { return nullptr; }
-const char * __attribute__((weak)) build_capstone_flags() { return nullptr; }
-const char * __attribute__((weak)) build_dlh_version() { return nullptr; }
-const char * __attribute__((weak)) build_dlh_date() { return nullptr; }
-const char * __attribute__((weak)) build_dlh_flags() { return nullptr; }
-const char * __attribute__((weak)) build_luci_version() { return nullptr; }
-const char * __attribute__((weak)) build_luci_date() { return nullptr; }
-const char * __attribute__((weak)) build_luci_flags() { return nullptr; }
-const char * __attribute__((weak)) build_luci_compatibility() { return nullptr; }
-void build_info() {
-	LOG_INFO << "Luci";
-	if (build_luci_version() != nullptr)
-		LOG_INFO_APPEND << ' ' << build_luci_version();
-	if (build_luci_date() != nullptr)
-		LOG_INFO_APPEND << " (built " << build_luci_date() << ')';
-	LOG_INFO_APPEND << endl;
-	if (build_luci_flags() != nullptr)
-		LOG_TRACE << " with flags: " << build_luci_flags() << endl;
-	if (build_luci_compatibility() != nullptr)
-		LOG_DEBUG << " with glibc compatibility to " << build_luci_compatibility() << endl;
-
-	if (build_bean_version() != nullptr) {
-		LOG_DEBUG << "Using Bean " << build_bean_version();
-		if (build_elfo_version() != nullptr)
-			LOG_DEBUG_APPEND << " and Elfo " << build_elfo_version();
-		if (build_bean_date() != nullptr)
-			LOG_DEBUG_APPEND << " (built " << build_bean_date() << ')';
-		LOG_DEBUG_APPEND << endl;
-		if (build_bean_flags() != nullptr)
-			LOG_TRACE << " with flags: " << build_bean_flags() << endl;
-	}
-	if (build_capstone_version() != nullptr) {
-		LOG_DEBUG << "Using Capstone " << build_capstone_version() << endl;
-		if (build_capstone_flags() != nullptr)
-			LOG_TRACE << " with flags: " << build_capstone_flags() << endl;
-	}
-
-	if (build_dlh_version() != nullptr) {
-		LOG_DEBUG << "Using DirtyLittleHelper (DLH) " << build_dlh_version();
-		if (build_dlh_date() != nullptr)
-			LOG_DEBUG_APPEND << " (built " << build_dlh_date() << ')';
-		LOG_DEBUG_APPEND << endl;
-		if (build_dlh_flags() != nullptr)
-			LOG_TRACE << " with flags: " << build_dlh_flags() << endl;
-	}
-}
 
 // Setup commands
 static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts & opts) {
-	// Logger
-	auto env_loglevel = Parser::string_as<int>(Environ::variable("LD_LOGLEVEL", true)) ;
+	// Use config
+	Parser::Config config(opts.luciconf, Parser::Config::ENV_CONFIG, true);
 
-	LOG.set(static_cast<Log::Level>(env_loglevel && env_loglevel.value() > opts.loglevel ? env_loglevel.value() : opts.loglevel));
-	build_info();  // should be first output
+	// Logger
+	auto cfg_loglevel = config.value_as<int>("LD_LOGLEVEL");
+
+	LOG.set(static_cast<Log::Level>(cfg_loglevel && cfg_loglevel.value() > opts.loglevel ? cfg_loglevel.value() : opts.loglevel));
+	BuildInfo::log();  // should be first output
 	LOG_DEBUG << "Set log level to " << static_cast<int>(LOG.get()) << endl;
 
-	const char * logfile = opts.logfile == nullptr ? Environ::variable("LD_LOGFILE", true) : opts.logfile;
+	const char * logfile = opts.logfile == nullptr ? config.value("LD_LOGFILE") : opts.logfile;
 	if (logfile != nullptr) {
-		LOG_DEBUG << "Log to file " << logfile << endl;
-		LOG.output(logfile);
+		auto cfg_logfile_append = config.value_as<bool>("LD_LOGFILE_APPEND");
+		bool truncate = !(opts.logfileAppend || (cfg_logfile_append && cfg_logfile_append.value()));
+		LOG_DEBUG << "Log to file " << logfile << (truncate ? " (truncating contents)" : " (appending output)") << endl;
+		LOG.output(logfile, truncate);
 	}
 
 	// Tracing
-	auto env_tracing = Parser::string_as<bool>(Environ::variable("LD_TRACING", true));
-	if (opts.tracing || (env_tracing && env_tracing.value())) {
+	auto cfg_tracing = config.value_as<bool>("LD_TRACING");
+	if (opts.tracing || (cfg_tracing && cfg_tracing.value())) {
 		LOG_ERROR << "Tracing not implemented yet!" << endl;
 	}
 
 	// New Loader
-	auto env_dynamicupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_UPDATE", true));
-	auto env_dynamicdlupdate = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_DLUPDATE", true));
-	auto env_dynamicweak = Parser::string_as<bool>(Environ::variable("LD_DYNAMIC_WEAK", true));
-	Loader * loader = new Loader(luci_base, luci_path,
-	   opts.dynamicUpdate || (env_dynamicupdate && env_dynamicupdate.value()),
-	   opts.dynamicDlUpdate || (env_dynamicdlupdate && env_dynamicdlupdate.value()),
-	   opts.dynamicWeak || (env_dynamicweak && env_dynamicweak.value()));
+	if (luci_path == nullptr || luci_path[0] == '\0') {
+		luci_path = config.value("LD_PATH");
+		if (luci_path == nullptr || luci_path[0] == '\0')
+			luci_path = STR(SOPATH);
+	}
+	auto cfg_dynamicupdate = config.value_as<bool>("LD_DYNAMIC_UPDATE");
+	auto cfg_dynamicdlupdate = config.value_as<bool>("LD_DYNAMIC_DLUPDATE");
+	Loader * loader = new Loader(
+		luci_base,
+		luci_path,
+		opts.dynamicUpdate || (cfg_dynamicupdate && cfg_dynamicupdate.value()),
+		opts.dynamicDlUpdate || (cfg_dynamicdlupdate && cfg_dynamicdlupdate.value()),
+		opts.dynamicWeak || config.value("LD_DYNAMIC_WEAK") != nullptr
+	);
 	if (loader == nullptr) {
 		LOG_ERROR << "Unable to allocate loader" << endl;
 	} else {
@@ -176,10 +150,8 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		}
 
 		// Flags
-		auto env_bindnow = Parser::string_as<bool>(Environ::variable("LD_BIND_NOW", true));
-		loader->default_flags.bind_now = opts.bindNow || (env_bindnow && env_bindnow.value());
-		auto env_bindnot = Parser::string_as<bool>(Environ::variable("LD_BIND_NOT", true));
-		loader->default_flags.bind_not = opts.bindNot || (env_bindnot && env_bindnot.value());
+		loader->default_flags.bind_now = opts.bindNow || (config.value("LD_BIND_NOW") != nullptr);
+		loader->default_flags.bind_not = opts.bindNot || (config.value("LD_BIND_NOT") != nullptr);
 
 		// Library search path
 		for (auto & libpath : opts.libpath) {
@@ -187,7 +159,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			vector_append_unique(loader->library_path_runtime, libpath);
 		}
 
-		char * ld_library_path = Environ::variable("LD_LIBRARY_PATH", true);
+		char * ld_library_path = const_cast<char*>(config.value("LD_LIBRARY_PATH"));
 		if (ld_library_path != nullptr && *ld_library_path != '\0') {
 			LOG_DEBUG << "Add '" << ld_library_path<< "' (from LD_LIBRARY_PATH) to library search path..." << endl;
 			vector_append_unique(loader->library_path_runtime, String::split_inplace(ld_library_path, ';'));
@@ -198,7 +170,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			LOG_DEBUG << "Adding contents of '" << opts.libpathconf << "' to library search path..." << endl;
 			vector_append_unique(loader->library_path_config, File::lines(opts.libpathconf));
 		}
-		char * ld_library_conf = Environ::variable("LD_LIBRARY_CONF", true);
+		const char * ld_library_conf = config.value("LD_LIBRARY_CONF");
 		if (ld_library_conf != nullptr && *ld_library_conf != '\0' && File::readable(ld_library_conf)) {
 			LOG_DEBUG << "Adding contents of '" << ld_library_conf << "' (from LD_LIBRARY_CONF) to library search path..." << endl;
 			vector_append_unique(loader->library_path_config, File::lines(ld_library_conf));
@@ -216,7 +188,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			loader->library(preload);
 		}
 
-		char * preload = Environ::variable("LD_PRELOAD", true);
+		char * preload = const_cast<char*>(config.value("LD_PRELOAD"));
 		if (preload != nullptr && *preload != '\0') {
 			LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)..." << endl;
 			for (auto & lib : String::split_inplace(preload, ';'))
@@ -238,19 +210,22 @@ int main(int argc, char* argv[]) {
 	if (base == BASEADDRESS) {
 		// Available commandline options
 		auto args = Parser::Arguments<Opts>({
-				/* short & long name,  argument, element              required, help text,  optional validation function */
-				{'l',  "log",          "LEVEL", &Opts::loglevel,        false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
-				{'f',  "logfile",      "FILE",  &Opts::logfile,         false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
-				{'p',  "library-path", "DIR",   &Opts::libpath,         false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
-				{'c',  "library-conf", "FILE",  &Opts::libpathconf,     false, "library path configuration" },
-				{'P',  "preload",      "FILE",  &Opts::preload,         false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
-				{'u',  "update",       nullptr, &Opts::dynamicUpdate,   false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
-				{'U',  "dlupdate",     nullptr, &Opts::dynamicDlUpdate, false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1 " },
-				{'T',  "tracing",      nullptr, &Opts::tracing,         false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
-				{'w',  "weak",         nullptr, &Opts::dynamicWeak,     false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
-				{'n',  "bind-now",     nullptr, &Opts::bindNow,         false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
-				{'N',  "bind-not",     nullptr, &Opts::bindNot,         false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
-				{'h',  "help",         nullptr, &Opts::showHelp,        false, "Show this help" }
+				/* short & long name,    argument, element              required, help text,  optional validation function */
+				{'l',  "log",            "LEVEL", &Opts::loglevel,        false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
+				{'f',  "logfile",        "FILE",  &Opts::logfile,         false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
+				{'a',  "logfile-append", nullptr, &Opts::logfileAppend,   false, "Append output to log file (instead of truncate). Requires logfile, can also be enabled by setting the environment variable LD_LOGFILE_APPEND to 1" },
+				{'p',  "library-path",   "DIR",   &Opts::libpath,         false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
+				{'c',  "library-conf",   "FILE",  &Opts::libpathconf,     false, "library path configuration" },
+				{'C',  "luci-conf",      "FILE",  &Opts::luciconf,        false, "Luci loader configuration file" },
+				{'P',  "preload",        "FILE",  &Opts::preload,         false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
+				{'u',  "update",         nullptr, &Opts::dynamicUpdate,   false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
+				{'U',  "dlupdate",       nullptr, &Opts::dynamicDlUpdate, false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1 " },
+				{'T',  "tracing",        nullptr, &Opts::tracing,         false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
+				{'w',  "weak",           nullptr, &Opts::dynamicWeak,     false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
+				{'n',  "bind-now",       nullptr, &Opts::bindNow,         false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
+				{'N',  "bind-not",       nullptr, &Opts::bindNot,         false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
+				{'V',  "version",        nullptr, &Opts::showVersion,     false, "Show version information" },
+				{'h',  "help",           nullptr, &Opts::showHelp,        false, "Show this help" }
 			},
 			File::executable,
 			[](const char *) -> bool { return true; }
@@ -260,6 +235,9 @@ int main(int argc, char* argv[]) {
 		if (!args.parse(argc, argv)) {
 			LOG_ERROR << endl << "Parsing Arguments failed -- run " << endl << "   " << argv[0] << " --help" << endl << "for more information!" << endl;
 			return EXIT_FAILURE;
+		} else if (args.showVersion) {
+			BuildInfo::print(cout, true);
+			return EXIT_SUCCESS;
 		} else if (args.showHelp) {
 			args.help(cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "target args");
 			return EXIT_SUCCESS;
@@ -302,9 +280,7 @@ int main(int argc, char* argv[]) {
 
 		// Setup interpreter (luci)
 		uintptr_t luci_base = Auxiliary::vector(Auxiliary::AT_BASE).value();
-		const char * sopath = STR(SOPATH);
-		const char * sopath_env = Environ::variable("LD_PATH", true);
-		Loader * loader = setup(luci_base == 0 ? BASEADDRESS : luci_base, sopath_env != nullptr && *sopath_env != '\0' ? sopath_env : sopath, opts);
+		Loader * loader = setup(luci_base == 0 ? BASEADDRESS : luci_base, nullptr, opts);
 
 		// Load target binary
 		const char * bin = reinterpret_cast<const char *>(Auxiliary::vector(Auxiliary::AT_EXECFN).pointer());

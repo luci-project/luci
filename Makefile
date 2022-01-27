@@ -26,6 +26,7 @@ BASEADDRESS = 0x6ffff0000000
 LIBADDRESS = 0x600000000000
 # Default config file path
 LIBPATH_CONF = /opt/$(NAME)/libpath.conf
+LDLUCI_CONF = /opt/$(NAME)/ld-$(NAME).conf
 
 CXXFLAGS ?= -Og -g -std=c++2a
 CXXFLAGS += -I $(SRCFOLDER) -I $(dir $(LIBBEAN))/include/
@@ -40,7 +41,7 @@ CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-jump-tables -fno-
 CXXFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
 CXXFLAGS += -ffreestanding -ffunction-sections -fdata-sections -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
-CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBADDRESS=$(LIBADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
+CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBADDRESS=$(LIBADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DLDLUCI_CONF=$(LDLUCI_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
 CXXFLAGS += -fvisibility=hidden
 
 BUILDINFO = $(BUILDDIR)/.build_$(NAME).o
@@ -56,7 +57,7 @@ LDFLAGS = -pie -soname $(notdir $(TARGET_PATH)) --gc-sections -Ttext-segment=$(B
 SPACE = $(subst ,, )
 COMMA = ,
 
-install: $(TARGET_PATH) $(LIBPATH_CONF)
+install: $(TARGET_PATH) $(LIBPATH_CONF) $(LDLUCI_CONF)
 
 build: $(TARGET_FILE)
 
@@ -94,6 +95,9 @@ $(BUILDINFO): FORCE
 
 $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
 	$(VERBOSE) ./gen-libpath.sh $< | grep -v "i386\|i486\|i686\|lib32\|libx32" > $@
+
+$(LDLUCI_CONF): example.conf
+	$(VERBOSE) cp $< $@
 
 clean::
 	$(VERBOSE) rm -f $(DEPFILES) $(OBJECTS)
