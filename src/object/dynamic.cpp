@@ -3,6 +3,7 @@
 #include <elfo/elf_rel.hpp>
 #include <dlh/log.hpp>
 #include <dlh/string.hpp>
+#include <dlh/auxiliary.hpp>
 
 #include "compatibility/glibc/patch.hpp"
 #include "dynamic_resolve.hpp"
@@ -51,11 +52,60 @@ bool ObjectDynamic::preload() {
 
 
 void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
-	size_t dir_len = this->file.path.len - this->file.name.len - 1;
-	char dir[dir_len + 1] = {};
-	// TODO: Here we allocate space which is never freed yet
-	for (auto s : String::split_inplace(String::replace(str, "$ORIGIN", String::copy(dir, this->file.path.c_str(), dir_len)), ":"))
-		vec.emplace_back(s);
+	char str_copy[String::len(str)];
+	for (auto s : String::split_inplace(String::copy(str_copy, str), ':')) {
+		// Apply rpath token expansion if required
+		if (String::find(str, '$') != nullptr) {
+			// TODO: Here we allocate space which is never freed yet
+			char * path = String::duplicate(str, PATH_MAX + 1);
+			assert(path != nullptr);
+
+			// Origin
+			size_t origin_len = this->file.path.len - this->file.name.len - 1;
+			char origin[origin_len + 1] = {};
+			String::copy(origin, this->file.path.c_str(), origin_len);
+			String::replace_inplace(path, PATH_MAX, "$ORIGIN", origin);
+			String::replace_inplace(path, PATH_MAX, "${ORIGIN}", origin);
+
+			// Lib
+			const char * lib =
+#if defined(__x86_64__)
+				"lib64"
+#elif defined(__i386__)
+				"lib"
+#else
+				""
+#error "Rpath token expension with unknown lib"
+#endif
+			;
+			String::replace_inplace(path, PATH_MAX, "$LIB", lib);
+			String::replace_inplace(path, PATH_MAX, "${LIB}", lib);
+
+			// Platform
+			static const char * platform = nullptr;
+			if (platform == nullptr) {
+				if (auto at_platform = Auxiliary::vector(Auxiliary::AT_PLATFORM)) {
+					platform = reinterpret_cast<char *>(at_platform.pointer());
+				} else {
+					platform =
+#if defined(__x86_64__)
+					"x86_64"
+#elif defined(__i386__)
+					"i386"
+#else
+				""
+#endif
+					;
+				}
+			}
+			String::replace_inplace(path, PATH_MAX, "$PLATFORM", platform);
+			String::replace_inplace(path, PATH_MAX, "${PLATFORM}", platform);
+
+			vec.emplace_back(path);
+		} else {
+			vec.emplace_back(String::duplicate(s));
+		}
+	}
 }
 
 bool ObjectDynamic::preload_libraries() {
