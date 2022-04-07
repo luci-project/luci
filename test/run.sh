@@ -10,10 +10,11 @@ LD_SYSTEM=false
 LD_LOGLEVEL=3
 LD_DYNAMIC_UPDATE=0
 EXEC="run"
-
+TIMEOUT=120
+TIMEOUT_KILLDELAY=1
 
 # Options
-while getopts "c:dhl:r:uR" OPT; do
+while getopts "c:dhl:r:t:uR" OPT; do
 	case "${OPT}" in
 		c)
 			COMPILER=${OPTARG}
@@ -26,6 +27,9 @@ while getopts "c:dhl:r:uR" OPT; do
 			;;
 		r)
 			LD_PATH_SHORT=${OPTARG}
+			;;
+		t)
+			TIMEOUT=${OPTARG}
 			;;
 		u)
 			LD_DYNAMIC_UPDATE=1
@@ -40,6 +44,7 @@ while getopts "c:dhl:r:uR" OPT; do
 			echo "	-c COMPILER  Use 'GCC' (default) or 'LLVM'" >&2
 			echo "	-l LOGLEVEL  Specify log level (default: $LD_LOGLEVEL)" >&2
 			echo "	-r PATH      (Short) Path for RTLD (default: $LD_PATH_SHORT)" >&2
+			echo "	-t SECONDS   set maximum run time per test case (default: $TIMEOUT)" >&2
 			echo "	-d           Debug: Print output" >&2
 			echo "	-h           Show this help" >&2
 			echo "	-u           Enable dynamic updates (disabled by default)" >&2
@@ -66,6 +71,11 @@ case $COMPILER in
 		exit 1
 		;;
 esac
+
+if [[ $TIMEOUT =~ [^0-9] ]] ; then
+   echo "Invalid timeout seconds:'$TIMEOUT'" >&2
+   exit 1
+fi
 
 TESTS="*"
 if [ $# -gt 0 ] ; then
@@ -168,6 +178,22 @@ for TEST in ${TESTS} ; do
 			exit 1
 		fi
 
+		# Set timeout thread
+		if [[ $TIMEOUT -gt 0 ]] ; then
+			(
+				PID=${BASHPID}
+				sleep $TIMEOUT
+				echo -e "\e[31mRuntime of $TIMEOUT seconds exceeded -- stopping via SIGTERM...\e[0m" >&2
+				if ps -o pid --ppid $$ | sed -e "/^[ ]*\(${PID}\|PID\)\$/d" | xargs kill -s SIGTERM 2>/dev/null ; then
+					sleep $TIMEOUT_KILLDELAY
+					if ps -o pid --ppid $$ | sed -e "/^[ ]*\(${PID}\|PID\)\$/d" | xargs kill -s SIGKILL 2>/dev/null ; then
+						echo -e "\e[31m(stopped via SIGKILL)\e[0m" >&2
+					fi
+				fi
+			) &
+			TIMEOUT_PID=$!
+		fi
+
 		# (Re)Set environment variables
 		export LC_ALL=C
 		export LD_NAME
@@ -176,7 +202,6 @@ for TEST in ${TESTS} ; do
 		export LD_LOGLEVEL
 		export LD_DYNAMIC_UPDATE
 		export LD_LIBRARY_PATH=$(readlink -f "${TEST}")
-
 
 		# Execute and capture stdout + stderr
 		STDOUT=$(mktemp)
@@ -206,6 +231,16 @@ for TEST in ${TESTS} ; do
 			exit ${EXITCODE}
 		fi
 		cd "${TESTDIR}"
+
+		# Stop Timeout process
+		if [[ $TIMEOUT -gt 0 ]] ; then
+			kill -s SIGTERM $TIMEOUT_PID 2>/dev/null \
+			&& sleep .1 \
+			&& kill -0 $TIMEOUT_PID 2>/dev/null \
+			&& sleep $TIMEOUT_KILLDELAY \
+			&& kill -s SIGKILL $TIMEOUT_PID 2>/dev/null \
+			|| true
+		fi
 
 		# Compare stdout + stderr with example
 		check "${TEST}/.stdout" < "$STDOUT"
