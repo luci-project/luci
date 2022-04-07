@@ -181,18 +181,21 @@ for TEST in ${TESTS} ; do
 		# Set timeout thread
 		if [[ $TIMEOUT -gt 0 ]] ; then
 			(
-				(
-					PID=${BASHPID}
-					sleep $TIMEOUT
-					echo -e "\e[31mRuntime of $TIMEOUT seconds exceeded -- stopping via SIGTERM...\e[0m"
-					if ps -o pid --ppid $$ | sed -e "/^[ ]*\(${PID}\|PID\)\$/d" | xargs kill -s SIGTERM ; then
+				sleep 1
+				if TARGET=$(ps -o pid=,cmd= --ppid $$ 2>/dev/null | sed -ne "s|^[ ]*\([0-9]*\) .*\./${EXEC}\$|\1|p") ; then
+					for ((t=1;t<$TIMEOUT;t++)) ; do
+						sleep 1
+						kill -0 $TARGET 2>/dev/null || exit 0
+					done
+					echo -e "\e[31mRuntime of $TIMEOUT seconds exceeded -- stopping PID $TARGET (${EXEC}) via SIGTERM...\e[0m" >&2
+					if kill -s SIGTERM $TARGET 2>/dev/null ; then
 						sleep $TIMEOUT_KILLDELAY
-						if ps -o pid --ppid $$ | sed -e "/^[ ]*\(${PID}\|PID\)\$/d" | xargs kill -s SIGKILL ; then
-							echo -e "\e[31m(stopped via SIGKILL)\e[0m"
+						if kill -s SIGKILL $TARGET 2>/dev/null ; then
+							echo -e "\e[31m(stopped via SIGKILL)\e[0m" >&2
 						fi
 					fi
-				) 2>/dev/null
-			) 1>&2 &
+				fi
+			) &
 			TIMEOUT_PID=$!
 		fi
 
@@ -236,9 +239,7 @@ for TEST in ${TESTS} ; do
 
 		# Stop Timeout process
 		if [[ $TIMEOUT -gt 0 ]] ; then
-			(
-				kill -s SIGTERM $TIMEOUT_PID && wait $TIMEOUT_PID || true
-			) 2>/dev/null
+			wait $TIMEOUT_PID 2>/dev/null || true
 		fi
 
 		# Compare stdout + stderr with example
