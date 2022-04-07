@@ -181,16 +181,18 @@ for TEST in ${TESTS} ; do
 		# Set timeout thread
 		if [[ $TIMEOUT -gt 0 ]] ; then
 			(
-				PID=${BASHPID}
-				sleep $TIMEOUT
-				echo -e "\e[31mRuntime of $TIMEOUT seconds exceeded -- stopping via SIGTERM...\e[0m" >&2
-				if ps -o pid --ppid $$ | sed -e "/^[ ]*\(${PID}\|PID\)\$/d" | xargs kill -s SIGTERM 2>/dev/null ; then
-					sleep $TIMEOUT_KILLDELAY
-					if ps -o pid --ppid $$ | sed -e "/^[ ]*\(${PID}\|PID\)\$/d" | xargs kill -s SIGKILL 2>/dev/null ; then
-						echo -e "\e[31m(stopped via SIGKILL)\e[0m" >&2
+				(
+					PID=${BASHPID}
+					sleep $TIMEOUT
+					echo -e "\e[31mRuntime of $TIMEOUT seconds exceeded -- stopping via SIGTERM...\e[0m"
+					if ps -o pid --ppid $$ | sed -e "/^[ ]*\(${PID}\|PID\)\$/d" | xargs kill -s SIGTERM ; then
+						sleep $TIMEOUT_KILLDELAY
+						if ps -o pid --ppid $$ | sed -e "/^[ ]*\(${PID}\|PID\)\$/d" | xargs kill -s SIGKILL ; then
+							echo -e "\e[31m(stopped via SIGKILL)\e[0m"
+						fi
 					fi
-				fi
-			) &
+				) 2>/dev/null
+			) 1>&2 &
 			TIMEOUT_PID=$!
 		fi
 
