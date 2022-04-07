@@ -236,12 +236,9 @@ for TEST in ${TESTS} ; do
 
 		# Stop Timeout process
 		if [[ $TIMEOUT -gt 0 ]] ; then
-			kill -s SIGTERM $TIMEOUT_PID 2>/dev/null \
-			&& sleep .1 \
-			&& kill -0 $TIMEOUT_PID 2>/dev/null \
-			&& sleep $TIMEOUT_KILLDELAY \
-			&& kill -s SIGKILL $TIMEOUT_PID 2>/dev/null \
-			|| true
+			(
+				kill -s SIGTERM $TIMEOUT_PID && wait $TIMEOUT_PID || true
+			) 2>/dev/null
 		fi
 
 		# Compare stdout + stderr with example
