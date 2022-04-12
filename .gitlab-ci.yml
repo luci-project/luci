@@ -27,7 +27,7 @@ fetch-artifacts:
   artifacts:
     paths:
       - "bean/elfo/elfo-*"
-      - "bean/example-*"
+      - "bean/bean-*"
   retry: 1
 
 test-debian-stretch-gcc:
