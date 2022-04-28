@@ -70,7 +70,7 @@ struct link_map {
 
 #if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
 	uintptr_t *l_info[76];
-#elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64) || defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
 	uintptr_t *l_info[77];
 #endif
 
@@ -119,16 +119,19 @@ struct link_map {
 	uint32_t l_symbolic_in_local_scope : 1;
 	uint32_t l_free_initfini           : 1;
 
-#if defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-	uint16_t l_nodelete_active;
-	uint16_t l_nodelete_pending;
-	enum {
+	enum CET {
 		lc_unknown = 0,                       /* Unknown CET status.  */
 		lc_none    = 1 << 0,                  /* Not enabled with CET.  */
 		lc_ibt     = 1 << 1,                  /* Enabled with IBT.  */
 		lc_shstk   = 1 << 2,                  /* Enabled with STSHK.  */
 		lc_ibt_and_shstk = lc_ibt | lc_shstk  /* Enabled with both.  */
-	} l_cet;
+	};
+#if defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
+	enum CET l_cet : 3;
+#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+	uint16_t l_nodelete_active;
+	uint16_t l_nodelete_pending;
+	enum CET l_cet;
 #endif
 
 	struct {
@@ -187,6 +190,10 @@ struct link_map {
 
 #if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
 static_assert(sizeof(link_map) == 1136, "Wrong link_map size for Debian Stretch (amd64)");
+#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
+static_assert(sizeof(link_map) == 1144, "Wrong link_map size for Debian Buster (amd64)");
+#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
+static_assert(sizeof(link_map) == 1152, "Wrong link_map size for Debian Bullseye (amd64)");
 #elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
 static_assert(sizeof(link_map) == 1152, "Wrong link_map size for Ubuntu Focal (amd64)");
 #else

@@ -33,7 +33,7 @@ struct rtld_global {
 	__rtld_lock_t _dl_load_write_lock;
 	uint64_t _dl_load_adds;
 	GLIBC::DL::link_map *_dl_initfirst;
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64) || defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
 	uint64_t _dl_cpuclock_offset;
 #endif
 	GLIBC::DL::link_map *_dl_profile_map;
@@ -51,19 +51,22 @@ struct rtld_global {
 
 	void (*_dl_rtld_lock_recursive)(void *);
 	void (*_dl_rtld_unlock_recursive)(void *);
-#if defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+#if defined(COMPATIBILITY_DEBIAN_BUSTER_X64) || defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
 	uint32_t _dl_x86_feature_1[2];
 	uint64_t _dl_x86_legacy_bitmap[2];
 #endif
 	int (*_dl_make_stack_executable_hook)(void**);
 	uint32_t _dl_stack_flags;
-	uint32_t _dl_tls_dtv_gaps;
+	uint32_t _dl_tls_dtv_gaps; // TODO: _Bool ?
 	size_t _dl_tls_max_dtv_idx;
 	void *_dl_tls_dtv_slotinfo_list;
 	size_t _dl_tls_static_nelem;
 	size_t _dl_tls_static_size;
 	size_t _dl_tls_static_used;
 	size_t _dl_tls_static_align;
+#if defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
+	size_t _dl_tls_static_optional;
+#endif
 	void *_dl_initial_dtv;
 	size_t _dl_tls_generation;
 	void (*_dl_init_static_tls)(GLIBC::DL::link_map *);
@@ -72,9 +75,13 @@ struct rtld_global {
 } rtld_global;
 
 #if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-static_assert(sizeof(rtld_global) == 3968, "Wrong size of rtld_globalo for Debian Stretch (amd64)");
+static_assert(sizeof(rtld_global) == 3968, "Wrong size of rtld_global for Debian Stretch (amd64)");
+#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
+static_assert(sizeof(rtld_global) == 3992, "Wrong size of rtld_global for Debian Buster (amd64)");
+#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
+static_assert(sizeof(rtld_global) == 4000, "Wrong size of rtld_global for Debian Bullseye (amd64)");
 #elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-static_assert(sizeof(rtld_global) == 3992, "Wrong size of rtld_globalo for Ubuntu Focal (amd64)");
+static_assert(sizeof(rtld_global) == 3992, "Wrong size of rtld_global for Ubuntu Focal (amd64)");
 #else
 #error No (known) rtld_global compatibility mode specified
 #endif
@@ -142,42 +149,45 @@ struct rtld_global_ro {
 	/* Pointer to the auxv list supplied to the program at startup.  */
 	void *_dl_auxv = nullptr;
 
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
+	/* CPU Feature information */
 	struct cpu_features {
 		enum cpu_features_kind {
 			arch_kind_unknown = 0,
 			arch_kind_intel = 1,
 			arch_kind_amd =	2,
 			arch_kind_other = 3
-		} kind;
-		int max_cpuid;
+		};
 		struct cpuid_registers {
 			unsigned eax;
 			unsigned ebx;
 			unsigned ecx;
 			unsigned edx;
-		} cpuid[3];
+		};
+#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
+		enum cpu_features_kind kind;
+		int max_cpuid;
+		struct cpuid_registers cpuid[3];
 		unsigned family;
 		unsigned model;
 		unsigned long xsave_state_size;
 		unsigned feature;
-	} _dl_x86_cpu_features;
-#elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
- 	struct cpu_features {
-		struct cpuid_registers {
-			unsigned eax;
-			unsigned ebx;
-			unsigned ecx;
-			unsigned edx;
-		} cpuid[6];
+#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
+		enum cpu_features_kind kind;
+		int max_cpuid;
+		struct cpuid_registers cpuid[3];
+		unsigned family;
+		unsigned model;
+		unsigned long xsave_state_size;
+		unsigned xsave_state_full_size;
+		unsigned feature;
+		unsigned long data_cache_size;
+		unsigned long shared_cache_size;
+		unsigned long non_temporal_threshold;
+#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+		struct cpuid_registers cpuid[6];
 		unsigned feature[2];
 		struct cpu_features_basic {
-			enum cpu_features_kind {
-				arch_kind_unknown = 0,
-				arch_kind_intel = 1,
-				arch_kind_amd = 2,
-				arch_kind_other = 3
-			} kind;
+			enum cpu_features_kind kind;
 			int max_cpuid;
 			unsigned family;
 			unsigned model;
@@ -188,7 +198,9 @@ struct rtld_global_ro {
 		unsigned long data_cache_size;
 		unsigned long shared_cache_size;
 		unsigned long non_temporal_threshold;
+#endif
 	} _dl_x86_cpu_features;
+#if defined(COMPATIBILITY_DEBIAN_BUSTER_X64) || defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
 	const char _dl_x86_hwcap_flags[3][9] = { "sse2", "x86_64", "avx512_1" };
 	const char _dl_x86_platforms[4][9] = { "i586", "i686", "haswell", "xeon_phi" };
 #endif
@@ -203,6 +215,10 @@ struct rtld_global_ro {
 	   0 if not, -2 use the default (honor biases for normal
 	   binaries, don't honor for PIEs).  */
 	uintptr_t _dl_use_load_bias = 0;
+
+#if defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
+	size_t _dl_tls_static_surplus;
+#endif
 
 	/* Name of the shared object to be profiled (if any).  */
 	const char *_dl_profile = 0;
@@ -228,7 +244,7 @@ struct rtld_global_ro {
 	   and this points to it.  */
 	/* struct link_map */ void *_dl_sysinfo_map = nullptr;
 
-#if defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+#if defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
 	void * _dl_vdso_clock_gettime64;
 	void * _dl_vdso_gettimeofday;
 	void * _dl_vdso_time;
@@ -264,6 +280,10 @@ struct rtld_global_ro {
 } rtld_global_ro;
 #if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
 static_assert(sizeof(rtld_global_ro) == 376, "Wrong size of rtld_global_ro for Debian Stretch (amd64)");
+#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
+static_assert(sizeof(rtld_global_ro) == 432, "Wrong size of rtld_global_ro for Debian Buster (amd64)");
+#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
+static_assert(sizeof(rtld_global_ro) == 544, "Wrong size of rtld_global_ro for Debian Bullseye (amd64)");
 #elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
 static_assert(sizeof(rtld_global_ro) == 536, "Wrong size of rtld_global_ro for Ubuntu Focal (amd64)");
 #else
