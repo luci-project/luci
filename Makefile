@@ -56,13 +56,25 @@ LDFLAGS = -pie -soname $(notdir $(TARGET_PATH)) --gc-sections -Ttext-segment=$(B
 # Helper
 SPACE = $(subst ,, )
 COMMA = ,
+FOREACHVERSIONDO = grep -r '$(COMPATIBILITY_PREFIX)' $(SRCFOLDER) | sed -ne 's/^.*defined($(COMPATIBILITY_PREFIX)_\([^_]*\)_\([^_]*\)_\([^)]*\)).*$$/\L\1 \2 \3/p' | sort -u | xargs -n3 sh -c
 
 install: $(TARGET_PATH) $(LIBPATH_CONF) $(LDLUCI_CONF)
+
+install-only: $(LIBPATH_CONF) $(LDLUCI_CONF)
+	$(VERBOSE) test -f "$(TARGET_FILE)"
+	$(VERBOSE) ln -s $(shell readlink -f "$(TARGET_FILE)") "/opt/luci/ld-luci.so"
 
 build: $(TARGET_FILE)
 
 all:
-	@grep -r '$(COMPATIBILITY_PREFIX)' $(SRCFOLDER) | sed -ne 's/^.*defined($(COMPATIBILITY_PREFIX)_\([^_]*\)_\([^_]*\)_\([^)]*\)).*$$/\L\1 \2 \3/p' | sort -u | xargs -n3 sh -c 'echo "\e[1mBuilding luci for $$0 $$1 ($$2)\e[0m" ; $(MAKE) OS=$$0 OSVERSION=$$1 PLATFORM=$$2 build'
+	$(VERBOSE) $(FOREACHVERSIONDO) 'echo "\e[1mBuilding luci for $$0 $$1 ($$2)\e[0m" ; $(MAKE) OS=$$0 OSVERSION=$$1 PLATFORM=$$2 build'
+
+test-all:
+	$(VERBOSE) $(FOREACHVERSIONDO) 'echo "\e[1mTesting luci for $$0 $$1 ($$2)\e[0m" ; $(MAKE) OS=$$0 OSVERSION=$$1 PLATFORM=$$2 test'
+
+test: $(TARGET_FILE)
+	$(VERBOSE) uname -m | sed -e "s/^x86_64$$/x64/" | xargs test "$(PLATFORM)" =
+	$(VERBOSE) ./tools/docker.sh $(OS):$(OSVERSION) /bin/sh -c "apt install -y gcc g++ && ./test/run.sh && ./test/run.sh -u"
 
 $(LIBBEAN):
 	@echo "GEN		$@"
@@ -110,10 +122,10 @@ $(BUILDDIR): ; @mkdir -p $@
 
 $(DEPFILES):
 
-ifeq ($(filter-out all clean,$(MAKECMDGOALS)),$(MAKECMDGOALS))
+ifeq ($(filter-out all clean install-only,$(MAKECMDGOALS)),$(MAKECMDGOALS))
 -include $(DEPFILES)
 endif
 
 FORCE:
 
-.PHONY: install all clean mrproper
+.PHONY: install install-only all clean mrproper
