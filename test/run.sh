@@ -163,7 +163,7 @@ function skip() {
 	return 1
 }
 
-declare -a FAILED
+FAILED=()
 TESTDIR="$(pwd)"
 for TEST in ${TESTS} ; do
 	if [ -d "${TEST}" ] ; then
@@ -281,10 +281,10 @@ for TEST in ${TESTS} ; do
 done
 
 if [[ ${#FAILED[@]} -eq 0 ]] ; then
-	echo -e "\n\n\e[32mTests finished successfully\e[0m"
+	echo -e "\n\e[32mTests finished successfully\e[0m"
 	exit 0
 else
-	echo -e "\n\n\e[31m${#FAILED[@]} test(s) failed:\e[0m"
+	echo -e "\n\e[31m${#FAILED[@]} test(s) failed:\e[0m"
 	for TEST in "${FAILED[@]}" ; do
 		echo -e "\e[31m - $TEST\e[0m"
 	done
