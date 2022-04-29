@@ -6,6 +6,7 @@ COMPILER="GCC"
 LD_NAME="Luci"
 LD_PATH_SHORT="/opt/luci/ld-luci.so"
 DEBUG_OUTPUT=false
+STOP_ON_ERROR=false
 LD_SYSTEM=false
 LD_LOGLEVEL=3
 LD_DYNAMIC_UPDATE=0
@@ -14,7 +15,7 @@ TIMEOUT=120
 TIMEOUT_KILLDELAY=1
 
 # Options
-while getopts "c:dhl:r:t:uR" OPT; do
+while getopts "c:dhl:r:st:uR" OPT; do
 	case "${OPT}" in
 		c)
 			COMPILER=${OPTARG}
@@ -27,6 +28,9 @@ while getopts "c:dhl:r:t:uR" OPT; do
 			;;
 		r)
 			LD_PATH_SHORT=${OPTARG}
+			;;
+		s)
+			STOP_ON_ERROR=true
 			;;
 		t)
 			TIMEOUT=${OPTARG}
@@ -45,6 +49,7 @@ while getopts "c:dhl:r:t:uR" OPT; do
 			echo "	-l LOGLEVEL  Specify log level (default: $LD_LOGLEVEL)" >&2
 			echo "	-r PATH      (Short) Path for RTLD (default: $LD_PATH_SHORT)" >&2
 			echo "	-t SECONDS   set maximum run time per test case (default: $TIMEOUT)" >&2
+			echo "	-s           Stop on (first) Error" >&2
 			echo "	-d           Debug: Print output" >&2
 			echo "	-h           Show this help" >&2
 			echo "	-u           Enable dynamic updates (disabled by default)" >&2
@@ -158,7 +163,7 @@ function skip() {
 	return 1
 }
 
-
+declare -a FAILED
 TESTDIR="$(pwd)"
 for TEST in ${TESTS} ; do
 	if [ -d "${TEST}" ] ; then
@@ -175,7 +180,11 @@ for TEST in ${TESTS} ; do
 		# Check executable
 		if [ ! -x "${TEST}/${EXEC}" ] ; then
 			echo "No executable file (${TEST}/${EXEC}) found" >&2
-			exit 1
+			if ${STOP_ON_ERROR} ; then
+				exit 1
+			else
+				continue
+			fi
 		fi
 
 		# Set timeout thread
@@ -213,6 +222,7 @@ for TEST in ${TESTS} ; do
 		STDERR=$(mktemp)
 
 		cd "${TEST}"
+		EXITCODE=0
 		SECONDS=0
 		if ${DEBUG_OUTPUT} ; then
 			if ../../tools/stdlog -t -e "$STDERR" -e- -o "$STDOUT" -o- "./${EXEC}" ; then
@@ -221,7 +231,11 @@ for TEST in ${TESTS} ; do
 				EXITCODE=$?
 				echo -e "\e[31mExecution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
 				rm "$STDOUT" "$STDERR"
-				exit ${EXITCODE}
+				if ${STOP_ON_ERROR} ; then
+					exit ${EXITCODE}
+				else
+					FAILED+=( "$TEST (exit code ${EXITCODE})" )
+				fi
 			fi
 		elif "./${EXEC}" 2>"$STDERR" >"$STDOUT" ; then
 			echo "(finished after ${SECONDS}s)"
@@ -233,7 +247,11 @@ for TEST in ${TESTS} ; do
 			cat "$STDERR" >&2
 			echo -e "\e[31mExecution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
 			rm "$STDOUT" "$STDERR"
-			exit ${EXITCODE}
+			if ${STOP_ON_ERROR} ; then
+				exit ${EXITCODE}
+			else
+				FAILED+=( "$TEST (exit code ${EXITCODE})" )
+			fi
 		fi
 		cd "${TESTDIR}"
 
@@ -243,13 +261,32 @@ for TEST in ${TESTS} ; do
 		fi
 
 		# Compare stdout + stderr with example
-		check "${TEST}/.stdout" < "$STDOUT"
-		check "${TEST}/.stderr" < "$STDERR"
+		if ! ( check "${TEST}/.stdout" < "$STDOUT" &&  check "${TEST}/.stderr" < "$STDERR" ) ; then
+			echo -e "\e[31mUnexpected output content of ${EXEC} (${TEST}) -- runtime ${SECONDS}s\e[0m" >&2
+			if ${STOP_ON_ERROR} ; then
+				exit ${EXITCODE}
+			else
+				FAILED+=( "$TEST (output mismatch)" )
+			fi
+		fi
 
 		# Remove files
 		rm "$STDOUT" "$STDERR"
 	elif [ "$TESTS" != "*" ] ; then
 		echo "Test '$TEST' does not exist!" >&2
-		exit 1
+		if ${STOP_ON_ERROR} ; then
+			exit 1
+		fi
 	fi
 done
+
+if [[ ${#FAILED[@]} -eq 0 ]] ; then
+	echo -e "\n\n\e[32mTests finished successfully\e[0m"
+	exit 0
+else
+	echo -e "\n\n\e[31m${#FAILED[@]} test(s) failed:\e[0m"
+	for TEST in "${FAILED[@]}" ; do
+		echo -e "\e[31m - $TEST\e[0m"
+	done
+	exit 1
+fi
