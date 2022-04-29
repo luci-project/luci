@@ -44,6 +44,34 @@ test-debian-stretch-gcc:
     - ./test/run.sh -c GCC -u
   retry: 2
 
+test-debian-buster-gcc:
+  image: debian:buster
+  stage: test
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc g++ make
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+  retry: 2
+
+test-debian-bullseye-gcc:
+  image: debian:bullseye
+  stage: test
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc g++ make
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+  retry: 2
+
 test-ubuntu-focal-gcc:
   image: ubuntu:focal
   stage: test
@@ -68,6 +96,34 @@ test-debian-stretch-llvm:
     - apt-get update && apt-get install -y clang-11 make
     - update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
     - update-alternatives --install /usr/bin/cc cc /usr/bin/clang 110 --slave /usr/bin/c++ c++ /usr/bin/clang++
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+  retry: 2
+
+test-debian-buster-llvm:
+  image: debian:buster
+  stage: test
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y clang make
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+  retry: 2
+
+test-debian-bullseye-llvm:
+  image: debian:bullseye
+  stage: test
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y clang make
   script:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
