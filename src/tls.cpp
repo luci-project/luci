@@ -72,7 +72,7 @@ void TLS::dtv_free(Thread * thread) {
 
 	auto count = dtv_module_size(thread->dtv);
 	assert(count >= initial_count);
-	for (size_t i = initial_count; i < count; i++)
+	for (size_t i = initial_count + 1; i < count; i++)
 		if (thread->dtv[i].allocated())
 			Memory::free(*(reinterpret_cast<uintptr_t*>(thread->dtv[i].pointer.val) - 1));
 
