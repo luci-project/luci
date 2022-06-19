@@ -331,7 +331,17 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 
 	// Prepare
 	if (flags.initialized == 1) {
-		assert(o->file_previous != nullptr || type == Elf::ET_EXEC || o->base == data.addr);
+		if (o->file_previous != nullptr) {
+			LOG_INFO << "Prepare new version of " << path << endl;
+			// Lazy evaluation is not possible for updated files!
+			flags.bind_now = 1;
+			// Fix relocations in dynamic objects
+			if (!o->prepare()) {
+				LOG_WARNING << "Preparing updated object " << path << " failed!" << endl;
+			}
+		} else {
+			assert(type == Elf::ET_EXEC || o->base == data.addr);
+		}
 		o->status = Object::STATUS_PREPARED;
 	}
 

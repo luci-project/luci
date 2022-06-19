@@ -169,15 +169,13 @@ bool ObjectDynamic::fix() {
 	return true;
 }
 
-bool ObjectDynamic::prepare(bool update) {
+bool ObjectDynamic::prepare() {
 	LOG_INFO << "Prepare " << *this << " with " << (void*)global_offset_table << endl;
 	bool success = true;
 
-
 	// Perform initial relocations
-	if (!update)
-		for (auto & reloc : dynamic_relocations)
-			relocate(reloc, true);
+	for (auto & reloc : dynamic_relocations)
+		relocate(reloc, true);
 
 	// PLT relocations
 	if (global_offset_table != 0) {
@@ -189,7 +187,7 @@ bool ObjectDynamic::prepare(bool update) {
 
 		// Remainder for relocations
 		for (const auto & reloc : dynamic_relocations_plt)
-			if (update || file.flags.bind_now == 1)
+			if (file.flags.bind_now == 1)
 				relocate(reloc, true);
 			else
 				Relocator(reloc).increment_value(base, base);

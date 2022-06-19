@@ -103,7 +103,7 @@ struct Object : public Elf {
 	bool map();
 
 	/*! \brief Prepare relocations */
-	virtual bool prepare(bool update = false) { (void)update; return true; };
+	virtual bool prepare() { return true; };
 
 	/*! \brief Update relocations */
 	virtual bool update() { return true; };

@@ -7,7 +7,7 @@ struct ObjectRelocatable : public Object {
 	ObjectRelocatable(ObjectIdentity & file, const Object::Data & data) : Object{file, data} {}
 
 	/*! \brief Relocate sections */
-	bool prepare(bool update = false) override;
+	bool prepare() override;
 
  protected:
 	bool preload() override {

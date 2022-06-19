@@ -1,6 +1,5 @@
 #include "object/relocatable.hpp"
 
-bool ObjectRelocatable::prepare(bool update) {
-	(void)update;
+bool ObjectRelocatable::prepare() {
 	return false;
 }
