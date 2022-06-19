@@ -31,7 +31,7 @@ void TLS::dtv_setup(Thread * thread) {
 
 		// Calculate address of module
 		auto addr = start - module.offset;
-		assert(addr % module.align == 0);
+		//TODO: assert(addr % module.align == 0); ?
 		assert(addr < start);  // only x86_64
 
 		// Copy data & assign pointer
@@ -86,7 +86,7 @@ void TLS::dtv_copy(Thread * thread, size_t module_id, void * ptr) const {
 	auto & dtv_ptr = thread->dtv[module_id].pointer;
 
 	// Copy tdata
-	LOG_INFO << "Copy " << module.image_size << " from " << reinterpret_cast<void*>(module.object.current->base + module.image) << " to " << ptr << endl;
+	LOG_INFO << "Copy " << module.image_size << " bytes from " << reinterpret_cast<void*>(module.object.current->base + module.image) << " to " << ptr << " (" << module.size << " bytes)" << endl;
 	Memory::copy(ptr, reinterpret_cast<void*>(module.object.current->base + module.image), module.image_size);
 	// Clear tbss
 	if (module.size > module.image_size)
