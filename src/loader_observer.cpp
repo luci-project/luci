@@ -51,19 +51,26 @@ void Loader::observer_loop() {
 
 				// Get Object
 				GuardedWriter _{lookup_sync};
+				bool do_relocate = false;
 				for (auto & object_file : lookup)
 					if (event->wd == object_file.wd) {
+						Object * updated_object;
 						LOG_DEBUG << "Notification for file modification in " << object_file.path << endl;
 						if ((event->mask & IN_IGNORED) != 0) {
 							// Reinstall watch
 							if (!object_file.watch(true))
 								LOG_ERROR << "Unable to watch for updates of " << object_file.path << endl;
-						} else if (object_file.load() != nullptr && !relocate(true)) {
-							LOG_ERROR << "Relocation failed during update of " << object_file.path << endl;
-							assert(false);
+						} else if ((updated_object = object_file.load()) != nullptr) {
+							if (!updated_object->prepare(true)) {
+								LOG_WARNING << "Preparing updated object of " << object_file.path << " failed!" << endl;
+							}
+							do_relocate = true;
 						}
-						break;
 					}
+				if (do_relocate && !relocate(true)) {
+					LOG_ERROR << "Updating relocations failed!" << endl;
+					assert(false);
+				}
 			}
 		}
 	}

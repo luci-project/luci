@@ -28,7 +28,7 @@ struct ObjectDynamic : public ObjectExecutable {
 	/*! \brief load required libaries */
 	bool preload_libraries();
 
-	bool prepare() override;
+	bool prepare(bool update = false) override;
 
 	bool update() override;
 
