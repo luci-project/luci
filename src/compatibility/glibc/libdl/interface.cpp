@@ -261,3 +261,10 @@ EXPORT void *dlvsym(void *__restrict handle, const char *__restrict symbol, cons
 	LOG_TRACE << "GLIBC dlvsym( " << handle << ", " << symbol << ", " << version << ")" << endl;
 	return _dlvsym(handle, symbol, version, __builtin_extract_return_addr(__builtin_return_address(0)));
 }
+
+EXPORT void _dl_rtld_di_serinfo (GLIBC::DL::link_map *loader, GLIBC::DL::Serinfo *si, bool counting) {
+	(void) loader;
+	(void) si;
+	(void) counting;
+	LOG_WARNING << "GLIBC _dl_rtld_di_serinfo not implemented!" << endl;
+}

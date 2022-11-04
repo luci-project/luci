@@ -1,5 +1,6 @@
 #include "compatibility/glibc/rtld/global.hpp"
 
+#include <dlh/log.hpp>
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
 #include <dlh/string.hpp>
@@ -297,6 +298,21 @@ __attribute__ ((visibility("default"))) int __libc_enable_secure = 0;
 void *libc_stack_end = nullptr;
 extern __attribute__ ((alias("libc_stack_end"), visibility("default"))) void * __libc_stack_end;
 
+void *dlfcn_hook = nullptr;
+extern __attribute__ ((alias("dlfcn_hook"), visibility("default"))) void * _dlfcn_hook;
+
+
+__attribute__ ((visibility("default"))) unsigned int __rseq_flags = 0;
+__attribute__ ((visibility("default"))) unsigned int __rseq_size = 0;
+__attribute__ ((visibility("default"))) ptrdiff_t __rseq_offset = 0;
+
+EXPORT const rtld_global_ro::cpu_features * _dl_x86_get_cpu_features() {
+	return &(rtld_global_ro._dl_x86_cpu_features);
+}
+
+EXPORT const rtld_global_ro::cpu_features * __get_cpu_features() {
+	return &(rtld_global_ro._dl_x86_cpu_features);
+}
 
 namespace GLIBC {
 namespace RTLD {
@@ -319,6 +335,14 @@ static void * error_catch_tsd() {
 static void notimplemented() {
 	LOG_ERROR << "This function was not implemented" << endl;
 }
+
+static void _dl_debug_printf(const char *fmt, ...) {
+	va_list arg;
+	va_start (arg, fmt);
+	LOG_DEBUG.output(fmt, arg);
+	va_end (arg);
+}
+
 
 void init_globals(const Loader & loader) {
 	uintptr_t sysinfo = 0;
@@ -363,7 +387,7 @@ void init_globals(const Loader & loader) {
 	rtld_global._dl_init_static_tls = reinterpret_cast<	void (*)(GLIBC::DL::link_map *)>(notimplemented);
 	rtld_global._dl_wait_lookup_done = reinterpret_cast<	void (*)()>(notimplemented);
 
-	rtld_global_ro._dl_debug_printf = reinterpret_cast<void (*) (const char *, ...)>(notimplemented);
+	rtld_global_ro._dl_debug_printf = _dl_debug_printf;
 	rtld_global_ro._dl_mcount = reinterpret_cast<void (*) (intptr_t, uintptr_t)>(notimplemented);
 	rtld_global_ro._dl_lookup_symbol_x = reinterpret_cast<void * (*) (const char *, void *, const void **, void *[], const void *, int, int, void *)>(notimplemented);
 	rtld_global_ro._dl_open = reinterpret_cast<void *(*) (const char *, int, const void *, int, int, char **, char **)>(notimplemented);

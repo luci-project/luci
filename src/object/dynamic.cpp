@@ -253,7 +253,8 @@ bool ObjectDynamic::patchable() const {
 	LOG_DEBUG << "Found " << diff.size() << " differences in " << this->file << " (compared to the current version)" << endl;
 	if (!Bean::patchable(diff)) {
 		LOG_WARNING << "New version of " << this->file << " has non-trivial changes in the data section..." << endl;
-		return false;
+		if (!file.loader.force_update)
+			return false;
 	}
 
 	// Check if all required (referenced) symbols to previous object still exist in the new version

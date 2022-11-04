@@ -43,6 +43,7 @@ struct Opts {
 	Vector<const char *> preload{};
 	bool dynamicUpdate{};
 	bool dynamicDlUpdate{};
+	bool forceUpdate{};
 	bool dynamicWeak{};
 	bool bindNow{};
 	bool bindNot{};
@@ -129,11 +130,13 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	}
 	auto cfg_dynamicupdate = config.value_as<bool>("LD_DYNAMIC_UPDATE");
 	auto cfg_dynamicdlupdate = config.value_as<bool>("LD_DYNAMIC_DLUPDATE");
+	auto cfg_forceupdate = config.value_as<bool>("LD_FORCE_UPDATE");
 	Loader * loader = new Loader(
 		luci_base,
 		luci_path,
 		opts.dynamicUpdate || (cfg_dynamicupdate && cfg_dynamicupdate.value()),
 		opts.dynamicDlUpdate || (cfg_dynamicdlupdate && cfg_dynamicdlupdate.value()),
+		opts.forceUpdate || (cfg_forceupdate && cfg_forceupdate.value()),
 		opts.dynamicWeak || config.value("LD_DYNAMIC_WEAK") != nullptr
 	);
 	if (loader == nullptr) {
@@ -220,6 +223,7 @@ int main(int argc, char* argv[]) {
 				{'P',  "preload",        "FILE",  &Opts::preload,         false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
 				{'u',  "update",         nullptr, &Opts::dynamicUpdate,   false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
 				{'U',  "dlupdate",       nullptr, &Opts::dynamicDlUpdate, false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1 " },
+				{'F',  "force",          nullptr, &Opts::forceUpdate,     false, "Force dynamic update of changed files, even if they seem to be incompatible -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_FORCE_UPDATE to 1" },
 				{'T',  "tracing",        nullptr, &Opts::tracing,         false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
 				{'w',  "weak",           nullptr, &Opts::dynamicWeak,     false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
 				{'n',  "bind-now",       nullptr, &Opts::bindNow,         false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },

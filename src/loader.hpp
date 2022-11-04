@@ -20,6 +20,9 @@ struct Loader {
 	/*! \brief enable dynamic updates of functionens using the dl* interface? */
 	const bool dynamic_dlupdate;
 
+	/*! \brief force dynamic updates even if they seem incompatible */
+	const bool force_update;
+
 	/*! \brief support dynamic weak definitions? */
 	const bool dynamic_weak;
 
@@ -62,7 +65,7 @@ struct Loader {
 	ObjectIdentity::Flags default_flags;
 
 	/*! \brief Constructor */
-	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false, bool dynamicDlUpdate = false, bool dynamicWeak = false);
+	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false, bool dynamicDlUpdate = false, bool forceUpdate = false, bool dynamicWeak = false);
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
