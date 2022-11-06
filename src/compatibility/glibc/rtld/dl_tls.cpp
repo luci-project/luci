@@ -1,15 +1,10 @@
+#include "compatibility/glibc/rtld/dl_tls.hpp"
+
 #include <dlh/log.hpp>
-#include <dlh/types.hpp>
 #include <dlh/macro.hpp>
 #include <dlh/assert.hpp>
-#include <dlh/thread.hpp>
 
 #include "loader.hpp"
-
-struct tls_index {
-	size_t ti_module;
-	uintptr_t ti_offset;
-};
 
 EXPORT uintptr_t __tls_get_addr(struct tls_index *ti) {
 	if (ti == nullptr)

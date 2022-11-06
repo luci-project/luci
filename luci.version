@@ -1,10 +1,10 @@
 GLIBC_PRIVATE {
-	global: __get_cpu_features; _dl_signal_exception; _dl_signal_exception; _dl_get_tls_static_info; _dl_catch_exception; _dl_catch_error; _dl_allocate_tls; _dl_deallocate_tls; _dl_find_dso_for_object; _dl_exception_create; _dl_argv; _dl_exception_create_form; __tunable_get_val;_dl_exception_free; _dl_signal_error; _dl_debug_state; _rtld_global; _dl_make_stack_executable; _dl_allocate_tls_init; _rtld_global_ro; __libc_enable_secure; _dl_rtld_di_serinfo; _dlfcn_hook; __libdl_freeres; _dl_starting_up;
+	global: _dl_x86_get_cpu_features; __get_cpu_features; _dl_signal_exception; _dl_signal_exception; _dl_get_tls_static_info; _dl_catch_exception; _dl_catch_error; _dl_allocate_tls; _dl_deallocate_tls; _dl_find_dso_for_object; _dl_exception_create; _dl_argv; _dl_exception_create_format; __tunable_get_val; _dl_exception_free; _dl_signal_error; _dl_debug_state; _rtld_global; _dl_make_stack_executable; _dl_allocate_tls_init; _rtld_global_ro; __libc_enable_secure; _dl_rtld_di_serinfo; _dlfcn_hook; __libdl_freeres; _dl_starting_up; _dl_audit_preinit; _dl_audit_symbind_alt; _dl_fatal_printf; __nptl_change_stack_perm; __nptl_initial_report_events;
 	local: *;
 };
 
 GLIBC_2.2.5 {
-	global: free; realloc; _r_debug; __libc_stack_end; calloc; _dl_mcount; malloc; dlsym; dladdr; dlopen; dlclose; dlerror; dlvsym;
+	global: free; realloc; _r_debug; __libc_stack_end; calloc; _dl_mcount; malloc; dlsym; dladdr; dlopen; dlclose; dlerror; dlvsym; dl_iterate_phdr;
 	local: *;
 };
 
@@ -20,5 +20,15 @@ GLIBC_2.3.3 {
 
 GLIBC_2.3.4 {
 	global: dlmopen;
+	local: *;
+};
+
+GLIBC_2.34 {
+	global:  __rtld_version_placeholder;
+	local: *;
+};
+
+GLIBC_2.35 {
+	global: __rseq_flags; __rseq_offset; __rseq_size;
 	local: *;
 };

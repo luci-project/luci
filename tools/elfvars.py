@@ -146,9 +146,6 @@ class ElfVar:
 
 
 	def extern_dbgsym(self):
-
-				break
-
 		if f.name in dbgfiles:
 			dwarf = DwarfVars(dbgfiles[f.name], aliases = args.aliases, names = args.names)
 

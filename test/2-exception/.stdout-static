@@ -1,0 +1,115 @@
+Run #0
+Executing 'foo(-1)'... 
+ foo v0: i = -1
+  bar: i = -23
+   baz v0: i = -23 (invalid argument)
+ foo: failed due to invalid argument (-1) @ v0
+returned 0!
+Executing 'foo(0)'... 
+ foo v0: i = 0
+  bar: i = 0
+   baz v0: i = 0 (runtime error)
+failed due to uncaught exception: Baz v0 cannot handle zero values
+Executing 'foo(1)'... 
+ foo v0: i = 1
+  bar: i = 23
+   baz v0: i = 23
+returned 30751!
+Executing 'foo(2)'... 
+ foo v0: i = 2
+  bar: i = 46
+   baz v0: i = 46
+returned 61502!
+
+Run #1
+Executing 'foo(-1)'... 
+ foo v0: i = -1
+  bar: i = -23
+   baz v0: i = -23 (invalid argument)
+ foo: failed due to invalid argument (-1) @ v0
+returned 0!
+Executing 'foo(0)'... 
+ foo v0: i = 0
+  bar: i = 0
+   baz v0: i = 0 (runtime error)
+failed due to uncaught exception: Baz v0 cannot handle zero values
+Executing 'foo(1)'... 
+ foo v0: i = 1
+  bar: i = 23
+   baz v0: i = 23
+returned 30751!
+Executing 'foo(2)'... 
+ foo v0: i = 2
+  bar: i = 46
+   baz v0: i = 46
+returned 61502!
+
+Run #2
+Executing 'foo(-1)'... 
+ foo v0: i = -1
+  bar: i = -23
+   baz v0: i = -23 (invalid argument)
+ foo: failed due to invalid argument (-1) @ v0
+returned 0!
+Executing 'foo(0)'... 
+ foo v0: i = 0
+  bar: i = 0
+   baz v0: i = 0 (runtime error)
+failed due to uncaught exception: Baz v0 cannot handle zero values
+Executing 'foo(1)'... 
+ foo v0: i = 1
+  bar: i = 23
+   baz v0: i = 23
+returned 30751!
+Executing 'foo(2)'... 
+ foo v0: i = 2
+  bar: i = 46
+   baz v0: i = 46
+returned 61502!
+
+Run #3
+Executing 'foo(-1)'... 
+ foo v0: i = -1
+  bar: i = -23
+   baz v0: i = -23 (invalid argument)
+ foo: failed due to invalid argument (-1) @ v0
+returned 0!
+Executing 'foo(0)'... 
+ foo v0: i = 0
+  bar: i = 0
+   baz v0: i = 0 (runtime error)
+failed due to uncaught exception: Baz v0 cannot handle zero values
+Executing 'foo(1)'... 
+ foo v0: i = 1
+  bar: i = 23
+   baz v0: i = 23
+returned 30751!
+Executing 'foo(2)'... 
+ foo v0: i = 2
+  bar: i = 46
+   baz v0: i = 46
+returned 61502!
+
+Run #4
+Executing 'foo(-1)'... 
+ foo v0: i = -1
+  bar: i = -23
+   baz v0: i = -23 (invalid argument)
+ foo: failed due to invalid argument (-1) @ v0
+returned 0!
+Executing 'foo(0)'... 
+ foo v0: i = 0
+  bar: i = 0
+   baz v0: i = 0 (runtime error)
+failed due to uncaught exception: Baz v0 cannot handle zero values
+Executing 'foo(1)'... 
+ foo v0: i = 1
+  bar: i = 23
+   baz v0: i = 23
+returned 30751!
+Executing 'foo(2)'... 
+ foo v0: i = 2
+  bar: i = 46
+   baz v0: i = 46
+returned 61502!
+

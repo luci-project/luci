@@ -5,8 +5,11 @@
 #include <dlh/assert.hpp>
 #include <dlh/string.hpp>
 #include <dlh/thread.hpp>
+#include <dlh/mutex_rec.hpp>
 #include <dlh/auxiliary.hpp>
 
+#include "compatibility/glibc/rtld/dl.hpp"
+#include "compatibility/glibc/rtld/exception.hpp"
 #include "compatibility/glibc/libdl/interface.hpp"
 #include "compatibility/gdb.hpp"
 
@@ -336,6 +339,18 @@ static void notimplemented() {
 	LOG_ERROR << "This function was not implemented" << endl;
 }
 
+static MutexRecursive rtld_mutex;
+static void _dl_rtld_lock_recursive(void* arg) {
+	LOG_DEBUG << "RTLD lock " << arg << endl;
+	if (!rtld_mutex.lock())
+		LOG_ERROR << "RTLD lock " << arg << "failed!" << endl;
+}
+
+static void _dl_rtld_unlock_recursive(void* arg) {
+	LOG_DEBUG << "RTLD unlock " << arg << endl;
+	rtld_mutex.unlock();
+}
+
 static void _dl_debug_printf(const char *fmt, ...) {
 	va_list arg;
 	va_start (arg, fmt);
@@ -381,11 +396,11 @@ void init_globals(const Loader & loader) {
 	(void) sysinfo;
 	(void) loader;
 
-	rtld_global._dl_rtld_lock_recursive = reinterpret_cast<void (*)(void *)>(notimplemented);
-	rtld_global._dl_rtld_unlock_recursive = reinterpret_cast<void (*)(void *)>(notimplemented);
-	rtld_global._dl_make_stack_executable_hook = reinterpret_cast<int (*)(void **)>(notimplemented);
-	rtld_global._dl_init_static_tls = reinterpret_cast<	void (*)(GLIBC::DL::link_map *)>(notimplemented);
-	rtld_global._dl_wait_lookup_done = reinterpret_cast<	void (*)()>(notimplemented);
+	rtld_global._dl_rtld_lock_recursive = _dl_rtld_lock_recursive;
+	rtld_global._dl_rtld_unlock_recursive = _dl_rtld_unlock_recursive;
+	rtld_global._dl_make_stack_executable_hook = _dl_make_stack_executable;
+	rtld_global._dl_init_static_tls = reinterpret_cast<void (*)(GLIBC::DL::link_map *)>(notimplemented);
+	rtld_global._dl_wait_lookup_done = reinterpret_cast<void (*)()>(notimplemented);
 
 	rtld_global_ro._dl_debug_printf = _dl_debug_printf;
 	rtld_global_ro._dl_mcount = reinterpret_cast<void (*) (intptr_t, uintptr_t)>(notimplemented);
@@ -404,9 +419,10 @@ void init_globals(const Loader & loader) {
 #elif defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
 	rtld_global._dl_error_catch_tsd = error_catch_tsd;
 
-	rtld_global_ro._dl_catch_error = reinterpret_cast<int (*) (const char **, const char **,  bool *, void (*) (void *), void *)>(notimplemented);
-	rtld_global_ro._dl_signal_error = reinterpret_cast<void (*) (int, const char *, const char *,const char *)>(notimplemented);
-	rtld_global_ro._dl_check_caller = reinterpret_cast<int (*) (const void *, int)>(notimplemented);
+	rtld_global_ro._dl_catch_error = _dl_catch_error;
+	rtld_global_ro._dl_signal_error = _dl_signal_error;
+	rtld_global_ro._dl_check_caller =_dl_check_caller;
+
 #endif
 }
 
