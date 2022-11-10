@@ -8,293 +8,33 @@
 #include <dlh/mutex_rec.hpp>
 #include <dlh/auxiliary.hpp>
 
-#include "compatibility/glibc/rtld/dl.hpp"
-#include "compatibility/glibc/rtld/exception.hpp"
-#include "compatibility/glibc/libdl/interface.hpp"
-#include "compatibility/gdb.hpp"
 
-typedef char __rtld_lock_t[40];
-
-// results using dwarfdump -n globals [system / ld]
-struct rtld_global {
-	struct link_namespaces {
-		GLIBC::DL::link_map *_ns_loaded;
-		uint32_t _ns_nloaded;
-		GLIBC::DL::link_map::r_scope_elem *_ns_main_searchlist;
-		uint32_t _ns_global_scope_alloc;
-		uint32_t _ns_global_scope_pending_adds;
-		struct unique_sym_table  {
-			__rtld_lock_t lock;
-			void *entries;
-			size_t size;
-			size_t n_elements;
-			void *free;
-		} _ns_unique_sym_table;
-		GDB::RDebug _ns_debug;
-	} _dl_ns[16];
-	size_t _dl_nns;
-	__rtld_lock_t _dl_load_lock;
-	__rtld_lock_t _dl_load_write_lock;
-	uint64_t _dl_load_adds;
-	GLIBC::DL::link_map *_dl_initfirst;
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64) || defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
-	uint64_t _dl_cpuclock_offset;
-#endif
-	GLIBC::DL::link_map *_dl_profile_map;
-	uint64_t _dl_num_relocations;
-	uint64_t _dl_num_cache_relocations;
-	void *_dl_all_dirs;
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-	void *(*_dl_error_catch_tsd) ();
-#endif
-	GLIBC::DL::link_map _dl_rtld_map;
-	struct auditstate {
-		uintptr_t cookie;
-		uint32_t bindflags;
-	} _dl_rtld_auditstate[16];
-
-	void (*_dl_rtld_lock_recursive)(void *);
-	void (*_dl_rtld_unlock_recursive)(void *);
-#if defined(COMPATIBILITY_DEBIAN_BUSTER_X64) || defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-	uint32_t _dl_x86_feature_1[2];
-	uint64_t _dl_x86_legacy_bitmap[2];
-#endif
-	int (*_dl_make_stack_executable_hook)(void**);
-	uint32_t _dl_stack_flags;
-	uint32_t _dl_tls_dtv_gaps; // TODO: _Bool ?
-	size_t _dl_tls_max_dtv_idx;
-	void *_dl_tls_dtv_slotinfo_list;
-	size_t _dl_tls_static_nelem;
-	size_t _dl_tls_static_size;
-	size_t _dl_tls_static_used;
-	size_t _dl_tls_static_align;
-#if defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
-	size_t _dl_tls_static_optional;
-#endif
-	void *_dl_initial_dtv;
-	size_t _dl_tls_generation;
-	void (*_dl_init_static_tls)(GLIBC::DL::link_map *);
-	void (*_dl_wait_lookup_done)();
-	void *_dl_scope_free_list;
-} rtld_global;
-
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-static_assert(sizeof(rtld_global) == 3968, "Wrong size of rtld_global for Debian Stretch (amd64)");
-#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
-static_assert(sizeof(rtld_global) == 3992, "Wrong size of rtld_global for Debian Buster (amd64)");
-#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
-static_assert(sizeof(rtld_global) == 4000, "Wrong size of rtld_global for Debian Bullseye (amd64)");
-#elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-static_assert(sizeof(rtld_global) == 3992, "Wrong size of rtld_global for Ubuntu Focal (amd64)");
+/* Setup _rtld_global */
+GLIBC::RTLD::Global rtld_global;
+#ifdef GLIBC_RTLD_GLOBAL_SIZE
+static_assert(sizeof(rtld_global) == GLIBC_RTLD_GLOBAL_SIZE, "Wrong size of rtld_global for " OS " " OSVERSION " (" PLATFORM ")");
 #else
-#error No (known) rtld_global compatibility mode specified
+#warning size of rtld_global was not checked
 #endif
+extern __attribute__ ((alias("rtld_global"), visibility("default"))) GLIBC::RTLD::Global _rtld_global;
 
-extern __attribute__ ((alias("rtld_global"), visibility("default"))) char * _rtld_global;
-
-// see glibc (2.31) sysdeps/generic/ldsodefs.h
-struct rtld_global_ro {
-
-	/* If nonzero the appropriate debug information is printed.  */
-	int _dl_debug_mask = 0;
-
-	/* OS version.  */
-	unsigned int _dl_osversion = 0;
-	/* Platform name.  */
-	const char *_dl_platform = "";
-	size_t _dl_platformlen = 0;
-
-	/* Cached value of `getpagesize ()'.  */
-	size_t _dl_pagesize = 0x1000;
-
-	/* Do we read from ld.so.cache?  */
-	int _dl_inhibit_cache = 0;
-
-	/* Copy of the content of `_dl_main_searchlist' at startup time.  */
-	struct r_scope_elem {
-		/* Array of maps for the scope.  */
-		void **r_list;
-		/* Number of entries in the scope.  */
-		unsigned int r_nlist;
-	} _dl_initial_searchlist;
-
-	/* CLK_TCK as reported by the kernel.  */
-	int _dl_clktck = 0;
-
-	/* If nonzero print warnings messages.  */
-	int _dl_verbose = 0;
-
-	/* File descriptor to write debug messages to.  */
-	int _dl_debug_fd = 2;
-
-	/* Do we do lazy relocations?  */
-	int _dl_lazy = 1;
-
-	/* Nonzero if runtime lookups should not update the .got/.plt.  */
-	int _dl_bind_not = 0;
-
-	/* Nonzero if references should be treated as weak during runtime linking.  */
-	int _dl_dynamic_weak = 0 ;
-
-	/* Default floating-point control word.  */
-	unsigned short _dl_fpu_control = 0x037f;
-
-	/* Expected cache ID.  */
-	int _dl_correct_cache_id = 0;
-
-	/* Mask for hardware capabilities that are available.  */
-	uint64_t _dl_hwcap = 2;
-
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-	/* Mask for important hardware capabilities we honour. */
-	uint64_t _dl_hwcap_mask = 0;
-#endif
-
-	/* Pointer to the auxv list supplied to the program at startup.  */
-	void *_dl_auxv = nullptr;
-
-	/* CPU Feature information */
-	struct cpu_features {
-		enum cpu_features_kind {
-			arch_kind_unknown = 0,
-			arch_kind_intel = 1,
-			arch_kind_amd =	2,
-			arch_kind_other = 3
-		};
-		struct cpuid_registers {
-			unsigned eax;
-			unsigned ebx;
-			unsigned ecx;
-			unsigned edx;
-		};
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-		enum cpu_features_kind kind;
-		int max_cpuid;
-		struct cpuid_registers cpuid[3];
-		unsigned family;
-		unsigned model;
-		unsigned long xsave_state_size;
-		unsigned feature;
-#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
-		enum cpu_features_kind kind;
-		int max_cpuid;
-		struct cpuid_registers cpuid[3];
-		unsigned family;
-		unsigned model;
-		unsigned long xsave_state_size;
-		unsigned xsave_state_full_size;
-		unsigned feature;
-		unsigned long data_cache_size;
-		unsigned long shared_cache_size;
-		unsigned long non_temporal_threshold;
-#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-		struct cpuid_registers cpuid[6];
-		unsigned feature[2];
-		struct cpu_features_basic {
-			enum cpu_features_kind kind;
-			int max_cpuid;
-			unsigned family;
-			unsigned model;
-			unsigned stepping;
-		} basic;
-		unsigned long xsave_state_size;
-		unsigned xsave_state_full_size;
-		unsigned long data_cache_size;
-		unsigned long shared_cache_size;
-		unsigned long non_temporal_threshold;
-#endif
-	} _dl_x86_cpu_features;
-#if defined(COMPATIBILITY_DEBIAN_BUSTER_X64) || defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-	const char _dl_x86_hwcap_flags[3][9] = { "sse2", "x86_64", "avx512_1" };
-	const char _dl_x86_platforms[4][9] = { "i586", "i686", "haswell", "xeon_phi" };
-#endif
-
-	/* Names of shared object for which the RPATH should be ignored.  */
-	const char *_dl_inhibit_rpath = nullptr;
-
-	/* Location of the binary.  */
-	const char *_dl_origin_path = nullptr;
-
-	/* -1 if the dynamic linker should honor library load bias,
-	   0 if not, -2 use the default (honor biases for normal
-	   binaries, don't honor for PIEs).  */
-	uintptr_t _dl_use_load_bias = 0;
-
-#if defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
-	size_t _dl_tls_static_surplus;
-#endif
-
-	/* Name of the shared object to be profiled (if any).  */
-	const char *_dl_profile = 0;
-	/* Filename of the output file.  */
-	const char *_dl_profile_output = "/var/tmp";
-	/* Name of the object we want to trace the prelinking.  */
-	const char *_dl_trace_prelink = nullptr;
-	/* Map of shared object to be prelink traced.  */
-	/* struct link_map */ void *_dl_trace_prelink_map = nullptr;
-
-	/* All search directories defined at startup.  This is assigned a
-	   non-NULL pointer by the ld.so startup code (after initialization
-	   to NULL), so this can also serve as an indicator whether a copy
-	   of ld.so is initialized and active.  See the rtld_active function
-	   below.  */
-	/* struct r_search_path_elem */ void *_dl_init_all_dirs = nullptr;
-
-	/* The vsyscall page is a virtual DSO pre-mapped by the kernel.
-	   This points to its ELF header.  */
-	/* ElfW(Ehdr) */ void *_dl_sysinfo_dso;
-
-	/* At startup time we set up the normal DSO data structure for it,
-	   and this points to it.  */
-	/* struct link_map */ void *_dl_sysinfo_map = nullptr;
-
-#if defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-	void * _dl_vdso_clock_gettime64;
-	void * _dl_vdso_gettimeofday;
-	void * _dl_vdso_time;
-	void * _dl_vdso_getcpu;
-	void * _dl_vdso_clock_getres_time64;
-#endif
-
-	/* Mask for more hardware capabilities that are available on some platforms.  */
-	uint64_t _dl_hwcap2;
-
-	/* We add a function table to _rtld_global which is then used to
-	   call the function instead of going through the PLT.  The result
-	   is that we can avoid exporting the functions and we do not jump
-	   PLT relocations in libc.so.  */
-	void (*_dl_debug_printf) (const char *, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-	int (*_dl_catch_error) (const char **, const char **,  bool *, void (*) (void *), void *);
-	void (*_dl_signal_error) (int, const char *, const char *,const char *);
-#endif
-	void (*_dl_mcount) (intptr_t, uintptr_t);
-	void * (*_dl_lookup_symbol_x) (const char *, void *, const void **, void *[], const void *, int, int, void *);
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-	int (*_dl_check_caller) (const void *, int);
-#endif
-	void *(*_dl_open) (const char *, int, const void *, int, int, char **, char **);
-	void (*_dl_close) (void *);
-	void *(*_dl_tls_get_addr_soft) (void *);
-	int (*_dl_discover_osversion) (void);
-
-	/* List of auditing interfaces.  */
-	/* struct audit_ifaces */ void *_dl_audit = nullptr;
-	unsigned int _dl_naudit = 0;
-} rtld_global_ro;
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-static_assert(sizeof(rtld_global_ro) == 376, "Wrong size of rtld_global_ro for Debian Stretch (amd64)");
-#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
-static_assert(sizeof(rtld_global_ro) == 432, "Wrong size of rtld_global_ro for Debian Buster (amd64)");
-#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
-static_assert(sizeof(rtld_global_ro) == 544, "Wrong size of rtld_global_ro for Debian Bullseye (amd64)");
-#elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-static_assert(sizeof(rtld_global_ro) == 536, "Wrong size of rtld_global_ro for Ubuntu Focal (amd64)");
+/* Setup _rtld_global_ro */
+GLIBC::RTLD::GlobalRO rtld_global_ro;
+#ifdef GLIBC_RTLD_GLOBAL_RO_SIZE
+static_assert(sizeof(rtld_global_ro) == GLIBC_RTLD_GLOBAL_RO_SIZE, "Wrong size of rtld_global_ro for " OS " " OSVERSION " (" PLATFORM ")");
 #else
-#error No (known) rtld_global_ro compatibility mode specified
+#warning size of rtld_global_ro was not checked
 #endif
 
-extern __attribute__((alias("rtld_global_ro"), visibility("default"))) struct rtld_global_ro _rtld_global_ro;
+extern __attribute__((alias("rtld_global_ro"), visibility("default"))) GLIBC::RTLD::GlobalRO _rtld_global_ro;
+
+EXPORT const GLIBC::RTLD::GlobalRO::cpu_features * _dl_x86_get_cpu_features() {
+	return &(rtld_global_ro._dl_x86_cpu_features);
+}
+
+EXPORT const GLIBC::RTLD::GlobalRO::cpu_features * __get_cpu_features() {
+	return &(rtld_global_ro._dl_x86_cpu_features);
+}
 
 __attribute__ ((visibility("default"))) int __libc_enable_secure = 0;
 
@@ -304,30 +44,16 @@ extern __attribute__ ((alias("libc_stack_end"), visibility("default"))) void * _
 void *dlfcn_hook = nullptr;
 extern __attribute__ ((alias("dlfcn_hook"), visibility("default"))) void * _dlfcn_hook;
 
-
 __attribute__ ((visibility("default"))) unsigned int __rseq_flags = 0;
 __attribute__ ((visibility("default"))) unsigned int __rseq_size = 0;
 __attribute__ ((visibility("default"))) ptrdiff_t __rseq_offset = 0;
 
-EXPORT const rtld_global_ro::cpu_features * _dl_x86_get_cpu_features() {
-	return &(rtld_global_ro._dl_x86_cpu_features);
-}
-
-EXPORT const rtld_global_ro::cpu_features * __get_cpu_features() {
-	return &(rtld_global_ro._dl_x86_cpu_features);
-}
 
 namespace GLIBC {
 namespace RTLD {
 
-#if defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-static void * resolve(const Loader & loader, const char * name) {
-	GuardedReader _{loader.lookup_sync};
-	auto sym = loader.resolve_symbol(name);
-	return sym ? reinterpret_cast<void*>(sym->object().base + sym->value()) : nullptr;
-}
-#elif defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-static void * error_catch_tsd() {
+#if GLIBC_VERSION < GLIBC_2_25
+void * Global::internal_dl_error_catch_tsd() {
 	LOG_INFO << "Using error_catch_tsd!" << endl;
 	//return &(Thread::self()->__glibc_unused2);
 	static void * data;
@@ -335,34 +61,101 @@ static void * error_catch_tsd() {
 }
 #endif
 
-static void notimplemented() {
-	LOG_ERROR << "This function was not implemented" << endl;
-}
-
-static MutexRecursive rtld_mutex;
-static void _dl_rtld_lock_recursive(void* arg) {
+#if !GLIBC_PTHREAD_IN_LIBC
+static MutexRecursive _dl_rtld_mutex;
+void Global::internal_dl_rtld_lock_recursive(void* arg) {
 	LOG_DEBUG << "RTLD lock " << arg << endl;
-	if (!rtld_mutex.lock())
+	if (!_dl_rtld_mutex.lock())
 		LOG_ERROR << "RTLD lock " << arg << "failed!" << endl;
 }
 
-static void _dl_rtld_unlock_recursive(void* arg) {
+void Global::internal_dl_rtld_unlock_recursive(void* arg) {
 	LOG_DEBUG << "RTLD unlock " << arg << endl;
-	rtld_mutex.unlock();
+	_dl_rtld_mutex.unlock();
 }
+#endif
 
-static void _dl_debug_printf(const char *fmt, ...) {
+
+#if GLIBC_VERSION < GLIBC_2_34 || !GLIBC_PTHREAD_IN_LIBC
+void Global::internal_dl_init_static_tls(GLIBC::DL::link_map * map) {
+	(void) map;
+	LOG_ERROR << "GLIBC _dl_init_static_tls not implemented" << endl;
+}
+#endif
+
+#if GLIBC_VERSION < GLIBC_2_33
+void Global::internal_dl_wait_lookup_done() {
+	LOG_ERROR << "GLIBC _dl_wait_lookup_done not implemented" << endl;
+}
+#endif
+
+EXPORT void _dl_debug_printf(const char *fmt, ...) {
 	va_list arg;
 	va_start (arg, fmt);
 	LOG_DEBUG.output(fmt, arg);
 	va_end (arg);
 }
 
+void * GlobalRO::internal_dl_lookup_symbol_x(const char * undef_name, GLIBC::DL::link_map *undef_map, const void **ref, void *symbol_scope[], const void * version, int type_class, int flags, GLIBC::DL::link_map * skip_map){
+	(void) undef_map;
+	(void) ref;
+	(void) symbol_scope;
+	(void) version;
+	(void) type_class;
+	(void) flags;
+	(void) skip_map;
+	LOG_ERROR << "GLIBC _dl_lookup_symbol_x (for " << undef_name << ") not implemented" << endl;
+	return nullptr;
+}
+
+void * GlobalRO::internal_dl_open(const char *file, int mode, const void *caller_dlopen, GLIBC::DL::Lmid_t nsid, int argc, char *argv[], char *env[]) {
+	(void) mode;
+	(void) caller_dlopen;
+	(void) nsid;
+	(void) argc;
+	(void) argv;
+	(void) env;
+	LOG_ERROR << "GLIBC _dl_open (for " << file << ") not implemented" << endl;
+	return nullptr;
+}
+
+void GlobalRO::internal_dl_close(void *) {
+	LOG_ERROR << "GLIBC _dl_close not implemented" << endl;
+}
+
+#if GLIBC_VERSION >= GLIBC_2_35
+void GlobalRO::internal_dl_libc_freeres() {
+	LOG_ERROR << "GLIBC _dl_libc_freeres not implemented" << endl;
+}
+
+int GlobalRO::internal_dl_find_object(void *, void *){
+	LOG_ERROR << "GLIBC _dl_find_object not implemented" << endl;
+	return -1;
+}
+#endif
+
+#if GLIBC_VERSION < GLIBC_2_36
+int GlobalRO::internal_dl_discover_osversion() {
+	LOG_ERROR << "GLIBC _dl_discover_osversion not implemented" << endl;
+	// should return the kernel version as integer
+	return 0;
+}
+#endif
+
+[[maybe_unused]] static void * resolve(const Loader & loader, const char * name) {
+	GuardedReader _{loader.lookup_sync};
+	auto sym = loader.resolve_symbol(name);
+	return sym ? reinterpret_cast<void*>(sym->object().base + sym->value()) : nullptr;
+}
 
 void init_globals(const Loader & loader) {
 	uintptr_t sysinfo = 0;
 	Auxiliary * auxv = Auxiliary::begin();
 	rtld_global_ro._dl_auxv = auxv;
+	int seen = 0;
+	int uid = 0;
+	int gid = 0;
+
 	for (int auxc = 0 ; auxv[auxc].valid(); auxc++) {
 		const auto & aux = auxv[auxc];
 		switch (aux.a_type) {
@@ -391,38 +184,48 @@ void init_globals(const Loader & loader) {
 			case Auxiliary::AT_SYSINFO_EHDR:
 				rtld_global_ro._dl_sysinfo_dso = aux.pointer();
 				break;
+#if GLIBC_VERSION >= GLIBC_2_34
+			case Auxiliary::AT_MINSIGSTKSZ:
+				rtld_global_ro._dl_minsigstacksize = aux.value();
+				break;
+#endif
+
+			case Auxiliary::AT_UID:
+				uid ^= aux.value();
+				seen |= 1;
+				break;
+			case Auxiliary::AT_EUID:
+				uid ^= aux.value();
+				seen |= 2;
+				break;
+			case Auxiliary::AT_GID:
+				gid ^= aux.value();
+				seen |= 4;
+				break;
+			case Auxiliary::AT_EGID:
+				gid ^= aux.value();
+				seen |= 8;
+				break;
+			case Auxiliary::AT_SECURE:
+				seen = -1;
+				__libc_enable_secure = aux.value();
+				break;
 		}
 	}
+	if (seen == 0xf) {
+		__libc_enable_secure = uid != 0 || gid != 0;
+	}
+
 	(void) sysinfo;
 	(void) loader;
 
-	rtld_global._dl_rtld_lock_recursive = _dl_rtld_lock_recursive;
-	rtld_global._dl_rtld_unlock_recursive = _dl_rtld_unlock_recursive;
-	rtld_global._dl_make_stack_executable_hook = _dl_make_stack_executable;
-	rtld_global._dl_init_static_tls = reinterpret_cast<void (*)(GLIBC::DL::link_map *)>(notimplemented);
-	rtld_global._dl_wait_lookup_done = reinterpret_cast<void (*)()>(notimplemented);
 
-	rtld_global_ro._dl_debug_printf = _dl_debug_printf;
-	rtld_global_ro._dl_mcount = reinterpret_cast<void (*) (intptr_t, uintptr_t)>(notimplemented);
-	rtld_global_ro._dl_lookup_symbol_x = reinterpret_cast<void * (*) (const char *, void *, const void **, void *[], const void *, int, int, void *)>(notimplemented);
-	rtld_global_ro._dl_open = reinterpret_cast<void *(*) (const char *, int, const void *, int, int, char **, char **)>(notimplemented);
-	rtld_global_ro._dl_close = reinterpret_cast<void (*) (void *)>(notimplemented);
-	rtld_global_ro._dl_tls_get_addr_soft = reinterpret_cast<void *(*) (void *)>(notimplemented);
-	rtld_global_ro._dl_discover_osversion = reinterpret_cast<int (*) (void)>(notimplemented);
-
-#if defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+#if GLIBC_VERSION >= GLIBC_2_31 && !defined(COMPATIBILITY_DEBIAN_BUSTER)
 	rtld_global_ro._dl_vdso_clock_gettime64 = resolve(loader, "__vdso_clock_gettime");
 	rtld_global_ro._dl_vdso_gettimeofday = resolve(loader, "__vdso_gettimeofday");
 	rtld_global_ro._dl_vdso_time = resolve(loader, "__vdso_time");
 	rtld_global_ro._dl_vdso_getcpu = resolve(loader, "__vdso_getcpu");
 	rtld_global_ro._dl_vdso_clock_getres_time64 = resolve(loader, "__vdso_clock_getres");
-#elif defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-	rtld_global._dl_error_catch_tsd = error_catch_tsd;
-
-	rtld_global_ro._dl_catch_error = _dl_catch_error;
-	rtld_global_ro._dl_signal_error = _dl_signal_error;
-	rtld_global_ro._dl_check_caller =_dl_check_caller;
-
 #endif
 }
 

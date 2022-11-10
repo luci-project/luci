@@ -12,7 +12,7 @@ CXX = g++
 
 # Compatibility macro name
 COMPATIBILITY_PREFIX = COMPATIBILITY
-COMPATIBILITY = $(shell echo "$(COMPATIBILITY_PREFIX)_$(OS)_$(OSVERSION)_$(PLATFORM)" | tr a-z A-Z)
+COMPATIBILITY_MACROS = $(shell echo "-D$(COMPATIBILITY_PREFIX)_$(OS) -D$(COMPATIBILITY_PREFIX)_$(OS)_$(OSVERSION) -D$(COMPATIBILITY_PREFIX)_$(OS)_$(OSVERSION)_$(PLATFORM) -DPLATFORM_$(PLATFORM)" | tr a-z A-Z)
 
 TARGET_FILE = ld-$(NAME)-$(OS)-$(OSVERSION)-$(PLATFORM).so
 TARGET_PATH = /opt/$(NAME)/$(TARGET_FILE)
@@ -56,7 +56,22 @@ LDFLAGS = -pie -soname $(notdir $(TARGET_PATH)) --gc-sections -Ttext-segment=$(B
 # Helper
 SPACE = $(subst ,, )
 COMMA = ,
-FOREACHVERSIONDO = grep -r '$(COMPATIBILITY_PREFIX)' $(SRCFOLDER) | sed -ne 's/^.*defined($(COMPATIBILITY_PREFIX)_\([^_]*\)_\([^_]*\)_\([^)]*\)).*$$/\L\1 \2 \3/p' | sort -u | xargs -n3 sh -c
+
+define custom_version
+	$(VERBOSE) /bin/echo -e "\e[1m$(1)ing luci for $(2) $(3) $(4)\e[0m"
+	$(VERBOSE) $(MAKE) "OS=$(2)" "OSVERSION=$(3)" "PLATFORM=$(4)" "$(1)"
+endef
+
+define each_version
+	$(VERBOSE) echo "$(1)ing luci for each version..."
+	$(call custom_version,$(1),ARCHLINUX,202211,X64)
+	$(call custom_version,$(1),DEBIAN,STRETCH,X64)
+	$(call custom_version,$(1),DEBIAN,BUSTER,X64)
+	$(call custom_version,$(1),DEBIAN,BULLSEYE,X64)
+	$(call custom_version,$(1),UBUNTU,FOCAL,X64)
+	$(call custom_version,$(1),UBUNTU,JAMMY,X64)
+endef
+
 
 install: $(TARGET_PATH) $(LIBPATH_CONF) $(LDLUCI_CONF)
 
@@ -67,10 +82,10 @@ install-only: $(LIBPATH_CONF) $(LDLUCI_CONF)
 build: $(TARGET_FILE)
 
 all:
-	$(VERBOSE) $(FOREACHVERSIONDO) 'echo "\e[1mBuilding luci for $$0 $$1 ($$2)\e[0m" ; $(MAKE) OS=$$0 OSVERSION=$$1 PLATFORM=$$2 build'
+	$(call each_version,build)
 
 test-all:
-	$(VERBOSE) $(FOREACHVERSIONDO) 'echo "\e[1mTesting luci for $$0 $$1 ($$2)\e[0m" ; $(MAKE) OS=$$0 OSVERSION=$$1 PLATFORM=$$2 test'
+	$(call each_version,test)
 
 test: $(TARGET_FILE)
 	$(VERBOSE) uname -m | sed -e "s/^x86_64$$/x64/" | xargs test "$(PLATFORM)" =
@@ -91,19 +106,19 @@ $(TARGET_FILE): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
 $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"
 	@mkdir -p $(@D)
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -D$(COMPATIBILITY) -MM -MP -MT $(BUILDDIR)/$*.o -MF $@ $<
+	$(VERBOSE) $(CXX) $(CXXFLAGS) $(COMPATIBILITY_MACROS) -MM -MP -MT $(BUILDDIR)/$*.o -MF $@ $<
 
 $(BUILDDIR)/%.o : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "CXX		$@"
 	@mkdir -p $(@D)
-	$(VERBOSE) $(CXX) $(CXXFLAGS) -D__MODULE__="$(NAME)" -D$(COMPATIBILITY) -c -o $@ $<
+	$(VERBOSE) $(CXX) $(CXXFLAGS) -D__MODULE__="$(NAME)" $(COMPATIBILITY_MACROS) -c -o $@ $<
 
 $(BUILDINFO): FORCE
 	@echo "CXX		$@"
 	@echo 'const char * build_$(NAME)_version() { return "$(shell git describe --dirty --always --tags)"; } ' \
 	'const char * build_$(NAME)_date() { return "$(shell date -R)"; }' \
 	'const char * build_$(NAME)_flags() { return "$(CXXFLAGS)"; }' \
-	'const char * build_$(NAME)_compatibility() { return "$(OS) $(OSVERSION) on $(PLATFORM) (macro $(COMPATIBILITY))"; }' | $(CXX) $(CXXFLAGS) -x c++ -c -o $@ -
+	'const char * build_$(NAME)_compatibility() { return "$(OS) $(OSVERSION) on $(PLATFORM)"; }' | $(CXX) $(CXXFLAGS) -x c++ -c -o $@ -
 
 $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
 	$(VERBOSE) ./gen-libpath.sh $< | grep -v "i386\|i486\|i686\|lib32\|libx32" > $@

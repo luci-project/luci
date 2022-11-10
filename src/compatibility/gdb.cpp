@@ -3,7 +3,9 @@
 #include <dlh/assert.hpp>
 #include <dlh/log.hpp>
 
-GDB::RDebug r_debug;
+GDB::RDebugExtended r_debug_extended;
+
+GDB::RDebug & r_debug = r_debug_extended.base;
 
 extern __attribute__ ((alias("r_debug"), visibility("default"))) GDB::RDebug _r_debug;
 

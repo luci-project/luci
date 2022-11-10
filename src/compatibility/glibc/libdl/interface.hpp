@@ -1,9 +1,10 @@
 #pragma once
 
 #include <dlh/types.hpp>
+#include <dlh/macro.hpp>
 
 #include "object/identity.hpp"
-
+#include "compatibility/glibc/version.hpp"
 
 namespace GLIBC {
 namespace DL {
@@ -68,10 +69,12 @@ struct link_map {
 
 	void *l_libname;
 
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-	uintptr_t *l_info[76];
-#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64) || defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
+#if GLIBC_VERSION >= GLIBC_2_36
+	uintptr_t *l_info[80];
+#elif GLIBC_VERSION >= GLIBC_2_28
 	uintptr_t *l_info[77];
+#else
+	uintptr_t *l_info[76];
 #endif
 
 	const uintptr_t *l_phdr;
@@ -104,10 +107,19 @@ struct link_map {
 		lt_library,
 		lt_loaded
 	} l_type                           : 2;
+#if GLIBC_VERSION >= GLIBC_2_35
+	uint32_t l_dt_relr_ref             : 1;
+#endif
 	uint32_t l_relocated               : 1;
 	uint32_t l_init_called             : 1;
 	uint32_t l_global                  : 1;
 	uint32_t l_reserved                : 2;
+#if GLIBC_VERSION >= GLIBC_2_35
+	uint32_t l_main_map                : 1;
+	uint32_t l_visited                 : 1;
+	uint32_t l_map_used                : 1;
+	uint32_t l_map_done                : 1;
+#endif
 	uint32_t l_phdr_allocated          : 1;
 	uint32_t l_soname_added            : 1;
 	uint32_t l_faked                   : 1;
@@ -116,22 +128,39 @@ struct link_map {
 	uint32_t l_audit_any_plt           : 1;
 	uint32_t l_removed                 : 1;
 	uint32_t l_contiguous              : 1;
+#if GLIBC_VERSION < GLIBC_2_36
 	uint32_t l_symbolic_in_local_scope : 1;
+#endif
 	uint32_t l_free_initfini           : 1;
+#if GLIBC_VERSION >= GLIBC_2_35
+ 	uint32_t l_ld_readonly             : 1;
+	uint32_t l_find_object_processed   : 1;
+#endif
 
-	enum CET {
+#if GLIBC_VERSION >= GLIBC_2_31 && !defined(COMPATIBILITY_DEBIAN_BUSTER)
+	bool l_nodelete_active;
+	bool l_nodelete_pending;
+#endif
+
+#if GLIBC_VERSION >= GLIBC_2_33
+	enum {
+		lc_property_unknown = 0,        /* Unknown property status.  */
+		lc_property_none = 1 << 0,      /* No property.  */
+		lc_property_valid = 1 << 1      /* Has valid property.  */
+	} l_property                       : 2;
+	unsigned int l_x86_feature_1_and;
+	unsigned int l_x86_isa_1_needed;
+ #if GLIBC_VERSION >= GLIBC_2_35
+	unsigned int l_1_needed;
+ #endif
+#elif GLIBC_VERSION >= GLIBC_2_28
+	enum {
 		lc_unknown = 0,                       /* Unknown CET status.  */
 		lc_none    = 1 << 0,                  /* Not enabled with CET.  */
 		lc_ibt     = 1 << 1,                  /* Enabled with IBT.  */
 		lc_shstk   = 1 << 2,                  /* Enabled with STSHK.  */
 		lc_ibt_and_shstk = lc_ibt | lc_shstk  /* Enabled with both.  */
-	};
-#if defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
-	enum CET l_cet : 3;
-#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64) || defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-	uint16_t l_nodelete_active;
-	uint16_t l_nodelete_pending;
-	enum CET l_cet;
+	} l_cet                            : 3;
 #endif
 
 	struct {
@@ -186,18 +215,16 @@ struct link_map {
 	uintptr_t l_relro_addr;
 	size_t l_relro_size;
 	unsigned long long l_serial;
+	struct auditstate {
+		uintptr_t cookie;
+		unsigned int bindflags;
+	} l_audit[0];
 };
 
-#if defined(COMPATIBILITY_DEBIAN_STRETCH_X64)
-static_assert(sizeof(link_map) == 1136, "Wrong link_map size for Debian Stretch (amd64)");
-#elif defined(COMPATIBILITY_DEBIAN_BUSTER_X64)
-static_assert(sizeof(link_map) == 1144, "Wrong link_map size for Debian Buster (amd64)");
-#elif defined(COMPATIBILITY_DEBIAN_BULLSEYE_X64)
-static_assert(sizeof(link_map) == 1152, "Wrong link_map size for Debian Bullseye (amd64)");
-#elif defined(COMPATIBILITY_UBUNTU_FOCAL_X64)
-static_assert(sizeof(link_map) == 1152, "Wrong link_map size for Ubuntu Focal (amd64)");
+#ifdef GLIBC_LINK_MAP_SIZE
+static_assert(sizeof(link_map) == GLIBC_LINK_MAP_SIZE, "Wrong size of link_map for " OS " " OSVERSION " (" PLATFORM ")");
 #else
-#error No (known) link_map compatibility mode specified
+#warning size of link_map was not checked
 #endif
 }  // namespace DL
 }  // namespace GLIBC

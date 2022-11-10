@@ -14,5 +14,6 @@ extern "C" int _dl_catch_exception (dl_exception *exception, void (*operate) (vo
 extern "C" void _dl_signal_error(int errcode, const char *objname, const char *occasion, const char *errstring);
 extern "C" int _dl_catch_error(const char **objname, const char **errstring, bool *mallocedp, void (*operate) (void *), void *args);
 extern "C" int _dl_check_caller(const void *caller, int mask);
+extern "C" void _dl_error_free(void *ptr);
 
 extern "C" void _dl_fatal_printf(const char *fmt, ...);

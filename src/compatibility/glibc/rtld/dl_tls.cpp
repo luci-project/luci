@@ -62,3 +62,9 @@ EXPORT void _dl_deallocate_tls(Thread * thread, bool free_thread_struct) {
 
 	loader->tls.free(thread, free_thread_struct);
 }
+
+void * _dl_tls_get_addr_soft(GLIBC::DL::link_map *l) {
+	(void) l;
+	LOG_ERROR << "GLIBC _dl_tls_get_addr_soft not implemented" << endl;
+	return nullptr;
+}

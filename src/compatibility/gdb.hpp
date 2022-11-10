@@ -13,7 +13,7 @@ enum State {
    details of shared object loading to the debugger.  If the executable's
    dynamic section has a DT_DEBUG element, the run-time linker sets that
    element's value to the address where this structure can be found.  */
-struct RDebug{
+struct RDebug {
 	int r_version;		/* Version number for this protocol.  */
 
 	const ObjectIdentity *r_map;	/* Head of the chain of loaded objects.  */
@@ -32,6 +32,20 @@ struct RDebug{
 
 	uintptr_t r_ldbase;  /* Base address the linker is loaded at.  */
 };
+
+/* The extended rendezvous structure used by the run-time dynamic linker
+   to communicate details of shared object loading to the debugger.  If
+   the executable's dynamic section has a DT_DEBUG element, the run-time
+   linker sets that element's value to the address where this structure
+   can be found.  */
+struct RDebugExtended {
+	RDebug base;
+	/* Link to the next r_debug_extended structure.  Each r_debug_extended
+	   structure represents a different namespace.  The first
+	   r_debug_extended structure is for the default namespace.  */
+	RDebugExtended *r_next;
+};
+
 
 void init(const Loader & loader);
 void notify(State state = RT_CONSISTENT);

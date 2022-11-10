@@ -50,7 +50,7 @@ EXPORT void _dl_signal_error(int errcode, const char *objname, const char *occas
 	          << endl;
 }
 
-EXPORT int _dl_catch_error (const char **objname, const char **errstring, bool *mallocedp, void (*operate) (void *), void *args) {
+EXPORT int _dl_catch_error(const char **objname, const char **errstring, bool *mallocedp, void (*operate) (void *), void *args) {
 	(void) objname;
 	(void) errstring;
 	(void) mallocedp;
@@ -60,18 +60,22 @@ EXPORT int _dl_catch_error (const char **objname, const char **errstring, bool *
 	return 0;
 }
 
-int _dl_check_caller (const void *caller, int mask) {
+int _dl_check_caller(const void *caller, int mask) {
 	(void) caller;
 	(void) mask;
 	LOG_WARNING << "GLIBC _dl_check_caller not implemented!" << endl;
 	return 0;
 }
 
+void _dl_error_free(void *ptr) {
+	(void) ptr;
+	LOG_WARNING << "GLIBC _dl_error_free not implemented!" << endl;
+}
 
 EXPORT void _dl_fatal_printf(const char *fmt, ...) {
 	va_list arg;
 	va_start (arg, fmt);
-	LOG_DEBUG.output(fmt, arg);
+	LOG_ERROR.output(fmt, arg);
 	va_end (arg);
 	Syscall::exit(127);
 }
