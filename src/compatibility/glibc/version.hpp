@@ -21,7 +21,7 @@
  #define PLATFORM "x86_64"
 
  #if defined(COMPATIBILITY_ARCHLINUX)
-  #define OS "Arch Linux"
+  #define OSNAME "Arch Linux"
   #if defined(COMPATIBILITY_ARCHLINUX_202211_X64)
    #define OSVERSION "Nov 2022"
    #define GLIBC_VERSION GLIBC_2_36
@@ -37,7 +37,7 @@
   #endif
 
  #elif defined(COMPATIBILITY_DEBIAN)
-  #define OS "Debian"
+  #define OSNAME "Debian"
   #if defined(COMPATIBILITY_DEBIAN_STRETCH)
    #define OSVERSION "9 (Stretch)"
    #define GLIBC_VERSION GLIBC_2_24
@@ -128,7 +128,7 @@
 
 
  #elif defined(COMPATIBILITY_UBUNTU)
-  #define OS "Ubuntu"
+  #define OSNAME "Ubuntu"
   #if defined(COMPATIBILITY_UBUNTU_FOCAL)
    #define OSVERSION "20.04 (Focal Fossa)"
    #define GLIBC_VERSION GLIBC_2_31

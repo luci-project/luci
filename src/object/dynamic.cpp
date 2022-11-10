@@ -47,7 +47,8 @@ void * ObjectDynamic::dynamic_resolve(size_t index) const {
 bool ObjectDynamic::preload() {
 	//base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
 	return preload_segments()
-	    && preload_libraries();
+	    && preload_libraries()
+	    && compatibility_setup();
 }
 
 
@@ -107,6 +108,20 @@ void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
 		}
 	}
 }
+
+bool ObjectDynamic::compatibility_setup() {
+	if (this->file_previous == nullptr) {
+		for (auto &dyn: dynamic_table)
+			if (dyn.tag() < 80)
+				this->file.libinfo[dyn.tag()] = dyn.ptr();
+
+		this->file.glibc_link_map.l_phdr = this->Elf::data(this->header.e_phoff);
+		this->file.glibc_link_map.l_entry = this->header.entry();
+		this->file.glibc_link_map.l_phnum = this->header.e_phnum;
+	}
+	return true;
+}
+
 
 bool ObjectDynamic::preload_libraries() {
 	bool success = true;

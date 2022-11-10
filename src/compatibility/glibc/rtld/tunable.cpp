@@ -416,7 +416,7 @@ enum TunableID {
 	_count
 };
 #if GLIBC_TUNABLE_COUNT
-static_assert(_count == GLIBC_TUNABLE_COUNT, "Wrong number of tunables for " OS " " OSVERSION " (" PLATFORM ")");
+static_assert(_count == GLIBC_TUNABLE_COUNT, "Wrong number of tunables for " OSNAME " " OSVERSION " (" PLATFORM ")");
 #endif
 #undef TUNABLE_VALUE
 
@@ -476,9 +476,9 @@ struct Tunable	{
 } tunables[] = {
 	TUNABLE_LIST
 };
-static_assert(sizeof(tunables) / sizeof(Tunable) == _count, "Tunables struct and enum do not match: " STR(sizeof(tunables) / sizeof(Tunable)) " vs " STR(_count));
+static_assert(sizeof(tunables) / sizeof(Tunable) == _count, "Tunables struct and enum do not match for " OSNAME " " OSVERSION " (" PLATFORM ")");
 #if GLIBC_TUNABLE_SIZE
-static_assert(sizeof(tunables) == GLIBC_TUNABLE_SIZE, "Wrong size of tunables for " OS " " OSVERSION " (" PLATFORM "):" STR(sizeof(tunables)) " vs " STR(GLIBC_TUNABLE_SIZE));
+static_assert(sizeof(tunables) == GLIBC_TUNABLE_SIZE, "Wrong size of tunables for " OSNAME " " OSVERSION " (" PLATFORM ")");
 #endif
 
 extern __attribute__((alias("tunables"), visibility("default"))) struct Tunable tunable_list;

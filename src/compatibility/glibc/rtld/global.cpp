@@ -12,7 +12,7 @@
 /* Setup _rtld_global */
 GLIBC::RTLD::Global rtld_global;
 #ifdef GLIBC_RTLD_GLOBAL_SIZE
-static_assert(sizeof(rtld_global) == GLIBC_RTLD_GLOBAL_SIZE, "Wrong size of rtld_global for " OS " " OSVERSION " (" PLATFORM ")");
+static_assert(sizeof(rtld_global) == GLIBC_RTLD_GLOBAL_SIZE, "Wrong size of rtld_global for " OSNAME " " OSVERSION " (" PLATFORM ")");
 #else
 #warning size of rtld_global was not checked
 #endif
@@ -21,7 +21,7 @@ extern __attribute__ ((alias("rtld_global"), visibility("default"))) GLIBC::RTLD
 /* Setup _rtld_global_ro */
 GLIBC::RTLD::GlobalRO rtld_global_ro;
 #ifdef GLIBC_RTLD_GLOBAL_RO_SIZE
-static_assert(sizeof(rtld_global_ro) == GLIBC_RTLD_GLOBAL_RO_SIZE, "Wrong size of rtld_global_ro for " OS " " OSVERSION " (" PLATFORM ")");
+static_assert(sizeof(rtld_global_ro) == GLIBC_RTLD_GLOBAL_RO_SIZE, "Wrong size of rtld_global_ro for " OSNAME " " OSVERSION " (" PLATFORM ")");
 #else
 #warning size of rtld_global_ro was not checked
 #endif
@@ -217,7 +217,6 @@ void init_globals(const Loader & loader) {
 	}
 
 	(void) sysinfo;
-	(void) loader;
 
 
 #if GLIBC_VERSION >= GLIBC_2_31 && !defined(COMPATIBILITY_DEBIAN_BUSTER)
@@ -227,6 +226,11 @@ void init_globals(const Loader & loader) {
 	rtld_global_ro._dl_vdso_getcpu = resolve(loader, "__vdso_getcpu");
 	rtld_global_ro._dl_vdso_clock_getres_time64 = resolve(loader, "__vdso_clock_getres");
 #endif
+
+	if (loader.target != nullptr) {
+		rtld_global._dl_ns[NAMESPACE_BASE]._ns_loaded = &(loader.target->glibc_link_map);
+		rtld_global._dl_ns[NAMESPACE_BASE]._ns_nloaded = loader.lookup.size();
+	}
 }
 
 

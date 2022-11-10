@@ -3,8 +3,11 @@
 #include <dlh/types.hpp>
 #include <dlh/macro.hpp>
 
-#include "object/identity.hpp"
 #include "compatibility/glibc/version.hpp"
+
+typedef long int namespace_t;
+const namespace_t NAMESPACE_BASE = 0;
+const namespace_t NAMESPACE_NEW = -1;
 
 namespace GLIBC {
 namespace DL {
@@ -67,7 +70,13 @@ struct link_map {
 	struct link_map *l_real;
 	GLIBC::DL::Lmid_t l_ns;
 
-	void *l_libname;
+	struct libname_list {
+		const char *name;
+		struct libname_list *next;
+		int dont_free;
+	};
+	static libname_list libname_empty;
+	libname_list * l_libname = &libname_empty;
 
 #if GLIBC_VERSION >= GLIBC_2_36
 	uintptr_t *l_info[80];
@@ -77,7 +86,7 @@ struct link_map {
 	uintptr_t *l_info[76];
 #endif
 
-	const uintptr_t *l_phdr;
+	const void *l_phdr;
 	uintptr_t l_entry;
 	uint16_t l_phnum;
 	uint16_t l_ldnum;
@@ -220,12 +229,6 @@ struct link_map {
 		unsigned int bindflags;
 	} l_audit[0];
 };
-
-#ifdef GLIBC_LINK_MAP_SIZE
-static_assert(sizeof(link_map) == GLIBC_LINK_MAP_SIZE, "Wrong size of link_map for " OS " " OSVERSION " (" PLATFORM ")");
-#else
-#warning size of link_map was not checked
-#endif
 }  // namespace DL
 }  // namespace GLIBC
 

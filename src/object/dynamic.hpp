@@ -28,6 +28,9 @@ struct ObjectDynamic : public ObjectExecutable {
 	/*! \brief load required libaries */
 	bool preload_libraries();
 
+	/*! \brief configure glibc stuff */
+	bool compatibility_setup();
+
 	bool prepare() override;
 
 	bool update() override;
