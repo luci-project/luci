@@ -133,7 +133,7 @@ struct link_map {
 #endif
 	uint32_t l_free_initfini           : 1;
 #if GLIBC_VERSION >= GLIBC_2_35
- 	uint32_t l_ld_readonly             : 1;
+	uint32_t l_ld_readonly             : 1;
 	uint32_t l_find_object_processed   : 1;
 #endif
 

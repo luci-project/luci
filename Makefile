@@ -64,12 +64,12 @@ endef
 
 define each_version
 	$(VERBOSE) echo "$(1)ing luci for each version..."
-	$(call custom_version,$(1),ARCHLINUX,202211,X64)
-	$(call custom_version,$(1),DEBIAN,STRETCH,X64)
-	$(call custom_version,$(1),DEBIAN,BUSTER,X64)
-	$(call custom_version,$(1),DEBIAN,BULLSEYE,X64)
-	$(call custom_version,$(1),UBUNTU,FOCAL,X64)
-	$(call custom_version,$(1),UBUNTU,JAMMY,X64)
+	$(call custom_version,$(1),archlinux,202211,x64)
+	$(call custom_version,$(1),debian,stretch,x64)
+	$(call custom_version,$(1),debian,buster,x64)
+	$(call custom_version,$(1),debian,bullseye,x64)
+	$(call custom_version,$(1),ubuntu,focal,x64)
+	$(call custom_version,$(1),ubuntu,jammy,x64)
 endef
 
 
