@@ -148,6 +148,11 @@ int GlobalRO::internal_dl_discover_osversion() {
 	return sym ? reinterpret_cast<void*>(sym->object().base + sym->value()) : nullptr;
 }
 
+[[maybe_unused]] static void clear_list(GLIBC::RTLD::Global::list_t & l) {
+	l.next = &l;
+	l.prev = &l;
+}
+
 void init_globals(const Loader & loader) {
 	uintptr_t sysinfo = 0;
 	Auxiliary * auxv = Auxiliary::begin();
@@ -227,11 +232,21 @@ void init_globals(const Loader & loader) {
 	rtld_global_ro._dl_vdso_clock_getres_time64 = resolve(loader, "__vdso_clock_getres");
 #endif
 
+#if GLIBC_PTHREAD_IN_LIBC && GLIBC_VERSION >= GLIBC_2_33
+	clear_list(rtld_global._dl_stack_used);
+	clear_list(rtld_global._dl_stack_user);
+ #if GLIBC_VERSION >= GLIBC_2_34
+	clear_list(rtld_global._dl_stack_cache);
+ #endif
+#endif
+
 	if (loader.target != nullptr) {
 		rtld_global._dl_ns[NAMESPACE_BASE]._ns_loaded = &(loader.target->glibc_link_map);
 		rtld_global._dl_ns[NAMESPACE_BASE]._ns_nloaded = loader.lookup.size();
 	}
 }
+
+
 
 
 void stack_end(void * ptr) {

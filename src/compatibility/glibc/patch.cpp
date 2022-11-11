@@ -6,6 +6,7 @@
 #include <dlh/syscall.hpp>
 
 #include "page.hpp"
+#include "compatibility/glibc/version.hpp"
 #include "compatibility/glibc/libdl/interface.hpp"
 
 namespace GLIBC {
@@ -67,12 +68,21 @@ class Patch {
 };
 
 static bool redirect_fork_syscall(uint8_t * addr, size_t size, uintptr_t arg) {
+	// could be done faster, of course.
 	for (size_t i = 0; i < size; i++) {
 		uint8_t * a = addr + i;
 		// Find fork syscall instructions
-		if (a[0] == 0xbf && a[1] == 0x11 && a[2] == 0x00 && a[3] == 0x20 && a[4] == 0x01 &&  // mov    $0x1200011,%edi
-		    a[5] == 0xb8 && a[6] == 0x38 && a[7] == 0x00 && a[8] == 0x00 && a[9] == 0x00 &&  // mov    $0x38,%eax
-		    a[10] == 0x0f && a[11] == 0x05) {                                        // syscall
+		if (
+		    a[0] == 0xbf && a[1] == 0x11 && a[2] == 0x00 && a[3] == 0x20 && a[4] == 0x01 &&                                    // mov    $0x1200011,%edi
+#if GLIBC_VERSION >= GLIBC_2_34
+		    a[5] == 0x4c && a[6] == 0x8d && a[7] == 0x90 && a[8] == 0xd0 && a[9] == 0x02 && a[10] == 0x00 && a[11] == 0x00 &&  // lea    0x2d0(%rax),%r10
+		    a[12] == 0xb8 && a[13] == 0x38 && a[14] == 0x00 && a[15] == 0x00 && a[16] == 0x00 &&                               // mov    $0x38,%eax
+			a[17] == 0x0f && a[18] == 0x05                                                                                     // syscall
+#else
+		    a[5] == 0xb8 && a[6] == 0x38 && a[7] == 0x00 && a[8] == 0x00 && a[9] == 0x00 &&                                    // mov    $0x38,%eax
+		    a[10] == 0x0f && a[11] == 0x05                                                                                     // syscall
+#endif
+		 ){
 
 			// Replace with call to replacement function
 			// movabs $arg, %rax
@@ -89,7 +99,16 @@ static bool redirect_fork_syscall(uint8_t * addr, size_t size, uintptr_t arg) {
 			// callq *%rax
 			*(a++) = 0xff;
 			*(a++) = 0xd0;
-
+#if GLIBC_VERSION >= GLIBC_2_34
+			// nop (7 byte)
+			*(a++) = 0x0f;
+			*(a++) = 0x1f;
+			*(a++) = 0x80;
+			*(a++) = 0x00;
+			*(a++) = 0x00;
+			*(a++) = 0x00;
+			*(a++) = 0x00;
+#endif
 			return true;
 		}
 	}
@@ -137,7 +156,11 @@ static Patch fixes[] = {
 	{ "__libc_dlclose", nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
 	{ "__libc_dlsym", nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
 	{ "__libc_dlvsym", nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+#if GLIBC_VERSION >= GLIBC_2_34
+	{ "_Fork", redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+#else
 	{ "__libc_fork", redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+#endif
 };
 
 bool patch(const Elf::SymbolTable & symtab, uintptr_t base) {
