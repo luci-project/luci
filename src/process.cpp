@@ -3,6 +3,7 @@
 #include <dlh/syscall.hpp>
 #include <dlh/assert.hpp>
 #include <dlh/string.hpp>
+#include <dlh/macro.hpp>
 #include <dlh/log.hpp>
 
 
@@ -112,21 +113,49 @@ void Process::init(const Vector<const char *> &arg) {
 }
 
 void Process::start(uintptr_t entry) {
-	start(entry, stack_pointer);
+	start(entry, stack_pointer, envp);
 }
 
 static void exit_func() {
 	LOG_INFO << "Exit Function called" << endl;
 }
 
-void Process::start(uintptr_t entry, uintptr_t stack_pointer) {
+void Process::start(uintptr_t entry, uintptr_t stack_pointer, const char ** envp) {
 	LOG_INFO << "Starting process at " << (void*)entry << " (with sp = " << (void*)stack_pointer << ")" << endl;
+	const unsigned long flags = 1 << 0   // CF: No carry
+	                          | 1 << 2   // PF: Even parity
+	                          | 1 << 4   // AF: No auxiliary carry
+	                          | 1 << 6   // ZF: No zero result
+	                          | 1 << 7   // SF: Unsigned result
+	                          | 1 << 10  // DF: Direction forward
+	                          | 1 << 11  // OF: No overflow occurred
+	                          ;
 	asm (
-		"mov    %0,%%rsp;"
-		"mov    %1,%%r12;"
-		"mov    %2,%%rdx;"
+		/* Required by Sys V ABI */
+		"pushf;"                // Clear several flag set
+		"andq   $0,(%%rsp);"
+		"popf;"
+		"mov    %1,%%rsp;"      // stack pointer
+		"mov    %2,%%r12;"      // entry function in r12
+		"mov    %3,%%rdx;"      // exit function in rdx
+		/* GLIBC sysdeps/x86_64/dl-machine.h */
+		"mov    %4,%%rcx;"      // Evnironment pointer in rcx
+		"mov    %%rsp,%%r13;"   // stack pointer copy in r13
+		/* Sanity */
+		"mov    $0x1c,%%rax;"   // rax with (default?) value
+		"mov    $0,%%rbx;"      // rbx emptied
+		"mov    $0,%%rbp;"      // rbp emptied
+		"mov    $0,%%rsi;"      // rsi emptied
+		"mov    $0,%%rdi;"      // rdi emptied
+		"mov    $0,%%r8;"       // r8 emptied
+		"mov    $0,%%r9;"       // r8 emptied
+		"mov    $0,%%r10;"      // r10 emptied
+		"mov    $0,%%r11;"      // r11 emptied
+		"mov    $0,%%r14;"      // r14 emptied
+		"mov    $0,%%r15;"      // r54 emptied
+		/* Jump to function */
 		"jmp    *%%r12;"
-		:: "r" (stack_pointer), "r" (entry), "r" (exit_func)
+		:: "i"(~flags), "r" (stack_pointer), "r" (entry), "r" (exit_func), "r" (envp)
 	);
 }
 

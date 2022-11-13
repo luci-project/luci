@@ -74,9 +74,7 @@ struct link_map {
 		const char *name;
 		struct libname_list *next;
 		int dont_free;
-	};
-	static libname_list libname_empty;
-	libname_list * l_libname = &libname_empty;
+	} * l_libname;
 
 #if GLIBC_VERSION >= GLIBC_2_36
 	uintptr_t *l_info[80];
@@ -116,7 +114,7 @@ struct link_map {
 		lt_library,
 		lt_loaded
 	} l_type                           : 2;
-#if GLIBC_VERSION >= GLIBC_2_35
+#if GLIBC_VERSION >= GLIBC_2_36
 	uint32_t l_dt_relr_ref             : 1;
 #endif
 	uint32_t l_relocated               : 1;
@@ -213,7 +211,7 @@ struct link_map {
 		struct link_map *value;
 		const uintptr_t *ret;
 	} l_lookup_cache;
-	void *l_tls_initimage;
+	uintptr_t l_tls_initimage;
 	size_t l_tls_initimage_size;
 	size_t l_tls_blocksize;
 	size_t l_tls_align;
@@ -224,10 +222,6 @@ struct link_map {
 	uintptr_t l_relro_addr;
 	size_t l_relro_size;
 	unsigned long long l_serial;
-	struct auditstate {
-		uintptr_t cookie;
-		unsigned int bindflags;
-	} l_audit[0];
 };
 }  // namespace DL
 }  // namespace GLIBC

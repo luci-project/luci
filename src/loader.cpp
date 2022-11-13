@@ -11,6 +11,7 @@
 
 #include "compatibility/glibc/rtld/global.hpp"
 #include "compatibility/glibc/rtld/dl.hpp"
+#include "compatibility/glibc/init.hpp"
 #include "compatibility/gdb.hpp"
 #include "object/base.hpp"
 #include "process.hpp"
@@ -220,6 +221,8 @@ bool Loader::prepare() {
 		LOG_WARNING << "No AT_RANDOM!" << endl;
 	}
 	tls.dtv_setup(main_thread);
+	GLIBC::RTLD::init_globals_tls(tls, main_thread->dtv);
+	GLIBC::init(*this);
 
 	// Initialize GDB
 	GDB::init(*this);
@@ -321,7 +324,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	// Start
 	uintptr_t entry = start->header.entry();
 	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << " (using existing stack at " << (void*) stack_pointer << ")"<< endl;
-	Process::start(start->base + entry, stack_pointer);
+	Process::start(start->base + entry, stack_pointer, this->envp);
 
 	return true;
 }

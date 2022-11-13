@@ -6,8 +6,37 @@
 #include <dlh/syscall.hpp>
 #include <dlh/container/vector.hpp>
 
+#include "compatibility/glibc/init.hpp"
+
 /*! \brief Addtional space reserved for DTV (negative offset) */
 static const size_t dtv_magic_offset = 1;
+
+size_t TLS::add_module(ObjectIdentity & object, size_t size, size_t align, uintptr_t image, size_t image_size, intptr_t & offset) {
+	Guarded _{lock};
+	assert(size > 0);
+	if (gen == 0) {
+		initial_count++;
+		// Alignment of initial TLS is the maximum alignment of its modules
+		if (initial_align < align)
+			initial_align = align;
+		// increase intital TLS size
+		initial_size += Math::align_up(size, initial_align);
+		// Offset to thread pointer
+		offset = initial_size;
+	} else {
+		// dynamic modules have no fixed offset
+		offset = 0;
+	}
+	// add to module list
+	modules.emplace_back(object, size, align, image, image_size, offset);
+
+	auto modid = modules.size();
+	// GLIBC stuff
+	GLIBC::init_tls(object, size, align, image, image_size, offset, modid);
+
+	// return module id
+	return modid;
+}
 
 void TLS::dtv_setup(Thread * thread) {
 	if (gen == 0)
@@ -101,12 +130,11 @@ Thread * TLS::allocate(Thread * thread, bool set_fs) {
 	if (thread == nullptr) {
 		if (initial_align < 64)
 			initial_align = 64;
-		uintptr_t mem = Memory::alloc_array(initial_size + TLS_THREAD_SIZE + initial_align, 1);
+		uintptr_t mem = Memory::alloc_array(initial_size + sizeof(Thread) + initial_align, 1);
 		assert(mem != 0);
 
 		uintptr_t addr = Math::align_up(mem + initial_size, initial_align);
-		assert(TLS_THREAD_SIZE >= sizeof(Thread));
-		thread = new (reinterpret_cast<Thread*>(addr)) Thread(nullptr, mem, initial_size + TLS_THREAD_SIZE);
+		thread = new (reinterpret_cast<Thread*>(addr)) Thread(nullptr, mem, initial_size + sizeof(Thread));
 	}
 
 	dtv_allocate(thread);
@@ -128,7 +156,7 @@ void TLS::free(Thread * thread, bool free_thread_struct) {
 
 	dtv_free(thread);
 	if (free_thread_struct) {
-		assert(thread->map_size == initial_size + TLS_THREAD_SIZE);
+		assert(thread->map_size == initial_size + sizeof(Thread));
 		Memory::free(thread->map_base);
 	}
 }

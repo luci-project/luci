@@ -7,20 +7,11 @@
 #include "object/base.hpp"
 #include "loader.hpp"
 
-#ifdef GLIBC_LINK_MAP_SIZE
-static_assert(sizeof(GLIBC::DL::link_map) == GLIBC_LINK_MAP_SIZE, "Wrong size of link_map for " OSNAME " " OSVERSION " (" PLATFORM ")");
-#else
-#warning size of link_map was not checked
-#endif
-
-GLIBC::DL::link_map::libname_list GLIBC::DL::link_map::libname_empty = { "", nullptr, 1 };
-
 const void* RTLD_NEXT = reinterpret_cast<void*>(-1l);
 const void* RTLD_DEFAULT = 0;
 
 // TODO: Should be __thread
 static const char * error_msg = nullptr;
-
 
 EXPORT int dlclose(void *) {
 	error_msg = "Unloading is not supported (yet)";

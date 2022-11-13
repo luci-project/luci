@@ -38,7 +38,7 @@ struct ObjectIdentity {
 			/*! \brief Namespace for object */
 			const namespace_t ns;
 
-			void * libname = nullptr;
+			GLIBC::DL::link_map::libname_list * libname = nullptr;
 
 			const Elf::Dyn *libinfo[80] = {};
 		};
@@ -99,6 +99,8 @@ struct ObjectIdentity {
 
 	int wd;
 	char buffer[PATH_MAX + 1];
+
+	GLIBC::DL::link_map::libname_list libname_buffer[2];
 
 	/*! \brief watch for file modification */
 	bool watch(bool force = false, bool close_existing = true);

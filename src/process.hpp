@@ -69,9 +69,10 @@ class Process {
 
 	/*! \brief Start Process
 	 * \param entry Start address
-	 * \param stack_pointer Pointer to top of stack;
+	 * \param stack_pointer Pointer to top of stack
+	 * \param envp Pointer to start of environment variables on stack
 	 */
-	static void start(uintptr_t entry, uintptr_t stack_pointer);
+	static void start(uintptr_t entry, uintptr_t stack_pointer, const char ** envp);
 
 	/*! \brief Dump environment
 	 * \param argc argument count

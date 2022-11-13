@@ -6,6 +6,7 @@
 #include <dlh/auxiliary.hpp>
 
 #include "compatibility/glibc/patch.hpp"
+#include "compatibility/glibc/init.hpp"
 #include "dynamic_resolve.hpp"
 #include "loader.hpp"
 
@@ -110,16 +111,12 @@ void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
 }
 
 bool ObjectDynamic::compatibility_setup() {
-	if (this->file_previous == nullptr) {
+	if (this->file_previous == nullptr)
 		for (auto &dyn: dynamic_table)
 			if (dyn.tag() < 80)
 				this->file.libinfo[dyn.tag()] = dyn.ptr();
 
-		this->file.glibc_link_map.l_phdr = this->Elf::data(this->header.e_phoff);
-		this->file.glibc_link_map.l_entry = this->header.entry();
-		this->file.glibc_link_map.l_phnum = this->header.e_phnum;
-	}
-	return true;
+	return GLIBC::init(*this);
 }
 
 

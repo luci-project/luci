@@ -10,7 +10,6 @@
 #include "object/identity.hpp"
 
 static void * const TLS_UNALLOCATED = nullptr;
-static const size_t TLS_THREAD_SIZE = 2304;  // sizeof(struct pthread)
 
 struct TLS {
 	/*! \brief Generation counter */
@@ -63,27 +62,7 @@ struct TLS {
 	 * \param offset For initial TLS this will contain the offset from thread pointer to the TLS block
 	 * \return module ID of TLS block
 	 */
-	size_t add_module(const ObjectIdentity & object, size_t size, size_t align, uintptr_t image, size_t image_size, intptr_t & offset) {
-		Guarded _{lock};
-		assert(size > 0);
-		if (gen == 0) {
-			initial_count++;
-			// Alignment of initial TLS is the maximum alignment of its modules
-			if (initial_align < align)
-				initial_align = align;
-			// increase intital TLS size
-			initial_size += Math::align_up(size, initial_align);
-			// Offset to thread pointer
-			offset = initial_size;
-		} else {
-			// dynamic modules have no fixed offset
-			offset = 0;
-		}
-		// add to module list
-		modules.emplace_back(object, size, align, image, image_size, offset);
-		// return module id
-		return modules.size();
-	}
+	size_t add_module(ObjectIdentity & object, size_t size, size_t align, uintptr_t image, size_t image_size, intptr_t & offset);
 
 	/*! \brief Setup initial TLS
 	 * \param thread current Thread

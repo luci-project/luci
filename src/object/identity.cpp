@@ -168,6 +168,11 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 	// File based?
 	if (path == nullptr) {
 		buffer[0] = '\0';
+
+		libname_buffer[0].name = buffer;
+		libname_buffer[0].next = nullptr;
+		libname_buffer[0].dont_free = 1;
+		libname = libname_buffer;
 	} else {
 		// We need the absolute path to the directory (GLIBC requirement...)
 		auto pathlen = String::len(path) + 1;
@@ -193,6 +198,14 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 		this->path = StrPtr(buffer);
 		if (altname == nullptr)
 			this->name = this->path.find_last('/');
+
+		libname_buffer[0].name = this->path.c_str();
+		libname_buffer[0].next = libname_buffer + 1;
+		libname_buffer[0].dont_free = 1;
+		libname_buffer[1].name = this->name.c_str();
+		libname_buffer[1].next = nullptr;
+		libname_buffer[1].dont_free = 1;
+		libname = libname_buffer;
 
 		// Observe file?
 		if (this->flags.updatable == 1) {

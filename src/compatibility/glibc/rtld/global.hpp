@@ -6,11 +6,9 @@
 #include <dlh/types.hpp>
 #include <dlh/mutex_rec.hpp>
 
+#include "tls.hpp"
 #include "compatibility/gdb.hpp"
 #include "compatibility/glibc/version.hpp"
-#include "compatibility/glibc/rtld/dl.hpp"
-#include "compatibility/glibc/rtld/dl_tls.hpp"
-#include "compatibility/glibc/rtld/exception.hpp"
 #include "compatibility/glibc/libdl/interface.hpp"
 
 extern "C" void _dl_debug_printf(const char *fmt, ...);
@@ -18,6 +16,7 @@ extern "C" void _dl_debug_printf(const char *fmt, ...);
 namespace GLIBC {
 namespace RTLD {
 void init_globals(const Loader & loader);
+void init_globals_tls(const TLS & tls, void * dtv);
 void stack_end(void * ptr);
 
 // results using dwarfdump -n globals [system / ld]
@@ -68,8 +67,7 @@ struct Global {
 	uint64_t _dl_num_cache_relocations;
 	void *_dl_all_dirs;
 #if  GLIBC_VERSION < GLIBC_2_25
-	static void * internal_dl_error_catch_tsd();
-	void *(*_dl_error_catch_tsd) () = internal_dl_error_catch_tsd;
+	void *(*_dl_error_catch_tsd) ();
 #endif
 	GLIBC::DL::link_map _dl_rtld_map;
 	struct auditstate {
@@ -78,10 +76,8 @@ struct Global {
 	} _dl_rtld_auditstate[16] = {};
 
 #if !GLIBC_PTHREAD_IN_LIBC
-	static void internal_dl_rtld_lock_recursive(void* arg);
-	void (*_dl_rtld_lock_recursive)(void *) = internal_dl_rtld_lock_recursive;
-	static void internal_dl_rtld_unlock_recursive(void* arg);
-	void (*_dl_rtld_unlock_recursive)(void *) = internal_dl_rtld_unlock_recursive;
+	void (*_dl_rtld_lock_recursive)(void *);
+	void (*_dl_rtld_unlock_recursive)(void *);
 #endif
 #if GLIBC_VERSION >= GLIBC_2_32
 	uint32_t _dl_x86_feature_1;
@@ -100,7 +96,7 @@ struct Global {
 	uint64_t _dl_x86_legacy_bitmap[2] = {0, 0};
 #endif
 #if GLIBC_VERSION < GLIBC_2_34 || !GLIBC_PTHREAD_IN_LIBC
-	int (*_dl_make_stack_executable_hook)(void**) = _dl_make_stack_executable;
+	int (*_dl_make_stack_executable_hook)(void**);
 #endif
 	uint32_t _dl_stack_flags = 0x6;
 	bool _dl_tls_dtv_gaps = 0x0;
@@ -120,12 +116,10 @@ struct Global {
 	void *_dl_initial_dtv;
 	size_t _dl_tls_generation = 0x1;
 #if GLIBC_VERSION < GLIBC_2_34 || !GLIBC_PTHREAD_IN_LIBC
-	static void internal_dl_init_static_tls(GLIBC::DL::link_map *);
-	void (*_dl_init_static_tls)(GLIBC::DL::link_map *) = internal_dl_init_static_tls;
+	void (*_dl_init_static_tls)(GLIBC::DL::link_map *);
 #endif
 #if GLIBC_VERSION < GLIBC_2_33
-	static void internal_dl_wait_lookup_done();
-	void (*_dl_wait_lookup_done)() = internal_dl_wait_lookup_done;
+	void (*_dl_wait_lookup_done)();
 #endif
 	void *_dl_scope_free_list = 0;
 #if GLIBC_PTHREAD_IN_LIBC && GLIBC_VERSION >= GLIBC_2_33
@@ -379,35 +373,29 @@ struct GlobalRO {
 	   call the function instead of going through the PLT.  The result
 	   is that we can avoid exporting the functions and we do not jump
 	   PLT relocations in libc.so.  */
-	void (*_dl_debug_printf) (const char *, ...) __attribute__ ((__format__ (__printf__, 1, 2))) = _dl_debug_printf;
+	void (*_dl_debug_printf) (const char *, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 #if GLIBC_VERSION < GLIBC_2_25
-	int (*_dl_catch_error) (const char **, const char **,  bool *, void (*) (void *), void *) = _dl_catch_error;
-	void (*_dl_signal_error) (int, const char *, const char *,const char *) = _dl_signal_error;
+	int (*_dl_catch_error) (const char **, const char **,  bool *, void (*) (void *), void *);
+	void (*_dl_signal_error) (int, const char *, const char *,const char *);
 #endif
-	void (*_dl_mcount) (intptr_t, uintptr_t) = _dl_mcount;
-	static void * internal_dl_lookup_symbol_x(const char *, GLIBC::DL::link_map *, const void **, void *[], const void *, int, int,  GLIBC::DL::link_map *);
-	void * (*_dl_lookup_symbol_x) (const char *, GLIBC::DL::link_map *, const void **, void *[], const void *, int, int,  GLIBC::DL::link_map *) = internal_dl_lookup_symbol_x;
+	void (*_dl_mcount) (uintptr_t, uintptr_t);
+	void * (*_dl_lookup_symbol_x) (const char *, GLIBC::DL::link_map *, const void **, void *[], const void *, int, int,  GLIBC::DL::link_map *);
 #if GLIBC_VERSION < GLIBC_2_28
-	int (*_dl_check_caller) (const void *, int) = _dl_check_caller;
+	int (*_dl_check_caller) (const void *, int);
 #endif
-	static void *internal_dl_open(const char *, int, const void *, GLIBC::DL::Lmid_t, int, char **, char **);
-	void *(*_dl_open) (const char *, int, const void *, GLIBC::DL::Lmid_t, int, char **, char **) = internal_dl_open;
-	static void internal_dl_close(void *);
-	void (*_dl_close) (void *) = internal_dl_close;
+	void *(*_dl_open) (const char *, int, const void *, GLIBC::DL::Lmid_t, int, char **, char **);
+	void (*_dl_close) (void *);
 #if GLIBC_VERSION >= GLIBC_2_34
-	int (*_dl_catch_error)(const char **, const char **, bool *, void (*)(void *), void *) = _dl_catch_error;
-	void (*_dl_error_free)(void *) = _dl_error_free;
+	int (*_dl_catch_error)(const char **, const char **, bool *, void (*)(void *), void *);
+	void (*_dl_error_free)(void *);
 #endif
-	void *(*_dl_tls_get_addr_soft) (GLIBC::DL::link_map *) = ::_dl_tls_get_addr_soft;
+	void *(*_dl_tls_get_addr_soft) (GLIBC::DL::link_map *);
 #if GLIBC_VERSION >= GLIBC_2_35
-	static void internal_dl_libc_freeres();
-	void (*_dl_libc_freeres)(void) = internal_dl_libc_freeres;
-	static int internal_dl_find_object(void *, void *);
-	int (*_dl_find_object)(void *, void *) = internal_dl_find_object;
+	void (*_dl_libc_freeres)(void);
+	int (*_dl_find_object)(void *, void *);
 #endif
 #if GLIBC_VERSION < GLIBC_2_36
-	static int internal_dl_discover_osversion();
-	int (*_dl_discover_osversion) (void) = internal_dl_discover_osversion;
+	int (*_dl_discover_osversion) (void);
 #endif
 #if GLIBC_VERSION >= GLIBC_2_34
 	const struct dlfcn_hook *_dl_dlfcn_hook = 0;

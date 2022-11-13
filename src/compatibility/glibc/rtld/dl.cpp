@@ -37,9 +37,76 @@ EXPORT int _dl_make_stack_executable(__attribute__((unused)) void **stack_endp) 
 	return 0;
 }
 
-EXPORT void _dl_mcount(__attribute__((unused)) uintptr_t from, __attribute__((unused)) uintptr_t to) {
+extern "C" __attribute__((__used__)) void __dl_mcount(uintptr_t from, uintptr_t to) {
+	(void) from;
+	(void) to;
 	LOG_WARNING << "GLIBC _dl_mcount not implemented!" << endl;
 }
+
+
+asm(R"(
+.globl _dl_mcount
+.type _dl_mcount, @function
+.align 16
+_dl_mcount:
+	.cfi_startproc
+	endbr64
+
+	# Save base pointer
+	push %rax
+	.cfi_adjust_cfa_offset 8
+	.cfi_rel_offset rax, 0
+	push %rcx
+	.cfi_adjust_cfa_offset 8
+	.cfi_rel_offset rcx, 0
+	push %rdx
+	.cfi_adjust_cfa_offset 8
+	.cfi_rel_offset rdx, 0
+	push %rsi
+	.cfi_adjust_cfa_offset 8
+	.cfi_rel_offset rsi, 0
+	push %rdi
+	.cfi_adjust_cfa_offset 8
+	.cfi_rel_offset rdi, 0
+	push %r8
+	.cfi_adjust_cfa_offset 8
+	.cfi_rel_offset r8, 0
+	push %r9
+	.cfi_adjust_cfa_offset 8
+	.cfi_rel_offset r9, 0
+
+	# Call high level mcount function
+	call __dl_mcount
+
+	# Restore register
+	.cfi_adjust_cfa_offset -8
+	pop %r9
+	.cfi_adjust_cfa_offset -8
+	pop %r8
+	.cfi_adjust_cfa_offset -8
+	pop %rdi
+	.cfi_adjust_cfa_offset -8
+	pop %rsi
+	.cfi_adjust_cfa_offset -8
+	pop %rdx
+	.cfi_adjust_cfa_offset -8
+	pop %rcx
+	.cfi_adjust_cfa_offset -8
+	pop %rax
+	.cfi_adjust_cfa_offset -8
+
+	.cfi_restore rax
+	.cfi_restore rcx
+	.cfi_restore rdx
+	.cfi_restore rsi
+	.cfi_restore rdi
+	.cfi_restore r8
+	.cfi_restore r9
+
+	ret
+	.cfi_endproc
+)");
+
 
 EXPORT void __rtld_version_placeholder() {
 	/* do nothing */

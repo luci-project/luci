@@ -3,6 +3,7 @@
 #include <dlh/log.hpp>
 #include <dlh/macro.hpp>
 #include <dlh/assert.hpp>
+#include <dlh/thread.hpp>
 
 #include "loader.hpp"
 
@@ -24,8 +25,7 @@ EXPORT void _dl_get_tls_static_info(size_t *size, size_t *align) {
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
-	assert(TLS_THREAD_SIZE >= sizeof(Thread));
-	*size = loader->tls.initial_size + TLS_THREAD_SIZE;
+	*size = loader->tls.initial_size + sizeof(Thread);
 	*align = loader->tls.initial_align;
 }
 
