@@ -66,6 +66,10 @@ struct MemorySegment {
 		uintptr_t page_end() const {
 			return page_start() + page_size();
 		}
+
+		bool contains(uintptr_t ptr) const {
+			return ptr >= base + offset && ptr < base + offset + size;
+		}
 	} target;
 
 	/*! \brief Constructor */

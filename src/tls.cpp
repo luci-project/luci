@@ -130,11 +130,13 @@ Thread * TLS::allocate(Thread * thread, bool set_fs) {
 	if (thread == nullptr) {
 		if (initial_align < 64)
 			initial_align = 64;
-		uintptr_t mem = Memory::alloc_array(initial_size + sizeof(Thread) + initial_align, 1);
+
+		uintptr_t mem = Memory::alloc_array(initial_size + sizeof(Thread) + surplus + initial_align, 1);
 		assert(mem != 0);
 
-		uintptr_t addr = Math::align_up(mem + initial_size, initial_align);
-		thread = new (reinterpret_cast<Thread*>(addr)) Thread(nullptr, mem, initial_size + sizeof(Thread));
+		uintptr_t addr = Math::align_up(mem + initial_size + surplus, initial_align);
+		LOG_WARNING << "Allocate Thread " << (void*)addr << " with " << initial_size << "B (+" << surplus << "B) TLS starting at " << (void*)mem << endl;
+		thread = new (reinterpret_cast<Thread*>(addr)) Thread(nullptr, mem, initial_size + sizeof(Thread) + surplus);
 	}
 
 	dtv_allocate(thread);

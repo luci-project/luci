@@ -32,8 +32,11 @@ EXPORT void _dl_get_tls_static_info(size_t *size, size_t *align) {
 // This function is called from within pthread_create to initialize
 // the content of the dtv for a new thread before giving control to
 // that new thread
-EXPORT Thread * _dl_allocate_tls_init(Thread *thread) {
-	LOG_TRACE << "GLIBC _dl_allocate_tls_init(" << (void*)thread << ")" << endl;
+EXPORT Thread * _dl_allocate_tls_init(Thread *thread, bool init_tls) {
+#if GLIBC_VERSION < GLIBC_2_35
+	init_tls = true;
+#endif
+	LOG_TRACE << "GLIBC _dl_allocate_tls_init(" << (void*)thread << ", " << init_tls << ")" << endl;
 	if (thread == nullptr)
 		return nullptr;
 

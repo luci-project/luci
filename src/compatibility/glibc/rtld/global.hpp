@@ -102,16 +102,16 @@ struct Global {
 	bool _dl_tls_dtv_gaps = 0x0;
 	size_t _dl_tls_max_dtv_idx = 0x1;
 	void *_dl_tls_dtv_slotinfo_list;
-	size_t _dl_tls_static_nelem = 0x1;
+	size_t _dl_tls_static_nelem = 0;
 #if GLIBC_VERSION < GLIBC_2_34
-	size_t _dl_tls_static_size = 0x1040;
+	size_t _dl_tls_static_size;
 #endif
-	size_t _dl_tls_static_used = 0x90;
+	size_t _dl_tls_static_used;
 #if GLIBC_VERSION < GLIBC_2_34
-	size_t _dl_tls_static_align = 0x40;
+	size_t _dl_tls_static_align;
 #endif
 #if GLIBC_VERSION >= GLIBC_2_32 || defined(COMPATIBILITY_DEBIAN_BULLSEYE)
-	size_t _dl_tls_static_optional;
+	size_t _dl_tls_static_optional = 0x200;
 #endif
 	void *_dl_initial_dtv;
 	size_t _dl_tls_generation = 0x1;
@@ -311,10 +311,10 @@ struct GlobalRO {
 
 #if GLIBC_VERSION >= GLIBC_2_34
 	/* Size of the static TLS block.  */
-	size_t _dl_tls_static_size = 4224;
+	size_t _dl_tls_static_size = 0;
 
 	/* Alignment requirement of the static TLS block.  */
-	size_t _dl_tls_static_align = 64;
+	size_t _dl_tls_static_align = 0;
 #endif
 #if GLIBC_VERSION >= GLIBC_2_34 || defined(COMPATIBILITY_DEBIAN_BULLSEYE)
 	/* Size of surplus space in the static TLS area for dynamically
@@ -332,7 +332,7 @@ struct GlobalRO {
 	/* Name of the object we want to trace the prelinking.  */
 	const char *_dl_trace_prelink = nullptr;
 	/* Map of shared object to be prelink traced.  */
-	/* struct link_map */ void *_dl_trace_prelink_map = nullptr;
+	GLIBC::DL::link_map * _dl_trace_prelink_map = nullptr;
 #endif
 
 	/* All search directories defined at startup.  This is assigned a
@@ -348,7 +348,7 @@ struct GlobalRO {
 
 	/* At startup time we set up the normal DSO data structure for it,
 	   and this points to it.  */
-	/* struct link_map */ void *_dl_sysinfo_map = nullptr;
+	GLIBC::DL::link_map *_dl_sysinfo_map = nullptr;
 
 #if GLIBC_VERSION >= GLIBC_2_31 && !defined(COMPATIBILITY_DEBIAN_BUSTER)
 	void * _dl_vdso_clock_gettime64 = nullptr;
@@ -392,7 +392,15 @@ struct GlobalRO {
 	void *(*_dl_tls_get_addr_soft) (GLIBC::DL::link_map *);
 #if GLIBC_VERSION >= GLIBC_2_35
 	void (*_dl_libc_freeres)(void);
-	int (*_dl_find_object)(void *, void *);
+	struct dl_find_object {
+		unsigned long long int dlfo_flags;
+		uintptr_t dlfo_map_start;		/* Beginning of mapping containing address.  */
+		uintptr_t dlfo_map_end;		/* End of mapping.  */
+		const GLIBC::DL::link_map *dlfo_link_map;
+		uintptr_t dlfo_eh_frame;		/* Exception handling data of the object.  */
+		unsigned long long int __dflo_reserved[7];
+	};
+	int (*_dl_find_object)(uintptr_t, struct dl_find_object *);
 #endif
 #if GLIBC_VERSION < GLIBC_2_36
 	int (*_dl_discover_osversion) (void);

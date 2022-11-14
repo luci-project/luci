@@ -77,7 +77,7 @@ install: $(TARGET_PATH) $(LIBPATH_CONF) $(LDLUCI_CONF)
 
 install-only: $(LIBPATH_CONF) $(LDLUCI_CONF)
 	$(VERBOSE) test -f "$(TARGET_FILE)"
-	$(VERBOSE) ln -s $(shell readlink -f "$(TARGET_FILE)") "/opt/luci/ld-luci.so"
+	$(VERBOSE) ln -f -s $(shell readlink -f "$(TARGET_FILE)") "/opt/luci/ld-luci.so"
 
 build: $(TARGET_FILE)
 

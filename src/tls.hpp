@@ -12,6 +12,9 @@
 static void * const TLS_UNALLOCATED = nullptr;
 
 struct TLS {
+	/* GLIBC adds extra space */
+	const size_t surplus = 0x680;
+
 	/*! \brief Generation counter */
 	unsigned long gen = 0;
 

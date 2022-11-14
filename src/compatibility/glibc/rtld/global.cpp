@@ -2,6 +2,7 @@
 
 #include <dlh/log.hpp>
 #include <dlh/mem.hpp>
+#include <dlh/math.hpp>
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
 #include <dlh/string.hpp>
@@ -121,8 +122,28 @@ static __attribute__((unused)) void _dl_libc_freeres() {
 	LOG_ERROR << "GLIBC _dl_libc_freeres not implemented" << endl;
 }
 
-static __attribute__((unused)) int _dl_find_object(void *, void *){
-	LOG_ERROR << "GLIBC _dl_find_object not implemented" << endl;
+static int _dl_find_object(uintptr_t address, GLIBC::RTLD::GlobalRO::dl_find_object * result) {
+	LOG_TRACE << "GLIBC _dl_find_object(" << (void*)address << ", " << result << ")" << endl;
+	auto loader = Loader::instance();
+	assert(loader != nullptr);
+
+	GuardedReader _{loader->lookup_sync};
+	for (const auto & object_file : loader->lookup)
+		for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous)
+			for (const MemorySegment & mem : obj->memory_map)
+				if (mem.target.contains(address)) {
+					result->dlfo_flags = 0;
+					result->dlfo_map_start = mem.target.address();
+					result->dlfo_map_end = mem.target.address() + mem.target.size;
+					result->dlfo_link_map = &object_file.glibc_link_map;
+					result->dlfo_eh_frame = 0;
+					for (const auto & s : obj->Elf::segments)
+						if (s.type() == Elf::PT_GNU_EH_FRAME) {
+							result->dlfo_eh_frame = obj->base + s.virt_addr();
+							break;
+						}
+					return 0;
+				}
 	return -1;
 }
 #endif
@@ -280,11 +301,23 @@ void init_globals(const Loader & loader) {
 
 
 void init_globals_tls(const TLS & tls, void * dtv) {
-	rtld_global._dl_tls_static_nelem = tls.initial_count;
 	rtld_global._dl_tls_max_dtv_idx = tls.modules.size();
 	rtld_global._dl_tls_generation = tls.gen;
 	rtld_global._dl_initial_dtv = dtv;
-	// TODO:	rtld_global._dl_tls_dtv_slotinfo_list;
+	rtld_global._dl_tls_static_nelem = tls.initial_count;
+	rtld_global._dl_tls_static_used = tls.initial_size;
+	auto static_size = Math::align_up(tls.initial_size + tls.surplus,  tls.initial_align) + sizeof(Thread);
+#if GLIBC_VERSION >= GLIBC_2_34
+	rtld_global_ro._dl_tls_static_size = static_size;
+	rtld_global_ro._dl_tls_static_align = tls.initial_align;
+#else
+	rtld_global._dl_tls_static_size = static_size;
+	rtld_global._dl_tls_static_align = tls.initial_align;
+#endif
+#if GLIBC_VERSION >= GLIBC_2_34 || defined(COMPATIBILITY_DEBIAN_BULLSEYE)
+	rtld_global_ro._dl_tls_static_surplus = tls.surplus;
+#endif
+
 }
 
 void stack_end(void * ptr) {
