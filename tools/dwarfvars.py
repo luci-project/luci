@@ -8,8 +8,48 @@ import regex
 import xxhash
 import argparse
 import subprocess
+from libdebuginfod import DebugInfoD
 
 # TODO: Use pyelftools instead
+
+def get_debugbin(filepath, root = '', buildid = None, debuginfod = True):
+	dbgsyms = []
+	ids = []
+	if buildid:
+		dbgsyms.append(root + '/usr/lib/debug/.build-id/' + buildid[:2] + '/' + buildid[2:] + '.debug')
+		ids.append(buildid)
+	else:
+		# Debug symbols via Build ID
+		buildids = regex.compile(r'^\s*Build-ID: ([0-9a-f]+)$')
+		readelf = subprocess.Popen(['readelf', '-n', root + filepath], stdout=subprocess.PIPE)
+		while line := readelf.stdout.readline().decode('utf-8'):
+			if buildid := buildids.match(line):
+				dbgsyms.append(root + '/usr/lib/debug/.build-id/' + buildid.group(1)[:2] + '/' + buildid.group(1)[2:] + '.debug')
+				ids.append( buildid.group(1))
+
+	dbgsyms.append(root + filepath + '.debug')
+	dbgsyms.append(root + os.path.dirname(filepath) + '/.debug/' + os.path.basename(filepath) + '.debug')
+	dbgsyms.append(root + '/usr/lib/debug' + filepath + '.debug')
+
+	for dbgsym in dbgsyms:
+		if os.path.exists(dbgsym):
+			return dbgsym
+
+	if debuginfod:
+		try:
+			session = DebugInfoD()
+			session.begin()
+			for id in ids:
+				fd, path = session.find_debuginfo(id)
+				if path:
+					session.end()
+					os.close(fd)
+					return path
+			session.end()
+		except:
+			return None
+
+	return None
 
 class DwarfVars:
 	def __init__(self, file, aliases = True, names = True, external_dbgsym = True, root = ''):
@@ -29,23 +69,7 @@ class DwarfVars:
 		elif self.parse(file):
 			self.dbgsym = file
 		elif external_dbgsym:
-			dbgsyms = []
-			# Debug symbols via Build ID
-			buildids = regex.compile(r'^\s*Build-ID: ([0-9a-f]+)$')
-			readelf = subprocess.Popen(['readelf', '-n', root + self.file], stdout=subprocess.PIPE)
-			while line := readelf.stdout.readline().decode('utf-8'):
-				if buildid := buildids.match(line):
-					dbgsyms.append(root + '/usr/lib/debug/.build-id/' + buildid.group(1)[:2] + '/' + buildid.group(1)[2:] + '.debug')
-			# Debug symbols via path
-			dbgsyms.append(root + self.file + '.debug')
-			dbgsyms.append(root + os.path.dirname(self.file) + '/.debug/' + os.path.basename(self.file) + '.debug')
-			dbgsyms.append(root + '/usr/lib/debug' + self.file + '.debug')
-			# Inoffical debug file names
-			dbgsyms.append(root + os.path.dirname(self.file) + '/.debug/' + os.path.basename(self.file))
-			dbgsyms.append(root + '/usr/lib/debug' + self.file)
-			for dbgsym in dbgsyms:
-				if os.path.exists(dbgsym) and self.parse(dbgsym):
-					self.dbgsym = dbgsym
+			self.dbgsym = get_debugbin(file, root)
 
 		# Not found:
 		if not self.dbgsym:
