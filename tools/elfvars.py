@@ -4,6 +4,7 @@
 import os
 import io
 import sys
+import json
 import errno
 import xxhash
 import os.path
@@ -34,12 +35,24 @@ def compare_symbols(a, b):
 	else:
 		return a['value'] - b['value']
 
-def sortuniq(symlist):
+def sortuniq_symbols(symlist):
 	l = None
 	for s in sorted(symlist, key=functools.cmp_to_key(compare_symbols)):
 		if l and l['value'] == s['value'] and l['name'] == s['name']:
-			if d['size'] != s['size']:
+			if l['size'] != s['size']:
 				print(f"Size mismatch for duplicate {l['name']}: {l['size']} vs {s['size']}", file=sys.stderr)
+		else:
+			l = s
+			yield s
+
+def sortuniq_datatypes(datatypelist):
+	l = None
+	for s in sorted(datatypelist, key= lambda x: x['type']):
+		if l and l['type'] == s['type']:
+			if l['size'] != s['size']:
+				print(f"Size mismatch for duplicate {l['type']}: {l['size']} vs {s['size']}", file=sys.stderr)
+			elif l['hash'] != s['hash']:
+				print(f"Hash mismatch for duplicate {l['type']}: {l['hash']} vs {s['hash']}", file=sys.stderr)
 		else:
 			l = s
 			yield s
@@ -106,14 +119,14 @@ class ElfVar:
 
 		# Get debug symbols
 		if self.elf.has_dwarf_info() and next(self.elf.get_dwarf_info().iter_CUs(), False):
-			dbgsym = self.path
+			self.dbgsym = self.path
 		elif dbgsym_extern:
-			dbgsym = get_debugbin(self.path, root, self.buildid)
+			self.dbgsym = get_debugbin(self.path, root, self.buildid)
 		else:
-			dbgsym = None
+			self.dbgsym = None
 
 		if dbgsym:
-			self.dwarf = DwarfVars(dbgsym, aliases = aliases, names = names)
+			self.dwarf = DwarfVars(self.dbgsym, aliases = aliases, names = names)
 
 
 	def symbols(self):
@@ -176,19 +189,13 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	files = {}
-	datatypes = {}
-	buildids = {}
-	dbgfiles = {}
 	for f in args.file:
 		elf = ElfVar(f, args.root, args.dbgsym, args.dbgsym_extern, args.aliases, args.names)
-
 		symbols = elf.symbols()
-
 		variables = []
-
 		if args.dbgsym and elf.dwarf:
-			si = sortuniq(symbols)
-			di = sortuniq(elf.symbols_debug())
+			si = sortuniq_symbols(symbols)
+			di = sortuniq_symbols(elf.symbols_debug())
 
 			s = next(si, None)
 			d = next(di, None)
@@ -224,28 +231,36 @@ if __name__ == '__main__':
 						variables.append(s)
 						s = next(si, None)
 		else:
-			variables = list(sortuniq(symbols))
+			variables = list(sortuniq_symbols(symbols))
 
 
-		files[f.name] = {}
+		files[f.name] = {
+			"file": os.path.realpath(f.name).lstrip(args.root),
+			"buildid": elf.buildid,
+			"variables": len(variables)
+		}
+		if elf.dbgsym:
+			files[f.name]["debug"] = os.path.realpath(elf.dbgsym).lstrip(args.root)
+
 		for cat in sorted(elf.categories):
 			if args.writable and not 'W' in cat and cat != 'TLS':
 				continue
 
 			hash = xxhash.xxh64()
-
+			files[f.name][cat] = {}
+			if args.verbose:
+				files[f.name][cat]["details"] = []
 			vars = filter(lambda x: x['category'] == cat, variables)
-			varstr = []
 			for var in vars:
-				varstr.append(str(var))
+				if args.verbose:
+					files[f.name][cat]["details"].append(str(var))
 				if args.names:
 					hash.update(var['name'])
 				if 'hash' in var:
 					hash.update('#' + var['hash'])
 				hash.update('@' + str(var['value']) + '/' + str(var['align']) + ':' + str(var['size']))
+			files[f.name][cat]["hash"] = hash.hexdigest()
 
-			if len(varstr) > 0:
-				files[f.name][cat] = (hash.hexdigest(), '\n  [\n    ' + "\n    ".join(varstr) + "\n  ]" if args.verbose else '')
 
 		if args.datatypes and elf.dwarf:
 			datatypes = []
@@ -260,34 +275,15 @@ if __name__ == '__main__':
 			if len(datatypes) > 0:
 				datatypes.sort(key = lambda x: x['type'])
 				hash = xxhash.xxh64()
-				datastr = []
-				for t in datatypes:
-					datastr.append(str(t))
+
+				files[f.name]["datatypes"] = {}
+				if args.verbose:
+					files[f.name]["datatypes"]["details"] = []
+				for t in sortuniq_datatypes(datatypes):
+					if args.verbose:
+						files[f.name]["datatypes"]["details"].append(str(t))
 					hash.update(t['hash'])
+				files[f.name]["datatypes"]["hash"] = hash.hexdigest()
 
-				files[f.name]["TYPE"] = (hash.hexdigest(), '\n  [\n    ' + "\n    ".join(datastr) + "\n  ]" if args.verbose else '')
-
-	identical = True
-	for f in args.file:
-		if f.name in files:
-			names = [ f.name ]
-			data = files.pop(f.name)
-			others = list(files.keys())
-			for other in others:
-				if data == files[other]:
-					names.append(other)
-					del files[other]
-			if len(files) > 0:
-				identical = False
-			for name in sorted(names):
-				str = '# ' + os.path.realpath(name).lstrip(args.root)
-				if name in buildids:
-					str = str + ' [' + buildids[name] + ']'
-				if name in dbgfiles:
-					str = str + ' (' + dbgfiles[name].lstrip(args.root) + ')'
-				print(str)
-			for cat in sorted(data):
-				print(data[cat][0], cat, data[cat][1])
-
-	if args.identical:
-		sys.exit(0 if identical else 1)
+		# TODO: Compare if multiple files
+		print(json.dumps(files[f.name], indent=4))

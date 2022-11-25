@@ -244,7 +244,8 @@ class DwarfVars:
 				enc =  str(size) + " byte " + DIE['encoding']
 				id += '(' + enc + ')' if len(id) > 0 else enc
 
-			hash.update(':' + str(size) + '*' + str(factor))
+			# TODO: hash.update(':' + str(size) + '*' + str(factor))
+			hash.update(':' + str(factor))
 			DIE[key_id] = id
 			if 'total_size' in DIE:
 				assert(DIE['total_size'] == factor * size)
