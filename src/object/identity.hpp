@@ -118,6 +118,8 @@ struct ObjectIdentity {
 	bool protect();
 
 	bool initialize();
+
+	void status(const char * msg);
 };
 
 typedef List<ObjectIdentity, ObjectIdentity, &ObjectIdentity::next, &ObjectIdentity::prev> ObjectIdentityList;

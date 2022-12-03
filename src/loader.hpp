@@ -4,6 +4,7 @@
 #include <dlh/container/vector.hpp>
 #include <dlh/container/tree.hpp>
 #include <dlh/container/list.hpp>
+#include <dlh/socket_client.hpp>
 #include <dlh/rwlock.hpp>
 #include <dlh/mutex.hpp>
 #include <dlh/thread.hpp>
@@ -14,17 +15,25 @@
 #include "tls.hpp"
 
 struct Loader {
-	/*! \brief enable dynamic updates? */
-	const bool dynamic_update;
+	const struct Config {
+		/*! \brief enable dynamic updates? */
+		bool dynamic_update = false;
 
-	/*! \brief enable dynamic updates of functionens using the dl* interface? */
-	const bool dynamic_dlupdate;
+		/*! \brief enable dynamic updates of functions using the dl* interface? */
+		bool dynamic_dlupdate = false;
 
-	/*! \brief force dynamic updates even if they seem incompatible */
-	const bool force_update;
+		/*! \brief force dynamic updates even if they seem incompatible */
+		bool force_update = false;
 
-	/*! \brief support dynamic weak definitions? */
-	const bool dynamic_weak;
+		/*! \brief support dynamic weak definitions? */
+		bool dynamic_weak = false;
+
+		/*! \brief detect execution of outdated files?*/
+		bool detect_outdated_access = false;
+
+		/* Default constructor */
+		Config() {}
+	} config;
 
 	/*! \brief default library path via argument / environment variable */
 	Vector<const char *> library_path_runtime;
@@ -56,6 +65,18 @@ struct Loader {
 	/*! \brief Trampoline to dynamically loaded symbols (using dlsym) - for dynamic_dlupdate */
 	Trampoline dlsyms;
 
+	/*! \brief socket to receive elf hash */
+	Socket::Client debughash;
+
+	/*! \brief Descriptor for status info output */
+	int statusinfofd = -1;
+
+	/*! \brief Descriptor for inotify */
+	int filemodification_inotifyfd = -1;
+
+	/*! \brief Descriptor for userfaultfd */
+	int userfaultfd = -1;
+
 	/*! \brief start arguments & environment pointer*/
 	int argc = 0;
 	const char ** argv = nullptr;
@@ -65,7 +86,7 @@ struct Loader {
 	ObjectIdentity::Flags default_flags;
 
 	/*! \brief Constructor */
-	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", bool dynamicUpdate = false, bool dynamicDlUpdate = false, bool forceUpdate = false, bool dynamicWeak = false);
+	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", Config config = Config{});
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
@@ -122,12 +143,12 @@ struct Loader {
 	/*! \brief get instance for current process */
 	static Loader * instance();
 
-	/*! \brief Start observer thread */
-	bool start_observer();
+	/*! \brief Start handler threads */
+	bool start_handler_threads();
 
  private:
-	friend void* kickoff_observer(void * ptr);
-	friend struct ObjectIdentity;
+	friend void* kickoff_filemodification_handler(void * ptr);
+	friend void* kickoff_userfault_handler(void * ptr);
 
 	/*! \brief Next Namespace */
 	mutable namespace_t next_namespace;
@@ -135,11 +156,11 @@ struct Loader {
 	/*! \brief Main thread (for TLS) */
 	Thread * main_thread = nullptr;
 
-	/*! \brief Descriptor for inotify */
-	int inotifyfd;
+	/*! \brief file modification handler (executed in thread) */
+	void filemodification_handler();
 
-	/*! \brief inotify observer method */
-	void observer_loop();
+	/*! \brief userfault handler (executed in thread) */
+	void userfault_handler();
 
 	/*! \brief relocate all loaded files for execution */
 	bool relocate(bool update = false);

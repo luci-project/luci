@@ -149,7 +149,7 @@ bool ObjectDynamic::preload_libraries() {
 	flags.ignore_mtime = 0;
 	flags.initialized = 0;
 	flags.premapped = 0;
-	flags.updatable = file.loader.dynamic_update ? 1 : 0;
+	flags.updatable = file.loader.config.dynamic_update ? 1 : 0;
 
 	for (auto & lib : libs) {
 		// Is lib excluded? TODO: Should be done with resolved path
@@ -265,7 +265,7 @@ bool ObjectDynamic::patchable() const {
 	LOG_DEBUG << "Found " << diff.size() << " differences in " << this->file << " (compared to the current version)" << endl;
 	if (!Bean::patchable(diff)) {
 		LOG_WARNING << "New version of " << this->file << " has non-trivial changes in the data section..." << endl;
-		if (!file.loader.force_update)
+		if (!file.loader.config.force_update)
 			return false;
 	}
 
@@ -305,7 +305,7 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const char * name, uint3
 		auto naked_sym = dynamic_symbols.at(found);
 /*
 		// In case we have multiple versions, check if it is mapped here or delegate to previous version (required for partial update)
-		if (file.loader.dynamic_update && file_previous != nullptr) {
+		if (file.loader.config.dynamic_update && file_previous != nullptr) {
 			bool provided = false;
 			for (const auto & seg : memory_map)
 				if (seg.target.offset >= naked_sym.value() && seg.target.offset + seg.target.size < naked_sym.value()){

@@ -22,7 +22,7 @@ bool MemorySegment::map() {
 	int offset = 0;
 	int protection = target.protection | (writable ? PROT_WRITE : 0);
 
-	if (identity.loader.dynamic_update && writable) {
+	if (identity.loader.config.dynamic_update && writable) {
 		// Shared memory for updatable writable sections (if set, it is already initialized)
 		if ((copy = (target.fd == -1))) {
 			// Only first version
@@ -32,6 +32,7 @@ bool MemorySegment::map() {
 				return false;
 			// This will zero the contents
 			if (auto ftruncate = Syscall::ftruncate(target.fd, target.page_size())) {
+				// TODO madvise(MADV_DONTFORK)
 				// Seal
 				if (auto fcntl = Syscall::fcntl(target.fd, F_ADD_SEALS, F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL); fcntl.failed()) {
 					LOG_WARNING << "Sealing shared memory at fd " << target.fd << " failed: " << fcntl.error_message() << endl;
@@ -72,12 +73,12 @@ bool MemorySegment::map() {
 		Memory::copy(target.address(), source.object.data.addr + source.offset, source.size);
 	}
 
-	target.available = true;
+	target.status = MEMSEG_MAPPED;
 	return true;
 }
 
 bool MemorySegment::protect() {
-	if (!target.available) {
+	if (target.status != MEMSEG_MAPPED) {
 		LOG_WARNING << "Cannot protect " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) since it is not mapped!" << endl;
 		return false;
 	} else if (target.effective_protection == target.protection) {
@@ -91,29 +92,79 @@ bool MemorySegment::protect() {
 	}
 }
 
+bool MemorySegment::disable() {
+	switch (target.status) {
+		case MEMSEG_INACTIVE:
+			LOG_DEBUG << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) already inactive!" << endl;
+			break;
+		case MEMSEG_MAPPED:
+		case MEMSEG_REACTIVATED:
+		{
+			if ((target.protection & ~(PROT_NONE | PROT_READ | PROT_EXEC)) != 0) {
+				LOG_WARNING << "Memory at " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) has potential unsuitable permissions for disabling!" << endl;
+			}
+
+			auto & identity = source.object.file;
+			if (identity.loader.config.detect_outdated_access) {
+				// TODO: This code is racy
+
+				// create private anonymous mapping
+				if (auto mmap = Syscall::mmap(target.page_start(), target.page_size(), target.protection, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) {
+					target.status = MEMSEG_INACTIVE;
+					target.effective_protection = target.protection;
+				} else {
+					LOG_ERROR << "Mapping (inactive) " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mmap.error_message() << endl;
+					return false;
+				}
+
+				// register Userfault
+				uffdio_register reg(target.page_start(), target.page_size(), UFFDIO_REGISTER_MODE_MISSING);
+				if (auto ioctl = Syscall::ioctl(identity.loader.userfaultfd, UFFDIO_REGISTER, &reg)) {
+					return true;
+				} else {
+				LOG_ERROR << "Registering " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) for userfault failed!" << endl;
+					return false;
+				}
+			}
+			break;
+		}
+		default:
+			LOG_WARNING << "Cannot disable " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) since it is not mapped!" << endl;
+			return false;
+	}
+	return true;
+}
+
 bool MemorySegment::unmap() {
-	if (!target.available) {
+	if (target.status == MEMSEG_NOT_MAPPED) {
 		LOG_WARNING << "Cannot unmap " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) since it is not mapped!" << endl;
 		return false;
-	} else if (auto munmap = Syscall::munmap(target.page_start(), target.page_size())) {
-		target.available = false;
-		target.effective_protection = PROT_NONE;
-		return true;
 	} else {
-		LOG_WARNING << "Unmapping " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) failed: " << munmap.error_message() << endl;
-		return false;
+		auto & identity = source.object.file;
+		if (target.status != MEMSEG_MAPPED && identity.loader.config.detect_outdated_access) {
+			uffdio_range range(target.page_start(), target.page_size());
+			Syscall::ioctl(identity.loader.userfaultfd, UFFDIO_UNREGISTER, &range);
+		}
+		if (auto munmap = Syscall::munmap(target.page_start(), target.page_size())) {
+			target.status = MEMSEG_NOT_MAPPED;
+			target.effective_protection = PROT_NONE;
+			return true;
+		} else {
+			LOG_WARNING << "Unmapping " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) failed: " << munmap.error_message() << endl;
+			return false;
+		}
 	}
 }
 
 int MemorySegment::shmemdup() {
-	if (!target.available) {
+	if (target.status != MEMSEG_MAPPED) {
 		LOG_WARNING << "Cannot duplicate shared memory when it is not mapped!" << endl;
 	} else {
 		if (target.fd == -1)
 			LOG_WARNING << "Source is not a shared memory!" << endl;
 		int tmpfd = shmemfd();
 		if (tmpfd != -1) {
-			assert(target.available && target.fd != -1);
+			assert(target.status == MEMSEG_MAPPED && target.fd != -1);
 			LOG_DEBUG << "Created memcopy at fd " << tmpfd << endl;
 
 			// Try fast copy

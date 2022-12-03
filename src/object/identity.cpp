@@ -6,6 +6,8 @@
 #include <dlh/xxhash.hpp>
 #include <dlh/utility.hpp>
 #include <dlh/syscall.hpp>
+#include <dlh/datetime.hpp>
+#include <dlh/stream/output.hpp>
 
 #include "object/base.hpp"
 #include "object/dynamic.hpp"
@@ -55,6 +57,7 @@ static bool supported(const Elf::Header * header) {
 Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 	// Not updatable: Allow only one (current) version
 	if (!flags.updatable && current != nullptr) {
+		status("NO_UPDATE");
 		LOG_WARNING << "Cannot load new version of " << *this << " - updates are not allowed!" << endl;
 		return nullptr;
 	}
@@ -71,6 +74,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 			data.fd = open.value();
 		} else {
 			LOG_VERBOSE << "Opening " << *this << " failed: " << open.error_message() << endl;
+			status("ERROR_OPEN");
 			return nullptr;
 		}
 
@@ -81,6 +85,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 		} else {
 			LOG_ERROR << "Stat file " << *this << " failed: " << fstat.error_message() << endl;
 			Syscall::close(data.fd);
+			status("ERROR_STAT");
 			return nullptr;
 		}
 
@@ -90,6 +95,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 				if (obj->data.modification_time.tv_sec == data.modification_time.tv_sec && obj->data.modification_time.tv_nsec == data.modification_time.tv_nsec && obj->data.size == data.size) {
 					LOG_INFO << "Already loaded " << *this << " with same modification time -- abort loading..." << endl;
 					Syscall::close(data.fd);
+					status("IDENTICAL");
 					return nullptr;
 				}
 
@@ -99,6 +105,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 		} else {
 			LOG_ERROR << "Mapping " << *this << " failed: " << mmap.error_message() << endl;
 			Syscall::close(data.fd);
+			status("ERROR_MAP");
 			return nullptr;
 		}
 
@@ -114,6 +121,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 		if (flags.premapped == 0)
 			Syscall::munmap(data.addr, data.size);
 		Syscall::close(data.fd);
+		status("ERROR_FORMAT");
 		return nullptr;
 	} else if (type == Elf::ET_NONE) {
 		type = header->type();
@@ -127,6 +135,8 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 		Syscall::close(data.fd);
 	}
 
+	status(o == nullptr ? "FAILED" : "SUCCESS");
+
 	watch();
 
 	return o;
@@ -135,7 +145,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 bool ObjectIdentity::watch(bool force, bool close_existing) {
 	if (flags.updatable == 1 && (wd == -1 || force)) {
 		if (wd != -1 && close_existing) {
-			if (auto inotify = Syscall::inotify_rm_watch(loader.inotifyfd, wd)) {
+			if (auto inotify = Syscall::inotify_rm_watch(loader.filemodification_inotifyfd, wd)) {
 				LOG_DEBUG << "Remove old watch for modifications at " << this->path << endl;
 			} else if (force) {
 				LOG_DEBUG << "Cannot remove old watch for modification of " << this->path << " (" << inotify.error_message() << "). however we have expected this in force mode... (ignored)" << endl;
@@ -143,7 +153,7 @@ bool ObjectIdentity::watch(bool force, bool close_existing) {
 				LOG_WARNING << "Cannot remove old watch for modification of " << this->path << ": " << inotify.error_message() << endl;
 			}
 		}
-		if (auto inotify = Syscall::inotify_add_watch(loader.inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
+		if (auto inotify = Syscall::inotify_add_watch(loader.filemodification_inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
 			LOG_DEBUG << "Watching for modifications at " << this->path << endl;
 			wd = inotify.value();
 		} else {
@@ -158,7 +168,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 	assert(ns != NAMESPACE_NEW);
 
 	// Dynamic updates?
-	if (!loader.dynamic_update) {
+	if (!loader.config.dynamic_update) {
 		this->flags.updatable = 0;
 		this->flags.immutable_source = 1;  // Without updates, don't expect changes to the binaries during runtime
 	} else if (this->flags.updatable == 1) {
@@ -225,8 +235,8 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 
 
 ObjectIdentity::~ObjectIdentity() {
-	if (loader.dynamic_update) {
-		if (auto inotify = Syscall::inotify_rm_watch(loader.inotifyfd, wd); inotify.failed())
+	if (loader.config.dynamic_update) {
+		if (auto inotify = Syscall::inotify_rm_watch(loader.filemodification_inotifyfd, wd); inotify.failed())
 			LOG_ERROR << "Removing watch for " << this->path << " failed: " << inotify.error_message() << endl;
 	}
 	// Delete all versions
@@ -429,4 +439,11 @@ bool ObjectIdentity::initialize() {
 			return false;
 	}
 	return true;
+}
+
+
+void ObjectIdentity::status(const char * msg) {
+	if (loader.statusinfofd >= 0) {
+		OutputStream<512>(loader.statusinfofd) << msg << " for " << name << " (" << path << ") in PID " << Syscall::getpid() << " at " << DateTime::now() << endl;
+	}
 }

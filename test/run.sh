@@ -87,7 +87,34 @@ if [ $# -gt 0 ] ; then
 	TESTS=$@
 fi
 
-source /etc/os-release
+if [ -z ${OS+empty} -o -z ${OSVERSION+empty} ] ; then
+	# Determine OS & its version
+	if [ ! -f /etc/os-release ] ; then
+		echo "Missing /etc/os-release" >&2
+		exit 1;
+	fi
+	source /etc/os-release
+
+	if [ -z ${ID+empty} ] ; then
+		if [ -z ${ID_LIKE+empty} ] ; then
+			echo "No OS information (in /etc/os-release)" >&2
+			exit 1;
+		else
+			OS=${ID_LIKE}
+		fi
+	else
+		OS=${ID}
+	fi
+	if [ -z ${VERSION_CODENAME+empty} ] ; then
+		if [ -z ${VERSION_ID+empty} ] ; then
+			echo "No OS version information" >&2
+			exit 1;
+		fi
+		OSVERSION=${VERSION_ID%%.*}
+	else
+		OSVERSION=${VERSION_CODENAME}
+	fi
+fi
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null
 
@@ -110,7 +137,7 @@ if $LD_SYSTEM ; then
 		exit 1
 	fi
 else
-	LD_PATH="$(readlink -f "../ld-${LD_NAME,,}-${ID,,}-${VERSION_CODENAME,,}-${PLATFORM,,}.so")"
+	LD_PATH="$(readlink -f "../ld-${LD_NAME,,}-${OS,,}-${OSVERSION,,}-${PLATFORM,,}.so")"
 	if [ ! -x "${LD_PATH}" ] ; then
 		echo "Missing RTLD ${LD_PATH} (${RTLD})" >&2
 		exit 1
@@ -124,13 +151,13 @@ fi
 
 # generate config
 LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
-../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF"
+../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF" || true
 
 if $DEBUG_OUTPUT ; then
 	make -C ../tools stdlog
 fi
 
-echo -e "\n\e[1;4mRunning Tests on ${ID} ${VERSION_CODENAME} (${PLATFORM}) with ${COMPILER}\e[0m"
+echo -e "\n\e[1;4mRunning Tests on ${OS} ${OSVERSION} (${PLATFORM}) with ${COMPILER}\e[0m"
 echo "using ${LD_NAME} RTLD at ${LD_PATH}"
 if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
 	echo "with dynamic updates enabled"
@@ -140,7 +167,7 @@ else
 fi
 
 function check() {
-	for file in $1{-${ID,,},}{-${VERSION_CODENAME},}{-${PLATFORM},}{-${COMPILER,,},}{-${UPDATEFLAG},} ; do
+	for file in $1{-${OS,,},}{-${OSVERSION,,},}{-${PLATFORM,,},}{-${COMPILER,,},}{-${UPDATEFLAG},} ; do
 		if [ -f "$file" ] ; then
 			echo "Checking $file" ;
 			if [ -x "$file" ] ; then
@@ -155,7 +182,7 @@ function check() {
 
 function skip() {
 	SKIP=".skip"
-	for SKIPTEST in $1/${SKIP}{,-${ID,,}}{,-${VERSION_CODENAME}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}} ; do
+	for SKIPTEST in $1/${SKIP}{,-${OS,,}}{,-${OSVERSION,,}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}} ; do
 		if [ -f "${SKIPTEST}" ] ; then
 			return 0
 		fi

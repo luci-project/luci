@@ -12,6 +12,13 @@ struct Object;
 
 // TODO: Ability to merge areas, use shared mem, manage map,
 struct MemorySegment {
+	enum Status {
+		MEMSEG_NOT_MAPPED,
+		MEMSEG_MAPPED,
+		MEMSEG_INACTIVE,
+		MEMSEG_REACTIVATED
+	};
+
 	/*! \brief Storage area relative to file */
 	struct {
 		/*! \brief Object */
@@ -43,8 +50,8 @@ struct MemorySegment {
 		/*! \brief Memory file descriptor for shared data */
 		int fd;
 
-		/*! \brief Mapped into memory */
-		bool available;
+		/*! \brief Current mapping status */
+		enum Status status;
 
 		/*! \brief get memory address */
 		uintptr_t address() const {
@@ -75,7 +82,7 @@ struct MemorySegment {
 	/*! \brief Constructor */
 	MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base = 0)
 	  : source{object, segment.offset(), segment.size() },
-	    target{base, segment.virt_addr(), segment.virt_size(), PROT_NONE | (segment.readable() ? PROT_READ : 0) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, false} {}
+	    target{base, segment.virt_addr(), segment.virt_size(), PROT_NONE | (segment.readable() ? PROT_READ : 0) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, MEMSEG_NOT_MAPPED} {}
 
 	/*! \brief Destructor (clean up) */
 	~MemorySegment();
@@ -85,6 +92,9 @@ struct MemorySegment {
 
 	/*! \brief set protection according to flags */
 	bool protect();
+
+	/* \brief set (non writeable) memory inactive */
+	bool disable();
 
 	/*! \brief release memory allocation */
 	bool unmap();

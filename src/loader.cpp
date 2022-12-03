@@ -19,22 +19,27 @@
 
 static Loader * _instance = nullptr;
 
-void* kickoff_observer(void * ptr) {
-	reinterpret_cast<Loader *>(ptr)->observer_loop();
+void* kickoff_filemodification_handler(void * ptr) {
+	reinterpret_cast<Loader *>(ptr)->filemodification_handler();
+	return nullptr;
+}
+
+void* kickoff_userfault_handler(void * ptr) {
+	reinterpret_cast<Loader *>(ptr)->userfault_handler();
 	return nullptr;
 }
 
 
-Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, bool dynamicDlUpdate, bool forceUpdate, bool dynamicWeak)
- : dynamic_update(dynamicUpdate), dynamic_dlupdate(dynamicUpdate && dynamicDlUpdate), force_update(dynamicUpdate && forceUpdate), dynamic_weak(dynamicWeak), next_namespace(NAMESPACE_BASE + 1) {
+Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
+ : config(config) {
 	default_flags.bind_global = 1;
 
-	if (dynamic_update) {
+	if (config.dynamic_update) {
 		default_flags.updatable = 1;
-		start_observer();
 	} else {
 		default_flags.immutable_source = 1;
 	}
+	start_handler_threads();
 
 	// Flags for vDSO and Luci
 	ObjectIdentity::Flags static_flags;
@@ -67,13 +72,33 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, bool dynamicUpdate, boo
 Loader::~Loader() {
 	_instance = nullptr;
 
-	if (dynamic_update) {
-		if (auto close = Syscall::close(inotifyfd)) {
-			LOG_INFO << "Destroyed observer background thread" << endl;
+	debughash.disconnect();
+
+	if (statusinfofd >= 0) {
+		if (auto close = Syscall::close(statusinfofd)) {
+			LOG_INFO << "Destroyed status info handle" << endl;
 		} else {
-			LOG_ERROR << "Closing inotify failed: " << close.error_message() << endl;
+			LOG_ERROR << "Closing status info handle failed: " << close.error_message() << endl;
 		}
 	}
+
+	if (config.dynamic_update && filemodification_inotifyfd >= 0) {
+		if (auto close = Syscall::close(filemodification_inotifyfd)) {
+			LOG_INFO << "Destroyed file modification handle" << endl;
+		} else {
+			LOG_ERROR << "Closing file modification handle failed: " << close.error_message() << endl;
+		}
+	}
+
+	if (config.detect_outdated_access && userfaultfd >= 0) {
+		if (auto close = Syscall::close(userfaultfd)) {
+			LOG_INFO << "Destroyed userfault handle" << endl;
+		} else {
+			LOG_ERROR << "Closing userfault handle failed: " << close.error_message() << endl;
+		}
+	}
+
+
 
 	lookup.clear();
 }
@@ -157,7 +182,7 @@ ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, 
 		o->flags.bind_global = flags.bind_global;
 		o->flags.bind_deep = flags.bind_deep;
 		o->flags.persistent = flags.persistent;
-		o->flags.updatable = dynamic_dlupdate;
+		o->flags.updatable = config.dynamic_dlupdate;
 
 		if (load && !o->prepare()) {
 			LOG_WARNING << "Preparation of " << o << " failed!" << endl;
@@ -187,7 +212,7 @@ bool Loader::relocate(bool update) {
 			if (!o.update())
 				return false;
 		// update dlsym trampolines
-		if (dynamic_dlupdate)
+		if (config.dynamic_dlupdate)
 			dlsyms.update();
 	}
 
@@ -199,9 +224,26 @@ bool Loader::relocate(bool update) {
 	return true;
 }
 
-
-extern uintptr_t __stack_chk_guard;
+extern "C" uintptr_t __stack_chk_guard;
 bool Loader::prepare() {
+	// Setup DLH vdso
+	if (auto sym = resolve_symbol("__vdso_clock_gettime")) {
+		Syscall::__clock_gettime = reinterpret_cast<int (*)(clockid_t, struct timespec *)>(sym->object().base + sym->value());
+		LOG_DEBUG << "Using VDSO clock_gettime at " << reinterpret_cast<void*>(Syscall::__clock_gettime) << endl;
+	}
+	if (auto sym = resolve_symbol("__vdso_clock_getres")) {
+		Syscall::__clock_getres = reinterpret_cast<int (*)(clockid_t, struct timespec *)>(sym->object().base + sym->value());
+		LOG_DEBUG << "Using VDSO clock_getres at " << reinterpret_cast<void*>(Syscall::__clock_getres) << endl;
+	}
+	if (auto sym = resolve_symbol("__vdso_getcpu")) {
+		Syscall::__getcpu = reinterpret_cast<int (*)(unsigned *, unsigned *, struct getcpu_cache *)>(sym->object().base + sym->value());
+		LOG_DEBUG << "Using VDSO getcpu at " << reinterpret_cast<void*>(Syscall::__getcpu) << endl;
+	}
+	if (auto sym = resolve_symbol("__vdso_time")) {
+		Syscall::__time = reinterpret_cast<time_t (*)(time_t *)>(sym->object().base + sym->value());
+		LOG_DEBUG << "Using VDSO time at " << reinterpret_cast<void*>(Syscall::__time) << endl;
+	}
+
 	// Init GLIBC globals
 	GLIBC::RTLD::init_globals(*this);
 
@@ -437,25 +479,59 @@ Loader * Loader::instance() {
 }
 
 
-bool Loader::start_observer() {
-	if (dynamic_update) {
+bool Loader::start_handler_threads() {
+	bool success = true;
+
+	if (filemodification_inotifyfd != -1) {
+		Syscall::close(filemodification_inotifyfd);
+		filemodification_inotifyfd = -1;
+	}
+	if (config.dynamic_update) {
 		if (auto inotify = Syscall::inotify_init(IN_CLOEXEC)) {
-			//Syscall::close(inotifyfd);
-			inotifyfd = inotify.value();
+			filemodification_inotifyfd = inotify.value();
 			for (auto & object_file : lookup)
 				object_file.watch(true, false);
 
-			if (Thread::create(&kickoff_observer, this, true) == nullptr) {
-				LOG_ERROR << "Creating inotify observer background thread failed" << endl;
+			if (Thread::create(&kickoff_filemodification_handler, this, true) == nullptr) {
+				LOG_ERROR << "Creating file modification handler thread failed" << endl;
+				success = false;
 			} else {
-				LOG_INFO << "Created observer background thread" << endl;
-				return true;
+				LOG_INFO << "Created file modification handler thread" << endl;
 			}
 		} else {
-			LOG_ERROR << "Initializing inotify failed: " << inotify.error_message() << endl;
+			LOG_ERROR << "Initializing file modification failed: " << inotify.error_message() << endl;
+			success = false;
 		}
 	} else {
-		LOG_WARNING << "Not starting observer thread since there are no dynamic updates" << endl;
+		LOG_WARNING << "Not starting file modification handler thread since there are no dynamic updates" << endl;
 	}
-	return false;
+
+	if (userfaultfd != -1) {
+		Syscall::close(userfaultfd);
+		userfaultfd = -1;
+	}
+	if (config.detect_outdated_access) {
+		if (auto userfault = Syscall::userfaultfd(O_CLOEXEC)) {
+			userfaultfd = userfault.value();
+			uffdio_api api;
+			if (auto ioctl = Syscall::ioctl(userfaultfd, UFFDIO_API, &api)) {
+				if (Thread::create(&kickoff_userfault_handler, this, true) == nullptr) {
+					LOG_ERROR << "Creating userfault handler thread failed" << endl;
+					success = false;
+				} else {
+					LOG_INFO << "Created userfault handler thread" << endl;
+				}
+
+			} else {
+				LOG_ERROR << "Enabling userfault failed: " << ioctl.error_message() << endl;
+				success = false;
+			}
+		} else {
+			LOG_ERROR << "Initializing userfaultfd failed: " << userfault.error_message() << endl;
+			success = false;
+		}
+	} else {
+		LOG_WARNING << "Not starting userfault handler thread since there is no detection of outdated executable sections" << endl;
+	}
+	return success;
 }

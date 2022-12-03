@@ -20,7 +20,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 	loader->lookup_sync.read_lock();
 
 	HashMap<int,int> replace_fd;
-	if (loader->dynamic_update) {
+	if (loader->config.dynamic_update) {
 		for (auto & i: loader->lookup)
 			for (auto o = i.current; o != nullptr; o = o->file_previous)
 				for (auto & m : o->memory_map) {
@@ -61,9 +61,9 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 				Syscall::close(f.key);
 			// Set own Thread ID
 			Thread::self()->tid = child;
-			// Start observer thread
-			loader->start_observer();
-		} else if (loader->dynamic_update) {
+			// Start handler threads
+			loader->start_handler_threads();
+		} else if (loader->config.dynamic_update) {
 			// Close (childs) shared memory file descriptors
 			for (auto & f : replace_fd)
 				Syscall::close(f.value);

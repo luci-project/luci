@@ -81,6 +81,14 @@ bool Object::protect() {
 	return true;
 }
 
+bool Object::disable() {
+	bool success = true;
+	for (MemorySegment &mem: memory_map)
+		if ((mem.target.protection & PROT_EXEC) != 0)
+			success &= mem.disable();
+	return success;
+}
+
 void* Object::dynamic_resolve(size_t index) const {
 	LOG_ERROR << "Unable to resolve " << index << " -- Object " << file.path << " does not support dynamic loading!" << endl;
 	assert(false);
@@ -92,8 +100,8 @@ bool Object::has_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, con
 	if (tmp) {
 		assert(tmp->valid());
 		assert(tmp->bind() != Elf::STB_LOCAL); // should not be returned
-		// Weak dynamic linkage is only taken into account, if file.loader.dynamic_weak is set. Otherwise it is always strong.
-		bool strong = tmp->bind() != Elf::STB_WEAK || !file.loader.dynamic_weak;
+		// Weak dynamic linkage is only taken into account, if file.loader.config.dynamic_weak is set. Otherwise it is always strong.
+		bool strong = tmp->bind() != Elf::STB_WEAK || !file.loader.config.dynamic_weak;
 		if (strong || !result) {
 			result = tmp;
 			return strong;

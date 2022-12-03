@@ -4,7 +4,7 @@ NAME = luci
 
 SRCFOLDER = src
 OS ?= $(shell bash -c 'source /etc/os-release ; echo "$${ID,,}"')
-OSVERSION ?= $(shell bash -c 'source /etc/os-release ; echo "$${VERSION_CODENAME,,}"')
+OSVERSION ?= $(shell bash -c 'source /etc/os-release ; if [ -z $${VERSION_CODENAME+empty} ] ; then echo "$${VERSION_ID%%.*}" ; else echo "$${VERSION_CODENAME,,}" ; fi')
 PLATFORM ?= x64
 BUILDDIR ?= .build-$(OS)-$(OSVERSION)-$(PLATFORM)
 LIBBEAN = bean/libbean.a
@@ -64,7 +64,7 @@ endef
 
 define each_version
 	$(VERBOSE) echo "$(1)ing luci for each version..."
-	$(call custom_version,$(1),archlinux,202211,x64)
+	$(call custom_version,$(1),arch,202211,x64)
 	$(call custom_version,$(1),debian,stretch,x64)
 	$(call custom_version,$(1),debian,buster,x64)
 	$(call custom_version,$(1),debian,bullseye,x64)
@@ -121,7 +121,7 @@ $(BUILDINFO): FORCE
 	'const char * build_$(NAME)_compatibility() { return "$(OS) $(OSVERSION) on $(PLATFORM)"; }' | $(CXX) $(CXXFLAGS) -x c++ -c -o $@ -
 
 $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
-	$(VERBOSE) ./gen-libpath.sh $< | grep -v "i386\|i486\|i686\|lib32\|libx32" > $@
+	$(VERBOSE) ./gen-libpath.sh $< | grep -v "i386\|i486\|i686\|lib32\|libx32" > $@ || true
 
 $(LDLUCI_CONF): example.conf
 	$(VERBOSE) cp $< $@

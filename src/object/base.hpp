@@ -117,6 +117,9 @@ struct Object : public Elf {
 	/*! \brief Check if current object can patch a previous version */
 	virtual bool patchable() const { return false; };
 
+	/*! \brief Make this (old) object inactive */
+	virtual bool disable();
+
 	/*! \brief Find (external visible) symbol in this object with same name and version */
 	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const {
 		return resolve_symbol(sym.name(), sym.hash_value(), sym.gnu_hash_value(), sym.version);

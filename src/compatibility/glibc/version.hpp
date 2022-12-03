@@ -20,9 +20,9 @@
 #if defined(PLATFORM_X64)
  #define PLATFORM "x86_64"
 
- #if defined(COMPATIBILITY_ARCHLINUX)
+ #if defined(COMPATIBILITY_ARCH)
   #define OSNAME "Arch Linux"
-  #if defined(COMPATIBILITY_ARCHLINUX_202211_X64)
+  #if defined(COMPATIBILITY_ARCH_202211)
    #define OSVERSION "Nov 2022"
    #define GLIBC_VERSION GLIBC_2_36
    #define GLIBC_PTHREAD_IN_LIBC 1
@@ -125,6 +125,34 @@
   #else
    #error Unsupported or unspecified debian version
   #endif
+
+
+ #elif defined(COMPATIBILITY_RHEL)
+  #define OSNAME "RedHat Enterprise Linux"
+  #if defined(COMPATIBILITY_RHEL_8)
+   #define OSVERSION "8"
+   #define GLIBC_VERSION GLIBC_2_28
+   #define GLIBC_PTHREAD_IN_LIBC 1
+   #define GLIBC_RTLD_GLOBAL_SIZE 4152
+   #define GLIBC_RTLD_GLOBAL_RO_SIZE 688
+   #define GLIBC_LINK_MAP_SIZE 1152
+   #define GLIBC_TUNABLE_COUNT 29
+   #define GLIBC_TUNABLE_SIZE 1624
+
+  #elif defined(COMPATIBILITY_RHEL_9)
+   #define OSVERSION "9"
+   #define GLIBC_VERSION GLIBC_2_34
+   #define GLIBC_PTHREAD_IN_LIBC 1
+   #define GLIBC_RTLD_GLOBAL_SIZE 4328
+   #define GLIBC_RTLD_GLOBAL_RO_SIZE 896
+   #define GLIBC_LINK_MAP_SIZE 1184
+   #define GLIBC_TUNABLE_COUNT 35
+   #define GLIBC_TUNABLE_SIZE 3920
+
+  #else
+   #error Unsupported or unspecified redhat enterprise linux version
+  #endif
+
 
 
  #elif defined(COMPATIBILITY_UBUNTU)
