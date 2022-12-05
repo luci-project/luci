@@ -83,6 +83,70 @@ struct ObjectIdentity {
 	/*! \brief Current (latest) version of the object */
 	Object * current = nullptr;
 
+	/*! \brief Storage for comparing relocated values in data section to detect changes by the user [program] */
+	HashMap<uintptr_t,uintptr_t> data_check;
+
+private:
+	friend struct Loader;
+
+	enum Info {
+		INFO_CONTINUE_LOAD,
+		INFO_ERROR_OPEN,
+		INFO_ERROR_STAT,
+		INFO_ERROR_MAP,
+		INFO_ERROR_CREATE,
+		INFO_ERROR_ELF,
+		INFO_ERROR_INOTIFY,
+		INFO_IDENTICAL_TIME,
+		INFO_IDENTICAL_HASH,
+		INFO_UPDATE_DISABLED,
+		INFO_UPDATE_INCOMPATIBLE,
+		INFO_UPDATE_MODIFIED,
+		INFO_FAILED_PRELOADING,
+		INFO_FAILED_MAPPING,
+		INFO_FAILED_REUSE,
+		INFO_SUCCESS_LOAD,
+		INFO_SUCCESS_UPDATE
+	};
+
+	/*! \brief inotify descriptor for file modifications */
+	int wd;
+
+	/*! \brief filename buffer */
+	char buffer[PATH_MAX + 1];
+	GLIBC::DL::link_map::libname_list libname_buffer[2];
+
+	/*! \brief watch for file modification */
+	bool watch(bool force = false, bool close_existing = true);
+
+	/*! \brief Open file (map into memory) */
+	Info open(uintptr_t addr, Object::Data & data, Elf::ehdr_type & type);
+
+	/*! \brief create new object instance */
+	Pair<Object *, enum Info> create(Object::Data & data, Elf::ehdr_type type);
+
+	/*! \brief Make memory copy of ELF */
+	bool memdup(Object::Data & data);
+
+	/*! \brief Prepare dependencies */
+	bool prepare();
+
+	/*! \brief Update relocations */
+	bool update();
+
+	/*! \brief Protect segments */
+	bool protect();
+
+	/*! \brief Unprotect (make writable) relro segments */
+	bool unprotect();
+
+	/*! \brief call initializer */
+	bool initialize();
+
+	/*! \brief send status info message */
+	void status(Info msg);
+
+ public:
 	/*! \brief Load/get current version
 	 * \param addr use memory mapped Elf instead of file located at path
 	 * \param type ELF type (`ET_NONE` to auto determine)
@@ -93,33 +157,6 @@ struct ObjectIdentity {
 	/*! \brief constructor */
 	ObjectIdentity(Loader & loader, const Flags flags, const char * path = nullptr, namespace_t ns = NAMESPACE_BASE, const char * altname = nullptr);
 	~ObjectIdentity();
-
- private:
-	friend struct Loader;
-
-	int wd;
-	char buffer[PATH_MAX + 1];
-
-	GLIBC::DL::link_map::libname_list libname_buffer[2];
-
-	/*! \brief watch for file modification */
-	bool watch(bool force = false, bool close_existing = true);
-
-	/*! \brief create new object instance */
-	Object * create(Object::Data & data, Elf::ehdr_type type);
-
-	/*! \brief Make memory copy of ELF */
-	bool memdup(Object::Data & data);
-
-	bool prepare();
-
-	bool update();
-
-	bool protect();
-
-	bool initialize();
-
-	void status(const char * msg);
 };
 
 typedef List<ObjectIdentity, ObjectIdentity, &ObjectIdentity::next, &ObjectIdentity::prev> ObjectIdentityList;

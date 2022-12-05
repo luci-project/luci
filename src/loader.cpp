@@ -208,9 +208,13 @@ bool Loader::relocate(bool update) {
 	// Optional: Update relocations
 	if (update) {
 		// TODO: Unmap if relro
-		for (auto & o : reverse(lookup))
+		for (auto & o : reverse(lookup)) {
+			if (!o.unprotect())
+				return false;
 			if (!o.update())
 				return false;
+		}
+
 		// update dlsym trampolines
 		if (config.dynamic_dlupdate)
 			dlsyms.update();

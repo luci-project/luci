@@ -64,9 +64,12 @@ void Loader::userfault_handler() {
 								          << " (Source " << mem.source.object << " at " << reinterpret_cast<void*>(mem.source.offset) << " with " << mem.source.size << " bytes)"
 								          << " for pagefault at " << reinterpret_cast<void*>(msg.arg.pagefault.address) << endl;
 
+								// Notify
+								mem.source.object.file.status(ObjectIdentity::INFO_FAILED_REUSE);
+
 								// Copy data
 								if (mem.source.size > 0) {
-									cpy.src = mem.source.offset - (mem.target.address() - mem.target.page_start());
+									cpy.src = mem.source.object.data.addr + mem.source.offset - (mem.target.address() - mem.target.page_start());
 									cpy.dst = mem.target.page_start();
 									cpy.len = mem.target.page_size();
 									// TODO For zeroing set cpy.mode = UFFDIO_COPY_MODE_DONTWAKE; and issue UFFDIO_WAKE at the end
@@ -98,7 +101,7 @@ void Loader::userfault_handler() {
 						LOG_INFO << "Userfault copy incomplete (" << cpy.copy << " / " << cpy.len << " bytes) -- retry"<< endl;
 						continue;
 					} else {
-						LOG_ERROR << "Userfault copy failed: " << ioctl.error_message() << endl;
+						LOG_ERROR << "Userfault copy of  " << cpy.len << " bytes from " << reinterpret_cast<void*>(cpy.src) << " to " << reinterpret_cast<void*>(cpy.dst) << " failed: " << ioctl.error_message() << endl;
 						break;
 					}
 				}

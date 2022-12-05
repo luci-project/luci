@@ -208,16 +208,32 @@ bool ObjectDynamic::prepare() {
 	return success;
 }
 
+bool ObjectDynamic::in_data(const Elf::Relocation & reloc) const {
+	uintptr_t target = Relocator(reloc, this->global_offset_table).address(this->base);
+	for (auto &mem : memory_map)
+		if (mem.target.contains(target))
+			return mem.target.writable();
+	return false;
+}
+
 bool ObjectDynamic::update() {
-	for (const auto & relpair : relocations)
-		if (!relpair.second.object().is_latest_version())
-			relocate(relpair.first, file.flags.bind_not == 0);
+	// Apply (external) relocations
+	for (const auto & r : relocations) {
+		// Update only if target has changed (relocation does not point to latest version).
+		// And if this is not the latest version, then omit (shared) data section relocations
+		// since they are performed in the latest version of this object
+		if (!r.value.object().is_latest_version() && (is_latest_version() || !in_data(r.key)))
+			relocate(r.key, file.flags.bind_not == 0);
+	}
 	return true;
 }
 
 void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 	// Initialize relocator object
 	Relocator relocator(reloc, this->global_offset_table);
+
+//relocator.address(this->base) in memory_segment
+
 	// find symbol
 	auto need_symbol_index = reloc.symbol_index();
 	if (need_symbol_index == 0) {
@@ -233,7 +249,8 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 		// COPY Relocations have a defined symbol with the same name
 		Loader::ResolveSymbolMode mode = relocator.is_copy() ? Loader::RESOLVE_EXCEPT_OBJECT : (file.flags.bind_deep == 1 ? Loader::RESOLVE_OBJECT_FIRST : Loader::RESOLVE_DEFAULT);
 		if (auto symbol = file.loader.resolve_symbol(need_symbol, file.ns, &file, mode)) {
-			relocations.emplace_back(reloc, symbol.value());
+			// Update / add symbol to cache
+			relocations.insert(reloc, symbol.value());
 			auto & symobj = symbol->object();
 			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << endl;
 			if (fix)
@@ -273,12 +290,12 @@ bool ObjectDynamic::patchable() const {
 	for (const auto & object_file : file.loader.lookup)
 		// TODO: If not partial, ignore &object_file == &file
 		for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous)
-			for (const auto & relpair : obj->relocations)
-				if (&relpair.second.object() == file_previous) {
+			for (const auto & r : obj->relocations)
+				if (&r.value.object() == file_previous) {
 					// TODO: Check if relocations are in some protected memory part
-					LOG_DEBUG << " - referenced symbol " << relpair.second.name() << endl;
-					if (!this->resolve_symbol(relpair.second.name())) {
-						LOG_WARNING << "Required symbol " << relpair.second.name() << " not found in new version of " << this->file << ") -- not patching the library!" << endl;
+					LOG_DEBUG << " - referenced symbol " << r.value.name() << endl;
+					if (!this->resolve_symbol(r.value.name())) {
+						LOG_WARNING << "Required symbol " << r.value.name() << " not found in new version of " << this->file << ") -- not patching the library!" << endl;
 						return false;
 					}
 			}

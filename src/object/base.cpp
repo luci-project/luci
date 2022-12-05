@@ -66,19 +66,24 @@ bool Object::memory_range(uintptr_t & start, uintptr_t & end) const {
 }
 
 bool Object::map() {
+	bool success = true;
 	for (auto & seg : memory_map)
-		if (!seg.map())
-			return false;
-
-	return true;
+		success &= seg.map();
+	return success;
 }
 
 bool Object::protect() {
+	bool success = true;
 	for (auto & seg : memory_map)
-		if (!seg.protect())
-			return false;
+		success &= seg.protect();
+	return success;
+}
 
-	return true;
+bool Object::unprotect() {
+	bool success = true;
+	for (auto & seg : memory_map)
+		success &= seg.unprotect();
+	return success;
 }
 
 bool Object::disable() {

@@ -67,7 +67,7 @@ struct Object : public Elf {
 	Optional<Bean> binary_hash;
 
 	/*! \brief Relocations to external symbols used in this object (cache) */
-	mutable Vector<Pair<Elf::Relocation, VersionedSymbol>> relocations;
+	mutable HashMap<Elf::Relocation, VersionedSymbol> relocations;
 
 	/*! \brief Pointer to previous version */
 	Object * file_previous = nullptr;
@@ -109,7 +109,10 @@ struct Object : public Elf {
 	virtual bool update() { return true; };
 
 	/*! \brief Set protection flags in memory */
-	bool protect();
+	virtual bool protect();
+
+	/*! \brief Unprotect (make writable)  */
+	virtual bool unprotect();
 
 	/*! \brief Initialisation method */
 	virtual bool initialize() { return true; };

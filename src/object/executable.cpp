@@ -1,12 +1,35 @@
 #include "object/executable.hpp"
 
+#include <dlh/assert.hpp>
+
 #include "loader.hpp"
+#include "page.hpp"
 
 bool ObjectExecutable::preload_segments() {
 	size_t load = 0;
+
+	// Check relocation read-only
+	const Elf::Segment * relro = nullptr;
 	for (auto & segment : this->segments)
-		if (Elf::PT_LOAD == segment.type() && segment.virt_size() > 0)
-			memory_map.emplace_back(*this, segment, base);
+		if (Elf::PT_GNU_RELRO == segment.type()) {
+			assert((segment.virt_addr() + segment.size()) % Page::SIZE == 0);
+			assert(segment.virt_size() == segment.size());
+			relro = &segment;
+		}
+
+	// LOAD segments
+	for (auto & segment : this->segments)
+		if (Elf::PT_LOAD == segment.type() && segment.virt_size() > 0) {
+			if (relro != nullptr && segment.offset() == relro->offset() && segment.virt_addr() == relro->virt_addr()) {
+				LOG_DEBUG << "Relocation read-only at " << reinterpret_cast<void*>(relro->virt_addr()) << " with " << relro->size() << "bytes" << endl;
+				// Relro section
+				memory_map.emplace_back(*this, *relro, base);
+				// Rest of data section
+				memory_map.emplace_back(*this, segment, base, relro->size());
+			} else {
+				memory_map.emplace_back(*this, segment, base);
+			}
+		}
 		else if (Elf::PT_TLS == segment.type() && segment.virt_size() > 0 && this->file.tls_module_id == 0)
 			this->file.tls_module_id = this->file.loader.tls.add_module(this->file, segment.virt_size(), segment.alignment(), segment.virt_addr(), segment.size(), this->file.tls_offset);
 
@@ -26,4 +49,14 @@ bool ObjectExecutable::preload_segments() {
 	}
 
 	return memory_map.size() > 0;
+}
+
+
+bool ObjectExecutable::unprotect() {
+	// make relocation read-only segments writable
+	bool success = true;
+	for (auto & mem : memory_map)
+		if (mem.target.relro)
+			success &= mem.unprotect();
+	return success;
 }

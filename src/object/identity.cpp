@@ -55,14 +55,36 @@ static bool supported(const Elf::Header * header) {
 
 
 Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
-	// Not updatable: Allow only one (current) version
-	if (!flags.updatable && current != nullptr) {
-		status("NO_UPDATE");
-		LOG_WARNING << "Cannot load new version of " << *this << " - updates are not allowed!" << endl;
-		return nullptr;
+	Object::Data data;
+	Object * object = nullptr;
+	// Open...
+	enum Info info = open(addr, data, type);
+	if (info == INFO_CONTINUE_LOAD) {
+		// ... and create object
+		create(data, type).assign(object, info);
+		// Clean up on failure
+		if (object == nullptr && data.fd != -1) {
+			if (flags.premapped == 0)
+				Syscall::munmap(data.addr, data.size);
+			Syscall::close(data.fd);
+		} else if (!watch()) {
+			info = INFO_ERROR_INOTIFY;
+		}
 	}
 
-	Object::Data data;
+	status(info);
+
+	return object;
+}
+
+
+ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, Elf::ehdr_type & type) {
+	// Not updatable: Allow only one (current) version
+	if (!flags.updatable && current != nullptr) {
+		LOG_WARNING << "Cannot load new version of " << *this << " - updates are not allowed!" << endl;
+		return INFO_UPDATE_DISABLED;
+	}
+
 	LOG_DEBUG << "Loading " << name << "..." << endl;
 
 	if (addr == 0) {
@@ -74,8 +96,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 			data.fd = open.value();
 		} else {
 			LOG_VERBOSE << "Opening " << *this << " failed: " << open.error_message() << endl;
-			status("ERROR_OPEN");
-			return nullptr;
+			return INFO_ERROR_OPEN;
 		}
 
 		// Determine file size and inode
@@ -85,8 +106,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 		} else {
 			LOG_ERROR << "Stat file " << *this << " failed: " << fstat.error_message() << endl;
 			Syscall::close(data.fd);
-			status("ERROR_STAT");
-			return nullptr;
+			return INFO_ERROR_STAT;
 		}
 
 		// Check if already loaded (using modification time)
@@ -95,8 +115,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 				if (obj->data.modification_time.tv_sec == data.modification_time.tv_sec && obj->data.modification_time.tv_nsec == data.modification_time.tv_nsec && obj->data.size == data.size) {
 					LOG_INFO << "Already loaded " << *this << " with same modification time -- abort loading..." << endl;
 					Syscall::close(data.fd);
-					status("IDENTICAL");
-					return nullptr;
+					return INFO_IDENTICAL_TIME;
 				}
 
 		// Map file
@@ -105,8 +124,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 		} else {
 			LOG_ERROR << "Mapping " << *this << " failed: " << mmap.error_message() << endl;
 			Syscall::close(data.fd);
-			status("ERROR_MAP");
-			return nullptr;
+			return INFO_ERROR_MAP;
 		}
 
 	} else {
@@ -121,26 +139,14 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 		if (flags.premapped == 0)
 			Syscall::munmap(data.addr, data.size);
 		Syscall::close(data.fd);
-		status("ERROR_FORMAT");
-		return nullptr;
+		return INFO_ERROR_ELF;
 	} else if (type == Elf::ET_NONE) {
 		type = header->type();
 	}
 
-	// Create object
-	Object * o = create(data, type);
-	if (o == nullptr && data.fd != -1) {
-		if (flags.premapped == 0)
-			Syscall::munmap(data.addr, data.size);
-		Syscall::close(data.fd);
-	}
-
-	status(o == nullptr ? "FAILED" : "SUCCESS");
-
-	watch();
-
-	return o;
+	return INFO_CONTINUE_LOAD;
 }
+
 
 bool ObjectIdentity::watch(bool force, bool close_existing) {
 	if (flags.updatable == 1 && (wd == -1 || force)) {
@@ -245,7 +251,7 @@ ObjectIdentity::~ObjectIdentity() {
 }
 
 
-Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
+Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 	// Hash file contents
 	if (flags.updatable) {
 		XXHash64 datahash(name.hash);  // Name hash as seed
@@ -257,7 +263,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 		for (Object * obj = current; obj != nullptr; obj = obj->file_previous)
 			if (obj->data.hash == data.hash && obj->data.size == data.size) {
 				LOG_INFO << "Already loaded " << name << " with same hash -- abort loading..." << endl;
-				return nullptr;
+				return { nullptr, INFO_IDENTICAL_HASH };
 			}
 	}
 
@@ -306,11 +312,11 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 			break;
 		default:
 			LOG_ERROR << "Unsupported ELF type!" << endl;
-			return nullptr;
+			return { nullptr, INFO_ERROR_ELF };
 	}
 	if (o == nullptr) {
 		LOG_ERROR << "unable to create object" << endl;
-		return nullptr;
+		return { nullptr, INFO_ERROR_CREATE };
 	}
 	o->file_previous = current;
 
@@ -324,7 +330,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 			if (!o->patchable()) {
 				LOG_WARNING << "Got new version of " << path << ", however, it is incompatible with current version and hence cannot be employed..." << endl;
 				delete o;
-				return nullptr;
+				return { nullptr, INFO_UPDATE_INCOMPATIBLE };
 			}
 		}
 	}
@@ -336,7 +342,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 		LOG_ERROR << "Loading of " << path << " failed (while preloading)..." << endl;
 		current = o->file_previous;
 		delete o;
-		return nullptr;
+		return { nullptr, INFO_FAILED_PRELOADING };
 	}
 
 	// Map memory
@@ -344,7 +350,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 		LOG_ERROR << "Loading of " << path << " failed (while mapping into memory)..." << endl;
 		current = o->file_previous;
 		delete o;
-		return nullptr;
+		return { nullptr, INFO_FAILED_MAPPING };
 	}
 
 	// Apply (Luci specific) fixes
@@ -374,7 +380,7 @@ Object * ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 	base = o->base;
 	dynamic = o->dynamic_address();
 
-	return o;
+	return { o, o->file_previous == nullptr ? INFO_SUCCESS_LOAD : INFO_SUCCESS_UPDATE };
 }
 
 
@@ -408,19 +414,38 @@ bool ObjectIdentity::prepare() {
 
 
 bool ObjectIdentity::update() {
-	assert(current != nullptr);
-	LOG_DEBUG << "Updating relocations at " << *this << endl;
-	return current->update();
+	bool success = true;
+	for (Object * c = current; c != nullptr; c = c->file_previous) {
+		LOG_DEBUG << "Updating relocations at " << *this << endl;
+		success &= c->update();
+		if (!loader.config.update_outdated_relocations)
+			break;
+	}
+	return success;
 }
 
-
 bool ObjectIdentity::protect() {
-	assert(current != nullptr);
-	if (flags.premapped == 0) {
-		LOG_DEBUG << "Protecting " << *this << endl;
-		return current->protect();
-	}
-	return true;
+	bool success = true;
+	if (flags.premapped == 0)
+		for (Object * c = current; c != nullptr; c = c->file_previous) {
+			LOG_DEBUG << "Protecting " << *this << endl;
+			success &= c->protect();
+			if (!loader.config.update_outdated_relocations)
+				break;
+		}
+	return success;
+}
+
+bool ObjectIdentity::unprotect() {
+	bool success = true;
+	if (flags.premapped == 0)
+		for (Object * c = current; c != nullptr; c = c->file_previous) {
+			LOG_DEBUG << "Unprotecting " << *this << endl;
+			success &= c->unprotect();
+			if (!loader.config.update_outdated_relocations)
+				break;
+		}
+	return success;
 }
 
 
@@ -441,9 +466,29 @@ bool ObjectIdentity::initialize() {
 	return true;
 }
 
-
-void ObjectIdentity::status(const char * msg) {
+void ObjectIdentity::status(ObjectIdentity::Info info) {
 	if (loader.statusinfofd >= 0) {
-		OutputStream<512>(loader.statusinfofd) << msg << " for " << name << " (" << path << ") in PID " << Syscall::getpid() << " at " << DateTime::now() << endl;
+		OutputStream<512> out (loader.statusinfofd);
+		switch (info) {
+			case INFO_ERROR_OPEN:          out << "ERROR (opening file failed)"; break;
+			case INFO_ERROR_STAT:          out << "ERROR (retrieving file status failed)"; break;
+			case INFO_ERROR_MAP:           out << "ERROR (mapping whole file into memory failed)"; break;
+			case INFO_ERROR_CREATE:        out << "ERROR (not able to create object)"; break;
+			case INFO_ERROR_ELF:           out << "ERROR (unsupported format)"; break;
+			case INFO_ERROR_INOTIFY:       out << "ERROR (not able to watch for file modifications)"; break;
+			case INFO_IDENTICAL_TIME:      out << "IGNORED (new version has same modification time)"; break;
+			case INFO_IDENTICAL_HASH:      out << "IGNORED (new version has same hash)"; break;
+			case INFO_UPDATE_DISABLED:     out << "IGNORED (dynamic updates are disabled)"; break;
+			case INFO_UPDATE_INCOMPATIBLE: out << "FAILED (new version is incompatible)"; break;
+			case INFO_UPDATE_MODIFIED:     out << "FAILED (relocated data was altered)"; break;
+			case INFO_FAILED_PRELOADING:   out << "FAILED (preload was unsuccessful)"; break;
+			case INFO_FAILED_MAPPING:      out << "FAILED (mapping of segments was unsuccessful)"; break;
+			case INFO_FAILED_REUSE:        out << "FAILED (reusing outdated code)"; break;
+			case INFO_CONTINUE_LOAD:       out << "ERROR (open was successful, but not continued load)"; break;
+			case INFO_SUCCESS_LOAD:        out << "SUCCESS (loaded initial version)"; break;
+			case INFO_SUCCESS_UPDATE:      out << "SUCCESS (updated to new version)"; break;
+			default:                       out << "ERROR (invalid info type)"; break;
+		}
+		out << " for " << name << " [" << path << "] in PID " << Syscall::getpid() << " at " << DateTime::now() << endl;
 	}
 }

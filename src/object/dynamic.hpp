@@ -56,6 +56,9 @@ struct ObjectDynamic : public ObjectExecutable {
 
 	void addpath(Vector<const char *> & vec, const char * str);
 
+	/*! \brief check if relocation modifies (shared) data section */
+	bool in_data(const Elf::Relocation & reloc) const;
+
 	uint16_t version_index(const VersionedSymbol::Version & version) const {
 		if (!version.valid) {
 			//return Elf::VER_NDX_LOCAL;

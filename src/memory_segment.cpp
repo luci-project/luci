@@ -15,12 +15,13 @@ bool MemorySegment::map() {
 	const bool writable = (target.protection & PROT_WRITE) != 0;
 	bool copy = source.object.data.fd < 0
 	         || (source.size > 0 && (source.offset % Page::SIZE) != (target.address() % Page::SIZE))
-	         || writable;
+	         || writable
+	         || target.relro;
 
 	int flags =  MAP_FIXED_NOREPLACE;
 	int fd = -1;
 	int offset = 0;
-	int protection = target.protection | (writable ? PROT_WRITE : 0);
+	int protection = target.protection | (writable || target.relro ? PROT_WRITE : 0);
 
 	if (identity.loader.config.dynamic_update && writable) {
 		// Shared memory for updatable writable sections (if set, it is already initialized)
@@ -88,6 +89,21 @@ bool MemorySegment::protect() {
 		return true;
 	} else {
 		LOG_ERROR << "Protecting " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mprotect.error_message() << endl;
+		return false;
+	}
+}
+
+bool MemorySegment::unprotect() {
+	if (target.status != MEMSEG_MAPPED) {
+		LOG_WARNING << "Cannot unprotect " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) since it is not mapped!" << endl;
+		return false;
+	} else if ((target.effective_protection & PROT_WRITE) != 0) {
+		return true;
+	} else if (auto mprotect = Syscall::mprotect(target.page_start(), target.page_size(), target.effective_protection |PROT_WRITE )) {
+		target.effective_protection |= PROT_WRITE;
+		return true;
+	} else {
+		LOG_ERROR << "Unprotecting " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mprotect.error_message() << endl;
 		return false;
 	}
 }

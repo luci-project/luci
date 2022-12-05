@@ -50,6 +50,9 @@ struct MemorySegment {
 		/*! \brief Memory file descriptor for shared data */
 		int fd;
 
+		/*! \brief read-only relocation */
+		bool relro = false;
+
 		/*! \brief Current mapping status */
 		enum Status status;
 
@@ -74,15 +77,24 @@ struct MemorySegment {
 			return page_start() + page_size();
 		}
 
+		/*! \brief check if this segment maps an virtual address */
 		bool contains(uintptr_t ptr) const {
 			return ptr >= base + offset && ptr < base + offset + size;
+		}
+
+		/*! \brief check if this segment is user writable */
+		bool writable() const {
+			return (protection & PROT_WRITE) != 0;
 		}
 	} target;
 
 	/*! \brief Constructor */
-	MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base = 0)
-	  : source{object, segment.offset(), segment.size() },
-	    target{base, segment.virt_addr(), segment.virt_size(), PROT_NONE | (segment.readable() ? PROT_READ : 0) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, MEMSEG_NOT_MAPPED} {}
+	MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base = 0, uintptr_t offset_delta = 0)
+	  : source{object, segment.offset() + offset_delta, segment.size() - offset_delta},
+	    target{base, segment.virt_addr() + offset_delta, segment.virt_size() - offset_delta, PROT_NONE | (segment.readable() ? PROT_READ : 0) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, segment.type() == Elf::PT_GNU_RELRO, MEMSEG_NOT_MAPPED} {
+		assert(!(target.relro && segment.writeable()));
+		assert(target.size >= source.size);
+	}
 
 	/*! \brief Destructor (clean up) */
 	~MemorySegment();
@@ -92,6 +104,9 @@ struct MemorySegment {
 
 	/*! \brief set protection according to flags */
 	bool protect();
+
+	/*! \brief unprotect (make writable)  */
+	bool unprotect();
 
 	/* \brief set (non writeable) memory inactive */
 	bool disable();

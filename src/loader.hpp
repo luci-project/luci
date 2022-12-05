@@ -28,6 +28,12 @@ struct Loader {
 		/*! \brief support dynamic weak definitions? */
 		bool dynamic_weak = false;
 
+		/*! \brief check if content of relocation target in data section has been altered by the user */
+		bool check_relocation_content = false;
+
+		/*! \brief update relocations in outdated (old) versions as well? */
+		bool update_outdated_relocations = false;
+
 		/*! \brief detect execution of outdated files?*/
 		bool detect_outdated_access = false;
 
