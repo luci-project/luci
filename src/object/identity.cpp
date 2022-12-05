@@ -467,7 +467,7 @@ bool ObjectIdentity::initialize() {
 }
 
 void ObjectIdentity::status(ObjectIdentity::Info info) {
-	if (loader.statusinfofd >= 0) {
+	if (loader.statusinfofd >= 0 && loader.target != nullptr) {
 		OutputStream<512> out (loader.statusinfofd);
 		switch (info) {
 			case INFO_ERROR_OPEN:          out << "ERROR (opening file failed)"; break;
@@ -478,7 +478,7 @@ void ObjectIdentity::status(ObjectIdentity::Info info) {
 			case INFO_ERROR_INOTIFY:       out << "ERROR (not able to watch for file modifications)"; break;
 			case INFO_IDENTICAL_TIME:      out << "IGNORED (new version has same modification time)"; break;
 			case INFO_IDENTICAL_HASH:      out << "IGNORED (new version has same hash)"; break;
-			case INFO_UPDATE_DISABLED:     out << "IGNORED (dynamic updates are disabled)"; break;
+			case INFO_UPDATE_DISABLED:     out << "FAILED (dynamic updates are disabled)"; break;
 			case INFO_UPDATE_INCOMPATIBLE: out << "FAILED (new version is incompatible)"; break;
 			case INFO_UPDATE_MODIFIED:     out << "FAILED (relocated data was altered)"; break;
 			case INFO_FAILED_PRELOADING:   out << "FAILED (preload was unsuccessful)"; break;

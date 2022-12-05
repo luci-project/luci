@@ -24,8 +24,9 @@ bool ObjectExecutable::preload_segments() {
 				LOG_DEBUG << "Relocation read-only at " << reinterpret_cast<void*>(relro->virt_addr()) << " with " << relro->size() << "bytes" << endl;
 				// Relro section
 				memory_map.emplace_back(*this, *relro, base);
-				// Rest of data section
-				memory_map.emplace_back(*this, segment, base, relro->size());
+				// Rest of data section (if any)
+				if (segment.virt_size() - relro->size() > 0)
+					memory_map.emplace_back(*this, segment, base, relro->size());
 			} else {
 				memory_map.emplace_back(*this, segment, base);
 			}

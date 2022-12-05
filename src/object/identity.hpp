@@ -84,7 +84,7 @@ struct ObjectIdentity {
 	Object * current = nullptr;
 
 	/*! \brief Storage for comparing relocated values in data section to detect changes by the user [program] */
-	HashMap<uintptr_t,uintptr_t> data_check;
+	HashMap<Pair<int,uintptr_t>,uintptr_t> datarel_content;
 
 private:
 	friend struct Loader;

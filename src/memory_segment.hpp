@@ -51,7 +51,7 @@ struct MemorySegment {
 		int fd;
 
 		/*! \brief read-only relocation */
-		bool relro = false;
+		bool relro;
 
 		/*! \brief Current mapping status */
 		enum Status status;

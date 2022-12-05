@@ -232,16 +232,39 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 	// Initialize relocator object
 	Relocator relocator(reloc, this->global_offset_table);
 
-//relocator.address(this->base) in memory_segment
+	Pair<int,uintptr_t> datarel_key{-1,0};
+	if (file.loader.config.check_relocation_content && is_latest_version())
+		for (auto &mem : memory_map)
+			if (mem.target.contains(relocator.address(this->base))) {
+				datarel_key.first = mem.target.fd;
+
+				// Address relative to start of segment
+				assert(relocator.address(this->base) >= mem.target.address());
+				datarel_key.second = relocator.address(this->base) - mem.target.address();
+
+				auto cached = file.datarel_content.find(datarel_key);
+				if (cached != file.datarel_content.end()){
+					uintptr_t current_value = *reinterpret_cast<uintptr_t *>(relocator.address(this->base));
+					if (current_value != cached->value) {
+						LOG_WARNING << "Value at relocation target " << reinterpret_cast<void*>(relocator.address(this->base)) << " has changed: " << reinterpret_cast<void*>(current_value) << " instead of " << reinterpret_cast<void*>(cached->value) << " (skipping!)" << endl;
+						return reinterpret_cast<void*>(cached->value);
+					}
+				}
+				break;
+			}
 
 	// find symbol
 	auto need_symbol_index = reloc.symbol_index();
 	if (need_symbol_index == 0) {
 		// Local symbol
-		if (fix)
-			return reinterpret_cast<void*>(relocator.fix_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset));
-		else
+		if (fix) {
+			auto r = relocator.fix_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset);
+			if (datarel_key.first != -1)
+				file.datarel_content[datarel_key] = r;
+			return reinterpret_cast<void*>(r);
+		} else {
 			return reinterpret_cast<void*>(relocator.value_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset));
+		}
 	} else /* TODO: if (!dynamic_symbols.ignored(need_symbol_index)) */ {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
 		//assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
@@ -253,10 +276,14 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 			relocations.insert(reloc, symbol.value());
 			auto & symobj = symbol->object();
 			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << endl;
-			if (fix)
-				return reinterpret_cast<void*>(relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset));
-			else
+			if (fix) {
+				auto r = relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset);
+				if (datarel_key.first != -1)
+					file.datarel_content[datarel_key] = r;
+				return reinterpret_cast<void*>(r);
+			} else {
 				return reinterpret_cast<void*>(relocator.value_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset));
+			}
 		} else if (need_symbol.bind() == STB_WEAK) {
 			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "..." << endl;
 		} else {
@@ -300,17 +327,6 @@ bool ObjectDynamic::patchable() const {
 					}
 			}
 
-/*
-	// Check if data section has changed (TODO: Other sections?)
-	for (const auto &sym : this->binary_hash.value().diff(file_previous->binary_hash.value(), true))
-		for (const auto & section : elf.sections)
-			if (section.type() == Elf::SHT_PROGBITS && section.allocate() && section.virt_addr() >= sym.address) {
-				if (section.writeable() && strcmp(section.name(), ".data") == 0) {
-					LOG_WARNING << "Data section changed in new version of " << this->file.name << " -- not patching the library!" << endl;
-					return false;
-				}
-			}
-*/
 	// All good
 	return true;
 }
