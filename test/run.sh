@@ -150,6 +150,16 @@ else
 	fi
 fi
 
+# Check userfaultfd permission
+LD_DETECT_OUTDATED=0
+if [ -f /proc/sys/vm/unprivileged_userfaultfd ] ; then
+	if getcap "$(readlink -f "${LD_PATH}")" | grep -i "cap_sys_ptrace=eip" ; then
+		LD_DETECT_OUTDATED=1
+	else
+		LD_DETECT_OUTDATED=$(cat /proc/sys/vm/unprivileged_userfaultfd)
+	fi
+fi
+
 # generate config
 LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
 ../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF" || true
@@ -236,6 +246,11 @@ for TEST in ${TESTS} ; do
 			TIMEOUT_PID=$!
 		fi
 
+		# Execute and capture stdout, stderr and status
+		STDOUT=$(mktemp)
+		STDERR=$(mktemp)
+		STATUS=$(mktemp)
+
 		# (Re)Set environment variables
 		export LC_ALL=C
 		export LD_NAME
@@ -243,11 +258,10 @@ for TEST in ${TESTS} ; do
 		export LD_LIBRARY_CONF
 		export LD_LOGLEVEL
 		export LD_DYNAMIC_UPDATE
+		export LD_DETECT_OUTDATED
+		export LD_RELOCATE_OUTDATED=1
+		export LD_STATUS_INFO=$STATUS
 		export LD_LIBRARY_PATH=$(readlink -f "${TEST}")
-
-		# Execute and capture stdout + stderr
-		STDOUT=$(mktemp)
-		STDERR=$(mktemp)
 
 		cd "${TEST}"
 		EXITCODE=0
@@ -289,7 +303,7 @@ for TEST in ${TESTS} ; do
 		fi
 
 		# Compare stdout + stderr with example
-		if ! ( check "${TEST}/.stdout" < "$STDOUT" &&  check "${TEST}/.stderr" < "$STDERR" ) ; then
+		if ! ( check "${TEST}/.stdout" < "$STDOUT" && check "${TEST}/.stderr" < "$STDERR" && check "${TEST}/.status" < <(sed -e "s/) for .*$/)/" "$STATUS")  ) ; then
 			echo -e "\e[31mUnexpected output content of ${EXEC} (${TEST}) -- runtime ${SECONDS}s\e[0m" >&2
 			if ${STOP_ON_ERROR} ; then
 				exit ${EXITCODE}
@@ -299,7 +313,7 @@ for TEST in ${TESTS} ; do
 		fi
 
 		# Remove files
-		rm "$STDOUT" "$STDERR"
+		rm "$STDOUT" "$STDERR" "$STATUS"
 	elif [ "$TESTS" != "*" ] ; then
 		echo "Test '$TEST' does not exist!" >&2
 		if ${STOP_ON_ERROR} ; then

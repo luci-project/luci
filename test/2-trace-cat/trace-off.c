@@ -21,4 +21,3 @@ ssize_t read(int fd, const char * msg, size_t len) {
 ssize_t write(int fd, const char * msg, size_t len) {
 	return sys_write(fd, msg, len);
 }
-

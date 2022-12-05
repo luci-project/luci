@@ -16,7 +16,8 @@ $(EXEC): $(BIN) $(SHARED_LIBS) $(MAKEFILE_LIST)
 	@echo "#!/bin/sh" > $@
 	@echo "for lib in $(SHARED_LIBS) ; do ln -f -s \$$lib lib$(LIB).so && echo "Using \$$lib" >&2 ; sleep 4 ; done & " >> $@
 	@echo "sleep 2" >> $@
-	@echo "echo '[ld updates disabled]' >&2" >> $@
+	@echo "export LD_DYNAMIC_DLUPDATE=1" >> $@
+	@echo "echo '[ld updates enabled]' >&2" >> $@
 	@echo "./$<" >> $@
 	@chmod +x $@
 

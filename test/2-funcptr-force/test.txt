@@ -1,0 +1,10 @@
+SUCCESS (loaded initial version) for libc.so.6 [/lib/x86_64-linux-gnu/libc.so.6] in PID 674610 at 2022-12-05T18:44:35.265149Z
+SUCCESS (loaded initial version) for libm.so.6 [/lib/x86_64-linux-gnu/libm.so.6] in PID 674610 at 2022-12-05T18:44:35.265320Z
+SUCCESS (loaded initial version) for libgcc_s.so.1 [/lib/x86_64-linux-gnu/libgcc_s.so.1] in PID 674610 at 2022-12-05T18:44:35.276677Z
+SUCCESS (loaded initial version) for libstdc++.so.6 [/usr/lib/x86_64-linux-gnu/libstdc++.so.6] in PID 674610 at 2022-12-05T18:44:35.276848Z
+SUCCESS (loaded initial version) for libfunc.so [/home/heinloth/projects/luci/test/2-funcptr-force/libfunc.so] in PID 674610 at 2022-12-05T18:44:35.276946Z
+ERROR (not able to watch for file modifications) for run-main [/home/heinloth/projects/luci/test/2-funcptr-force/run-main] in PID 674610 at 2022-12-05T18:44:35.276977Z
+SUCCESS (updated to new version) for libfunc.so [/home/heinloth/projects/luci/test/2-funcptr-force/libfunc.so] in PID 674611 at 2022-12-05T18:44:37.359746Z
+FAILED (reusing outdated code) for libfunc.so [/home/heinloth/projects/luci/test/2-funcptr-force/libfunc.so] in PID 674612 at 2022-12-05T18:44:40.283379Z
+SUCCESS (updated to new version) for libfunc.so [/home/heinloth/projects/luci/test/2-funcptr-force/libfunc.so] in PID 674611 at 2022-12-05T18:44:42.365743Z
+FAILED (reusing outdated code) for libfunc.so [/home/heinloth/projects/luci/test/2-funcptr-force/libfunc.so] in PID 674612 at 2022-12-05T18:44:45.284092Z
