@@ -322,7 +322,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 
 	// If dynamic updates are enabled, calculate function hashes
 	if (flags.updatable == 1) {
-		LOG_INFO << "Calculate Binary hash of " << *this << endl;
+		LOG_INFO << "Calculate Binary hash of " << *o << endl;
 		o->binary_hash.emplace(*o);
 		// if previous version exist, check if we can patch it
 		if (current != nullptr) {
@@ -374,7 +374,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 		o->status = Object::STATUS_PREPARED;
 	}
 
-	LOG_INFO << "Successfully loaded " << path << " with base " << (void*)(o->base) << endl;
+	LOG_INFO << "Successfully loaded " << path << " v" << o->version() << " with base " << (void*)(o->base) << endl;
 
 	// Initialize GLIBC specific stuff
 	base = o->base;
@@ -395,7 +395,7 @@ bool ObjectIdentity::prepare() {
 				if (!dep->prepare())
 					return false;
 
-			LOG_DEBUG << "Preparing " << *this << endl;
+			LOG_DEBUG << "Preparing " << *current << endl;
 			if (current->prepare())
 				current->status = Object::STATUS_PREPARED;
 			else
@@ -403,7 +403,7 @@ bool ObjectIdentity::prepare() {
 			break;
 
 		case Object::STATUS_PREPARING:
-			LOG_WARNING << "Circular dependency on " << *this << endl;
+			LOG_WARNING << "Circular dependency on " << *current << endl;
 			break;
 
 		case Object::STATUS_PREPARED:
@@ -416,7 +416,7 @@ bool ObjectIdentity::prepare() {
 bool ObjectIdentity::update() {
 	bool success = true;
 	for (Object * c = current; c != nullptr; c = c->file_previous) {
-		LOG_DEBUG << "Updating relocations at " << *this << endl;
+		LOG_DEBUG << "Updating relocations at " << *c << endl;
 		success &= c->update();
 		if (!loader.config.update_outdated_relocations)
 			break;
@@ -428,7 +428,7 @@ bool ObjectIdentity::protect() {
 	bool success = true;
 	if (flags.premapped == 0)
 		for (Object * c = current; c != nullptr; c = c->file_previous) {
-			LOG_DEBUG << "Protecting " << *this << endl;
+			LOG_DEBUG << "Protecting " << *c << endl;
 			success &= c->protect();
 			if (!loader.config.update_outdated_relocations)
 				break;
@@ -440,7 +440,7 @@ bool ObjectIdentity::unprotect() {
 	bool success = true;
 	if (flags.premapped == 0)
 		for (Object * c = current; c != nullptr; c = c->file_previous) {
-			LOG_DEBUG << "Unprotecting " << *this << endl;
+			LOG_DEBUG << "Unprotecting " << *c << endl;
 			success &= c->unprotect();
 			if (!loader.config.update_outdated_relocations)
 				break;
@@ -459,7 +459,7 @@ bool ObjectIdentity::initialize() {
 			if (!dep->initialize())
 				return false;
 
-		LOG_DEBUG << "Initializing " << *this << endl;
+		LOG_DEBUG << "Initializing " << *current << endl;
 		if (!current->initialize())
 			return false;
 	}

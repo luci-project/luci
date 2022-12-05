@@ -94,6 +94,13 @@ bool Object::disable() {
 	return success;
 }
 
+size_t Object::version() const {
+	size_t v = 0;
+	for (Object * p = file_previous; p != nullptr; p = p->file_previous)
+		v++;
+	return v;
+}
+
 void* Object::dynamic_resolve(size_t index) const {
 	LOG_ERROR << "Unable to resolve " << index << " -- Object " << file.path << " does not support dynamic loading!" << endl;
 	assert(false);

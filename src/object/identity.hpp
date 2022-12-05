@@ -165,5 +165,5 @@ static inline BufferStream& operator<<(BufferStream& bs, const ObjectIdentity & 
 	return bs << o.name << " (" << o.path << ")";
 }
 static inline BufferStream& operator<<(BufferStream& bs, const Object & o) {
-	return bs << "[Object " << o.file << "]";
+	return bs << "[Object " << o.file << " v" << o.version() << "]";
 }

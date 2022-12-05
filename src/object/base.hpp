@@ -123,6 +123,9 @@ struct Object : public Elf {
 	/*! \brief Make this (old) object inactive */
 	virtual bool disable();
 
+	/*! \brief Get (internal) version = number of updates */
+	size_t version() const;
+
 	/*! \brief Find (external visible) symbol in this object with same name and version */
 	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const {
 		return resolve_symbol(sym.name(), sym.hash_value(), sym.gnu_hash_value(), sym.version);
