@@ -159,6 +159,11 @@ if [ -f /proc/sys/vm/unprivileged_userfaultfd ] ; then
 		LD_DETECT_OUTDATED=$(cat /proc/sys/vm/unprivileged_userfaultfd)
 	fi
 fi
+if [[ ${LD_DETECT_OUTDATED} -eq 0 ]] ; then
+	USERFAULTFD="nouserfaultfd"
+else
+	USERFAULTFD="userfaultfd"
+fi
 
 # generate config
 LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
@@ -178,7 +183,7 @@ else
 fi
 
 function check() {
-	for file in $1{-${OS,,},}{-${OSVERSION,,},}{-${PLATFORM,,},}{-${COMPILER,,},}{-${UPDATEFLAG},} ; do
+	for file in $1{-${OS,,},}{-${OSVERSION,,},}{-${PLATFORM,,},}{-${COMPILER,,},}{-${UPDATEFLAG},}{,-${USERFAULTFD,,}} ; do
 		if [ -f "$file" ] ; then
 			echo "Checking $file" ;
 			if [ -x "$file" ] ; then
@@ -193,7 +198,7 @@ function check() {
 
 function skip() {
 	SKIP=".skip"
-	for SKIPTEST in $1/${SKIP}{,-${OS,,}}{,-${OSVERSION,,}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}} ; do
+	for SKIPTEST in $1/${SKIP}{,-${OS,,}}{,-${OSVERSION,,}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}}{,-${USERFAULTFD,,}} ; do
 		if [ -f "${SKIPTEST}" ] ; then
 			return 0
 		fi
@@ -287,8 +292,10 @@ for TEST in ${TESTS} ; do
 			cat "$STDOUT" >&2
 			echo -e "\n\e[4mstderr\e[0m" >&2
 			cat "$STDERR" >&2
+			echo -e "\n\e[4mstatus\e[0m" >&2
+			cat "$STATUS" >&2
 			echo -e "\e[31mExecution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
-			rm "$STDOUT" "$STDERR"
+			rm "$STDOUT" "$STDERR" "$STATUS"
 			if ${STOP_ON_ERROR} ; then
 				exit ${EXITCODE}
 			else

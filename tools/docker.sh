@@ -17,7 +17,7 @@ if [ -f "/.dockerenv" ] ; then
 elif [ $# -gt 1 ] ; then
 	IMAGE=$1
 	shift
-	docker run --rm -it -v $( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd ):${DOCKERBASE}-ro:ro "$IMAGE" "${DOCKERBASE}-ro/tools/$( basename -- "${BASH_SOURCE[0]}" )" "$@"
+	docker run --rm -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --security-opt apparmor=unconfined -v $( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd ):${DOCKERBASE}-ro:ro "$IMAGE" "${DOCKERBASE}-ro/tools/$( basename -- "${BASH_SOURCE[0]}" )" "$@"
 else
 	echo "Usage: $0 [DOCKER-IMAGE] [COMMAND [ARGS]]"
 	exit 1

@@ -102,6 +102,7 @@ $(TARGET_PATH): $(TARGET_FILE)
 $(TARGET_FILE): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
 	@echo "LD		$@"
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) -L$(dir $(LIBBEAN)) -Wl,--whole-archive -l$(patsubst lib%.a,%,$(notdir $(LIBBEAN))) -Wl,--no-whole-archive -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
+	$(VERBOSE) setcap cap_sys_ptrace=eip $@ 1>/dev/null 2>&1 && echo "CAP		$@" || true
 
 $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"
