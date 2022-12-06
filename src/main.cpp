@@ -79,6 +79,7 @@ static uintptr_t base_from_phdr(void * phdr_ptr, long int entries = 1) {
 			default:
 				continue;
 		}
+	(void) valid;
 	assert(valid);
 	return base;
 }
