@@ -28,7 +28,12 @@ LIBADDRESS = 0x600000000000
 LIBPATH_CONF = /opt/$(NAME)/libpath.conf
 LDLUCI_CONF = /opt/$(NAME)/ld-$(NAME).conf
 
-CXXFLAGS ?= -Og -g -std=c++2a
+ifeq ($(OPTIMIZE), 1)
+	CXXFLAGS := -O3 -DNDEBUG
+else
+	CXXFLAGS := -Og -g
+endif
+CXXFLAGS += -std=c++2a
 CXXFLAGS += -I $(SRCFOLDER) -I $(dir $(LIBBEAN))/include/
 # Elfo ELF class should be virtual & reference to DLH
 CXXFLAGS += -DVIRTUAL -DUSE_DLH
@@ -93,7 +98,7 @@ test: $(TARGET_FILE)
 
 $(LIBBEAN):
 	@echo "GEN		$@"
-	$(VERBOSE) $(MAKE) DIET=1 -C $(@D)
+	$(VERBOSE) $(MAKE) VERBOSE_MODE=0 -C $(@D)
 
 $(TARGET_PATH): $(TARGET_FILE)
 	@echo "CP		$@"
