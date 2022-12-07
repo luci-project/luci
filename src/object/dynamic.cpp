@@ -258,7 +258,11 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 	if (need_symbol_index == 0) {
 		// Local symbol
 		if (fix) {
+			if (mapping_protected)
+				unprotect();
 			auto r = relocator.fix_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset);
+			if (mapping_protected)
+				protect();
 			if (datarel_key.first != -1)
 				file.datarel_content[datarel_key] = r;
 			return reinterpret_cast<void*>(r);
@@ -277,7 +281,11 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 			auto & symobj = symbol->object();
 			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << endl;
 			if (fix) {
+				if (mapping_protected)
+					unprotect();
 				auto r = relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset);
+				if (mapping_protected)
+					protect();
 				if (datarel_key.first != -1)
 					file.datarel_content[datarel_key] = r;
 				return reinterpret_cast<void*>(r);

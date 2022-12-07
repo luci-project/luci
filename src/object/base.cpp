@@ -132,25 +132,25 @@ bool Object::map() {
 	return success;
 }
 
-bool Object::protect() {
+bool Object::protect() const {
 	bool success = true;
 	for (auto & seg : memory_map)
 		success &= seg.protect();
 	return success;
 }
 
-bool Object::unprotect() {
+bool Object::unprotect() const {
 	bool success = true;
 	for (auto & seg : memory_map)
 		success &= seg.unprotect();
 	return success;
 }
 
-bool Object::disable() {
+bool Object::disable() const {
 	bool success = true;
-	for (MemorySegment &mem: memory_map)
-		if ((mem.target.protection & PROT_EXEC) != 0)
-			success &= mem.disable();
+	for (auto & seg : memory_map)
+		if ((seg.target.protection & PROT_EXEC) != 0)
+			success &= seg.disable();
 	return success;
 }
 

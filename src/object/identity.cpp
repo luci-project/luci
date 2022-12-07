@@ -444,6 +444,7 @@ bool ObjectIdentity::protect() {
 		for (Object * c = current; c != nullptr; c = c->file_previous) {
 			LOG_DEBUG << "Protecting " << *c << endl;
 			success &= c->protect();
+			c->mapping_protected = true;
 			if (!loader.config.update_outdated_relocations)
 				break;
 		}
@@ -456,6 +457,7 @@ bool ObjectIdentity::unprotect() {
 		for (Object * c = current; c != nullptr; c = c->file_previous) {
 			LOG_DEBUG << "Unprotecting " << *c << endl;
 			success &= c->unprotect();
+			c->mapping_protected = false;
 			if (!loader.config.update_outdated_relocations)
 				break;
 		}

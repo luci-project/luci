@@ -61,10 +61,13 @@ struct Object : public Elf {
 	Vector<const char *> rpath, runpath;
 
 	/*! \brief Segments to be loaded in memory */
-	Vector<MemorySegment> memory_map;
+	mutable Vector<MemorySegment> memory_map;
 
 	/*! \brief Build ID, if available (null terminated) */
 	char build_id[41];
+
+	/*! \brief Mapping protected? */
+	bool mapping_protected = false;
 
 	/*! \brief Binary symbol hashes */
 	Optional<Bean> binary_hash;
@@ -118,10 +121,10 @@ struct Object : public Elf {
 	virtual bool update() { return true; };
 
 	/*! \brief Set protection flags in memory */
-	virtual bool protect();
+	virtual bool protect() const;
 
 	/*! \brief Unprotect (make writable)  */
-	virtual bool unprotect();
+	virtual bool unprotect() const;
 
 	/*! \brief Initialisation method */
 	virtual bool initialize() { return true; };
@@ -130,7 +133,7 @@ struct Object : public Elf {
 	virtual bool patchable() const { return false; };
 
 	/*! \brief Make this (old) object inactive */
-	virtual bool disable();
+	virtual bool disable() const;
 
 	/*! \brief Get (internal) version = number of updates */
 	size_t version() const;

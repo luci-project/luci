@@ -53,11 +53,11 @@ bool ObjectExecutable::preload_segments() {
 }
 
 
-bool ObjectExecutable::unprotect() {
+bool ObjectExecutable::unprotect() const {
 	// make relocation read-only segments writable
 	bool success = true;
 	for (auto & mem : memory_map)
-		if (mem.target.relro)
+		if (& mem.target.relro)
 			success &= mem.unprotect();
 	return success;
 }

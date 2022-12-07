@@ -20,10 +20,17 @@ void notify(State state) {
 }
 
 static bool set_dynamic_debug(const ObjectIdentity * object) {
+	assert(object != nullptr);
 	if (object->dynamic != 0)
 		for (auto dyn = reinterpret_cast<Elf::Dyn *>(object->dynamic); dyn->d_tag != Elf::DT_NULL; dyn++)
 			if (dyn->d_tag == Elf::DT_DEBUG) {
+				auto current = object->current;
+				assert(current != nullptr);
+				if (current->mapping_protected)
+					current->unprotect();
 				dyn->d_un.d_ptr = reinterpret_cast<uintptr_t>(&r_debug);
+				if (current->mapping_protected)
+					current->protect();
 				LOG_INFO << "GDB debug structure in " << *object << " at *" << &(dyn->d_un.d_ptr) << " = " << &r_debug << endl;
 				return true;
 			}
