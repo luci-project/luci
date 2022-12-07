@@ -139,6 +139,18 @@ bool ObjectDynamic::preload_libraries() {
 				addpath(this->runpath, dyn.string());
 				break;
 
+			case Elf::DT_FLAGS:
+				if ((dyn.value() & Elf::DF_BIND_NOW) != 0)
+					file.flags.bind_now = 1;
+				break;
+
+			case Elf::DT_FLAGS_1:
+				if ((dyn.value() & Elf::DF_1_NOW) != 0)
+					file.flags.bind_now = 1;
+				if ((dyn.value() & Elf::DF_1_GLOBAL) != 0)
+					file.flags.bind_global = 1;
+				break;
+
 			default:
 				continue;
 		}
