@@ -63,8 +63,14 @@ struct Object : public Elf {
 	/*! \brief Segments to be loaded in memory */
 	Vector<MemorySegment> memory_map;
 
+	/*! \brief Build ID, if available (null terminated) */
+	char build_id[41];
+
 	/*! \brief Binary symbol hashes */
 	Optional<Bean> binary_hash;
+
+	/*! \brief DWARF hash contents (if enabled) */
+	const char * debug_hash = nullptr;
 
 	/*! \brief Relocations to external symbols used in this object (cache) */
 	mutable HashMap<Elf::Relocation, VersionedSymbol> relocations;
@@ -80,6 +86,9 @@ struct Object : public Elf {
 
 	/*! \brief destroy object */
 	virtual ~Object();
+
+	/*! \brief query debug hash */
+	const char * query_debug_hash();
 
 	/*! \brief Get address of dynamic section */
 	uintptr_t dynamic_address() const;

@@ -2,6 +2,7 @@
 
 #include <dlh/syscall.hpp>
 #include <dlh/auxiliary.hpp>
+#include <dlh/utility.hpp>
 #include <dlh/log.hpp>
 
 #include "object/identity.hpp"
@@ -14,10 +15,29 @@
 
 Object::Object(ObjectIdentity & file, const Data & data) : Elf(data.addr), file(file), data(data) {
 	assert(data.addr != 0);
+	// Build ID
+	build_id[0] = '\0';
+	if (file.flags.updatable)
+		for (auto & section: this->sections)
+			if (section.type() == Elf::SHT_NOTE)
+				for (auto & note : section.get_notes())
+					if (note.name() != nullptr && strcmp(note.name(), "GNU") == 0 && note.type() == Elf::NT_GNU_BUILD_ID) {
+						BufferStream id(build_id, count(this->build_id));
+						auto desc = reinterpret_cast<const uint8_t *>(note.description());
+
+						for (size_t i = 0; i < note.size(); i++)
+							id << hex << right << setfill('0') << setw(2)  << static_cast<uint32_t>(desc[i]);
+						id.flush();
+						assert(build_id[count(build_id) - 1] == '\0');
+						break;
+					}
 }
 
 Object::~Object() {
 	// TODO: Not really supported yet, just a stub...
+
+	if (debug_hash != nullptr)
+		Memory::free(debug_hash);
 
 	// Remove this version from list
 	if (file.current == this)
@@ -42,6 +62,46 @@ Object::~Object() {
 		Syscall::close(data.fd);
 
 	// TODO: unmap file.data?
+}
+
+const char * Object::query_debug_hash() {
+	// Query for DWARF hash, if corresponding socket is connected)
+	if (debug_hash == nullptr) {
+		auto & socket = file.loader.debug_hash_socket;
+		if (socket.is_connected()) {
+			char tmp[128];
+
+			// First query for Build ID
+			if (build_id[0] != '\0') {
+				LOG_INFO << "Quering for debug hash by build id: " << build_id << endl;
+				size_t sent = socket.send(build_id, count(build_id));
+				if (sent != count(build_id)) {
+					LOG_WARNING << "Debug hash socket sent " << sent << " (instead of " << sizeof(build_id) << ") bytes" << endl;
+				} else {
+					size_t recv = socket.recv(tmp, count(tmp), true);
+					LOG_DEBUG << "Debug hash for build id " << build_id << " is " << tmp << endl;
+					if (recv > 0 && tmp[0] != '-' && tmp[1] != '\0') {
+						return debug_hash = String::duplicate(tmp, recv);
+					}
+				}
+			}
+
+			// Then try path
+			if (!file.path.empty()) {
+				LOG_INFO << "Quering for debug hash by path: " << file.path << endl;
+				size_t sent = socket.send(file.path.str, file.path.len + 1);
+				if (sent != file.path.len + 1) {
+					LOG_WARNING << "Debug hash socket sent " << sent << " (instead of " << file.path.len << ") bytes" << endl;
+				} else {
+					size_t recv = socket.recv(tmp, count(tmp), true);
+					LOG_DEBUG << "Debug hash for path " << file.path  << " is " << tmp << endl;
+					if (recv > 0 && tmp[0] != '-' && tmp[1] != '\0')
+						return debug_hash = String::duplicate(tmp, recv);
+				}
+			}
+		}
+	}
+	return debug_hash;
 }
 
 uintptr_t Object::dynamic_address() const {

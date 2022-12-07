@@ -72,7 +72,7 @@ struct Loader {
 	Trampoline dlsyms;
 
 	/*! \brief socket to receive elf hash */
-	Socket::Client debughash;
+	Socket::Client debug_hash_socket;
 
 	/*! \brief Descriptor for status info output */
 	int statusinfofd = -1;

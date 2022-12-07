@@ -11,17 +11,18 @@ LD_SYSTEM=false
 LD_LOGLEVEL=3
 LD_DYNAMIC_UPDATE=0
 LD_PRELOAD=""
+LD_DEBUG_HASH=""
 EXEC="run"
 TIMEOUT=120
 TIMEOUT_KILLDELAY=1
 
 # Options
-while getopts "c:dhl:r:st:uR" OPT; do
+while getopts "c:d:hl:or:st:uR" OPT; do
 	case "${OPT}" in
 		c)
 			COMPILER=${OPTARG}
 			;;
-		d)
+		o)
 			DEBUG_OUTPUT=true
 			;;
 		l)
@@ -29,6 +30,9 @@ while getopts "c:dhl:r:st:uR" OPT; do
 			;;
 		r)
 			LD_PATH_SHORT=${OPTARG}
+			;;
+		d)
+			LD_DEBUG_HASH=${OPTARG}
 			;;
 		s)
 			STOP_ON_ERROR=true
@@ -50,8 +54,9 @@ while getopts "c:dhl:r:st:uR" OPT; do
 			echo "	-l LOGLEVEL  Specify log level (default: $LD_LOGLEVEL)" >&2
 			echo "	-r PATH      (Short) Path for RTLD (default: $LD_PATH_SHORT)" >&2
 			echo "	-t SECONDS   set maximum run time per test case (default: $TIMEOUT)" >&2
+			echo "	-d SOCKET    Socket for debug hash (elfvarsd)" >&2
 			echo "	-s           Stop on (first) Error" >&2
-			echo "	-d           Debug: Print output" >&2
+			echo "	-o           Debug: Print output" >&2
 			echo "	-h           Show this help" >&2
 			echo "	-u           Enable dynamic updates (disabled by default)" >&2
 			echo "	-R           use default (system) RTLD, incompatible with updates" >&2
@@ -264,6 +269,7 @@ for TEST in ${TESTS} ; do
 		export LD_LOGLEVEL
 		export LD_DYNAMIC_UPDATE
 		export LD_DETECT_OUTDATED
+		export LD_DEBUG_HASH
 		export LD_RELOCATE_OUTDATED=1
 		export LD_STATUS_INFO=$STATUS
 		export LD_LIBRARY_PATH=$(readlink -f "${TEST}")

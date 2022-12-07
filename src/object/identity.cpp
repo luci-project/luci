@@ -320,7 +320,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 	}
 	o->file_previous = current;
 
-	// If dynamic updates are enabled, calculate function hashes
+	// If dynamic updates are enabled, compare hashes
 	if (flags.updatable == 1) {
 		LOG_INFO << "Calculate Binary hash of " << *o << endl;
 		o->binary_hash.emplace(*o);
@@ -329,6 +329,17 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 			assert(current->binary_hash && o->binary_hash);
 			if (!o->patchable()) {
 				LOG_WARNING << "Got new version of " << path << ", however, it is incompatible with current version and hence cannot be employed..." << endl;
+				delete o;
+				return { nullptr, INFO_UPDATE_INCOMPATIBLE };
+			}
+		}
+
+		// Query for DWARF hash, if corresponding socket is connected)
+		if (!loader.config.force_update && current != nullptr && o->query_debug_hash() != nullptr && current->query_debug_hash() != nullptr) {
+			if (String::compare(o->debug_hash, current->debug_hash) == 0) {
+				LOG_INFO << "DWARF hash (" << o->debug_hash << ") is identical" << endl;
+			} else {
+				LOG_WARNING << "Got new version of " << path << ", however, according to its DWARF (" << o->debug_hash << ") it seems to be incompatible with current version (" << current->debug_hash << ") and hence cannot be employed..." << endl;
 				delete o;
 				return { nullptr, INFO_UPDATE_INCOMPATIBLE };
 			}
@@ -374,7 +385,10 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 		o->status = Object::STATUS_PREPARED;
 	}
 
-	LOG_INFO << "Successfully loaded " << path << " v" << o->version() << " with base " << (void*)(o->base) << endl;
+	LOG_INFO << "Successfully loaded " << path << " v" << o->version() ;
+	if (o->build_id[0] != '\0')
+		LOG_INFO_APPEND << " (Build ID " << o->build_id << ")";
+	LOG_INFO_APPEND << " with base " << (void*)(o->base) << endl;
 
 	// Initialize GLIBC specific stuff
 	base = o->base;

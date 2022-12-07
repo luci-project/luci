@@ -72,7 +72,7 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
 Loader::~Loader() {
 	_instance = nullptr;
 
-	debughash.disconnect();
+	debug_hash_socket.disconnect();
 
 	if (statusinfofd >= 0) {
 		if (auto close = Syscall::close(statusinfofd)) {
