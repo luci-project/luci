@@ -35,6 +35,7 @@
 // Parse Arguments
 struct Opts {
 	int loglevel{Log::WARNING};
+	bool logtimeAbs{};
 	const char * logfile{};
 	bool logfileAppend{};
 	Vector<const char *> libpath{};
@@ -110,8 +111,9 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 
 	// Logger
 	auto cfg_loglevel = config_file.value_as<int>("LD_LOGLEVEL");
+	auto cfg_logtime_abs = opts.logtimeAbs || config_file.value_or_default<bool>("LD_LOGTIME_ABS", false);
 
-	LOG.set(static_cast<Log::Level>(cfg_loglevel && cfg_loglevel.value() > opts.loglevel ? cfg_loglevel.value() : opts.loglevel));
+	LOG.set(static_cast<Log::Level>(cfg_loglevel && cfg_loglevel.value() > opts.loglevel ? cfg_loglevel.value() : opts.loglevel), cfg_logtime_abs ? Log::Time::ABSOLUTE : Log::Time::DELTA);
 	BuildInfo::log();  // should be first output
 	LOG_DEBUG << "Set log level to " << static_cast<int>(LOG.get()) << endl;
 
@@ -257,6 +259,7 @@ int main(int argc, char* argv[]) {
 		auto args = Parser::Arguments<Opts>({
 				/* short & long name,     argument, element               required, help text,  optional validation function */
 				{'l',  "log",             "LEVEL",  &Opts::loglevel,         false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
+				{'A',  "logtimeabs",      nullptr,  &Opts::logtimeAbs,       false, "Use absolute time (instead of delta) in log. This option can also be enabled by setting the environment variable LD_LOGTIME_ABS to 1"},
 				{'f',  "logfile",         "FILE",   &Opts::logfile,          false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
 				{'a',  "logfile-append",  nullptr,  &Opts::logfileAppend,    false, "Append output to log file (instead of truncate). Requires logfile, can also be enabled by setting the environment variable LD_LOGFILE_APPEND to 1" },
 				{'p',  "library-path",    "DIR",    &Opts::libpath,          false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
