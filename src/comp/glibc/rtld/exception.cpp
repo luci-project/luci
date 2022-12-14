@@ -1,4 +1,4 @@
-#include "compatibility/glibc/rtld/exception.hpp"
+#include "comp/glibc/rtld/exception.hpp"
 
 #include <dlh/log.hpp>
 #include <dlh/macro.hpp>

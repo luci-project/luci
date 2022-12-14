@@ -1,4 +1,4 @@
-#include "compatibility/glibc/patch.hpp"
+#include "comp/glibc/patch.hpp"
 
 #include <dlh/log.hpp>
 #include <dlh/types.hpp>
@@ -6,8 +6,8 @@
 #include <dlh/syscall.hpp>
 
 #include "page.hpp"
-#include "compatibility/glibc/version.hpp"
-#include "compatibility/glibc/libdl/interface.hpp"
+#include "comp/glibc/version.hpp"
+#include "comp/glibc/libdl/interface.hpp"
 
 namespace GLIBC {
 

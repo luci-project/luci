@@ -1,4 +1,4 @@
-#include "compatibility/glibc/rtld/dl_tls.hpp"
+#include "comp/glibc/rtld/dl_tls.hpp"
 
 #include <dlh/log.hpp>
 #include <dlh/macro.hpp>

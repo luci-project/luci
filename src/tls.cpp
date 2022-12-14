@@ -6,7 +6,7 @@
 #include <dlh/syscall.hpp>
 #include <dlh/container/vector.hpp>
 
-#include "compatibility/glibc/init.hpp"
+#include "comp/glibc/init.hpp"
 
 /*! \brief Addtional space reserved for DTV (negative offset) */
 static const size_t dtv_magic_offset = 1;

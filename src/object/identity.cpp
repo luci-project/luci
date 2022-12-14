@@ -13,7 +13,7 @@
 #include "object/dynamic.hpp"
 #include "object/executable.hpp"
 #include "object/relocatable.hpp"
-#include "compatibility/glibc/patch.hpp"
+#include "comp/glibc/patch.hpp"
 
 #include "loader.hpp"
 

@@ -1,4 +1,4 @@
-#include "compatibility/gdb.hpp"
+#include "comp/gdb.hpp"
 
 #include <dlh/assert.hpp>
 #include <dlh/log.hpp>

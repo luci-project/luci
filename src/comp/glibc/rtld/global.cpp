@@ -1,4 +1,4 @@
-#include "compatibility/glibc/rtld/global.hpp"
+#include "comp/glibc/rtld/global.hpp"
 
 #include <dlh/log.hpp>
 #include <dlh/mem.hpp>
@@ -10,9 +10,9 @@
 #include <dlh/mutex_rec.hpp>
 #include <dlh/auxiliary.hpp>
 
-#include "compatibility/glibc/rtld/dl.hpp"
-#include "compatibility/glibc/rtld/dl_tls.hpp"
-#include "compatibility/glibc/rtld/exception.hpp"
+#include "comp/glibc/rtld/dl.hpp"
+#include "comp/glibc/rtld/dl_tls.hpp"
+#include "comp/glibc/rtld/exception.hpp"
 
 /* Setup _rtld_global */
 GLIBC::RTLD::Global rtld_global;

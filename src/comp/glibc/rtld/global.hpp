@@ -7,9 +7,9 @@
 #include <dlh/mutex_rec.hpp>
 
 #include "tls.hpp"
-#include "compatibility/gdb.hpp"
-#include "compatibility/glibc/version.hpp"
-#include "compatibility/glibc/libdl/interface.hpp"
+#include "comp/gdb.hpp"
+#include "comp/glibc/version.hpp"
+#include "comp/glibc/libdl/interface.hpp"
 
 extern "C" void _dl_debug_printf(const char *fmt, ...);
 

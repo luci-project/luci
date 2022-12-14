@@ -5,8 +5,8 @@
 #include <dlh/string.hpp>
 #include <dlh/auxiliary.hpp>
 
-#include "compatibility/glibc/patch.hpp"
-#include "compatibility/glibc/init.hpp"
+#include "comp/glibc/patch.hpp"
+#include "comp/glibc/init.hpp"
 #include "dynamic_resolve.hpp"
 #include "loader.hpp"
 

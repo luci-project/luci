@@ -1,4 +1,4 @@
-#include "compatibility/glibc/libgcc/iterate_phdr.hpp"
+#include "comp/glibc/libgcc/iterate_phdr.hpp"
 
 #include <dlh/log.hpp>
 #include <dlh/macro.hpp>

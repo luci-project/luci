@@ -6,7 +6,7 @@
 #include <dlh/strptr.hpp>
 #include <dlh/stream/buffer.hpp>
 
-#include "compatibility/glibc/libdl/interface.hpp"
+#include "comp/glibc/libdl/interface.hpp"
 #include "object/base.hpp"
 
 struct Loader;

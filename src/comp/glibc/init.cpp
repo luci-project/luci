@@ -1,11 +1,11 @@
-#include "compatibility/glibc/init.hpp"
+#include "comp/glibc/init.hpp"
 
 #include <elfo/elf.hpp>
 #include <dlh/assert.hpp>
 
-#include "compatibility/glibc/version.hpp"
-#include "compatibility/glibc/rtld/global.hpp"
-#include "compatibility/glibc/libdl/interface.hpp"
+#include "comp/glibc/version.hpp"
+#include "comp/glibc/rtld/global.hpp"
+#include "comp/glibc/libdl/interface.hpp"
 
 
 

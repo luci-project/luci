@@ -392,7 +392,7 @@
 
 /* Do some preprocessor *magic*, part 0: select list */
 
-#include "compatibility/glibc/version.hpp"
+#include "comp/glibc/version.hpp"
 
 #if GLIBC_TUNABLE_SIZE > 0
 

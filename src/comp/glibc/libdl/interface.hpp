@@ -3,7 +3,7 @@
 #include <dlh/types.hpp>
 #include <dlh/macro.hpp>
 
-#include "compatibility/glibc/version.hpp"
+#include "comp/glibc/version.hpp"
 
 typedef long int namespace_t;
 const namespace_t NAMESPACE_BASE = 0;

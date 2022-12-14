@@ -1,4 +1,4 @@
-#include "compatibility/glibc/rtld/dl.hpp"
+#include "comp/glibc/rtld/dl.hpp"
 
 #include <dlh/log.hpp>
 #include <dlh/macro.hpp>

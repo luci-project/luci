@@ -3,7 +3,7 @@
 #include <dlh/types.hpp>
 #include <dlh/thread.hpp>
 
-#include "compatibility/glibc/libdl/interface.hpp"
+#include "comp/glibc/libdl/interface.hpp"
 
 struct tls_index {
 	size_t ti_module;

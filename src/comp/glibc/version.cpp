@@ -1,8 +1,8 @@
-#include "compatibility/glibc/version.hpp"
+#include "comp/glibc/version.hpp"
 
 #include <dlh/thread.hpp>
-#include "compatibility/glibc/rtld/global.hpp"
-#include "compatibility/glibc/libdl/interface.hpp"
+#include "comp/glibc/rtld/global.hpp"
+#include "comp/glibc/libdl/interface.hpp"
 
 #ifdef GLIBC_RTLD_GLOBAL_SIZE
 static_assert(sizeof(rtld_global) == GLIBC_RTLD_GLOBAL_SIZE, "Wrong size of rtld_global for " OSNAME " " OSVERSION " (" PLATFORM ")");

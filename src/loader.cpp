@@ -9,10 +9,10 @@
 #include <dlh/file.hpp>
 #include <dlh/log.hpp>
 
-#include "compatibility/glibc/rtld/global.hpp"
-#include "compatibility/glibc/rtld/dl.hpp"
-#include "compatibility/glibc/init.hpp"
-#include "compatibility/gdb.hpp"
+#include "comp/glibc/rtld/global.hpp"
+#include "comp/glibc/rtld/dl.hpp"
+#include "comp/glibc/init.hpp"
+#include "comp/gdb.hpp"
 #include "object/base.hpp"
 #include "process.hpp"
 

@@ -1,9 +1,9 @@
-#include "compatibility/glibc/libdl/interface.hpp"
+#include "comp/glibc/libdl/interface.hpp"
 
 #include <dlh/log.hpp>
 #include <dlh/macro.hpp>
 
-#include "compatibility/gdb.hpp"
+#include "comp/gdb.hpp"
 #include "object/base.hpp"
 #include "loader.hpp"
 
