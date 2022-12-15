@@ -22,6 +22,9 @@ struct Loader {
 		/*! \brief enable dynamic updates of functions using the dl* interface? */
 		bool dynamic_dlupdate = false;
 
+		/*! \brief check all dependencies when comparing of functions*/
+		bool dependency_check = false;
+
 		/*! \brief force dynamic updates even if they seem incompatible */
 		bool force_update = false;
 

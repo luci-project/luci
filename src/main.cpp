@@ -46,6 +46,7 @@ struct Opts {
 	const char * statusinfo{};
 	bool dynamicUpdate{};
 	bool dynamicDlUpdate{};
+	bool dependencyCheck{};
 	bool forceUpdate{};
 	bool dynamicWeak{};
 	bool relocateCheck{};
@@ -143,6 +144,8 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	config_loader.dynamic_update = opts.dynamicUpdate || config_file.value_or_default<bool>("LD_DYNAMIC_UPDATE", false);
 	// Dynamic updates of dl-funcs
 	config_loader.dynamic_dlupdate = config_loader.dynamic_update ? (opts.dynamicDlUpdate || config_file.value_or_default<bool>("LD_DYNAMIC_DLUPDATE", false)) : false;
+	// Dynamic updates of dl-funcs
+	config_loader.dependency_check = config_loader.dynamic_update ? (opts.dependencyCheck || config_file.value_or_default<bool>("LD_DEPENDENCY_CHECK", false)) : false;
 	// Force dynamic updates
 	config_loader.force_update = config_loader.dynamic_update ? (opts.forceUpdate || config_file.value_or_default<bool>("LD_FORCE_UPDATE", false)) : false;
 	// Weak linking
@@ -163,6 +166,9 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			LOG_INFO << "Dynamic updates are enabled!" << endl;
 		} else {
 			LOG_DEBUG << "Dynamic updates are disabled!" << endl;
+		}
+		if (loader->config.dependency_check) {
+			LOG_INFO << "Recursively comparing function dependencies on updates!" << endl;
 		}
 
 		if (loader->config.dynamic_weak) {
@@ -263,18 +269,19 @@ int main(int argc, char* argv[]) {
 				{'f',  "logfile",         "FILE",   &Opts::logfile,          false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
 				{'a',  "logfile-append",  nullptr,  &Opts::logfileAppend,    false, "Append output to log file (instead of truncate). Requires logfile, can also be enabled by setting the environment variable LD_LOGFILE_APPEND to 1" },
 				{'p',  "library-path",    "DIR",    &Opts::libpath,          false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
-				{'c',  "library-conf",    "FILE",   &Opts::libpathconf,      false, "library path configuration" },
+				{'c',  "library-conf",    "FILE",   &Opts::libpathconf,      false, "Library path configuration" },
 				{'C',  "luci-conf",       "FILE",   &Opts::luciconf,         false, "Luci loader configuration file" },
 				{'P',  "preload",         "FILE",   &Opts::preload,          false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
 				{'s',  "statusinfo",      "FILE",   &Opts::statusinfo,       false, "File (named pipe) for logging successful and failed updates (latter would require a restart). Disabled if empty. This option can also be activated by setting the environment variable LD_STATUS_INFO" },
 				{'d',  "debughash",       "SOCKET", &Opts::debughash,        false, "Socket URI (unix / tcp / udp) for retrieving debug data hashes. Disabled if empty. This option can also be activated by setting the environment variable LD_DEBUG_HASH" },
 				{'u',  "update",          nullptr,  &Opts::dynamicUpdate,    false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
 				{'U',  "dlupdate",        nullptr,  &Opts::dynamicDlUpdate,  false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1" },
+				{'D',  "func-dep-check",  nullptr,  &Opts::dependencyCheck,  false, "Check (recursively) all dependencies of each function for patchability -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DEPENDENCY_CHECK to 1" },
 				{'F',  "force",           nullptr,  &Opts::forceUpdate,      false, "Force dynamic update of changed files, even if they seem to be incompatible -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_FORCE_UPDATE to 1" },
 				{'T',  "tracing",         nullptr,  &Opts::tracing,          false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
 				{'r',  "reloc-check",     nullptr,  &Opts::relocateCheck,    false, "Check if contents of relocation targets in data section have been altered during execution by the user. This option can also be enabled by setting the environment variable LD_RELOCATE_CHECK to 1"},
 				{'R',  "reloc-outdated",  nullptr,  &Opts::relocateOutdated, false, "Fix relocations of outdated versions as well. This option can also be enabled by setting the environment variable LD_RELOCATE_OUTDATED to 1"},
-				{'D',  "detect-outdated", nullptr,  &Opts::detectOutdated,   false, "Unmap outdated executable segments and use user space page fault handler to detect code access in old versions. This option can also be enabled by setting the environment variable LD_DETECT_OUTDATED to 1"},
+				{'o',  "detect-outdated", nullptr,  &Opts::detectOutdated,   false, "Unmap outdated executable segments and use user space page fault handler to detect code access in old versions. This option can also be enabled by setting the environment variable LD_DETECT_OUTDATED to 1"},
 				{'w',  "weak",            nullptr,  &Opts::dynamicWeak,      false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
 				{'n',  "bind-now",        nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
 				{'N',  "bind-not",        nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },

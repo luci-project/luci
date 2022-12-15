@@ -325,8 +325,10 @@ bool ObjectDynamic::patchable() const {
 	LOG_INFO << "Checking if " << this->file << " can patch previous version..." << endl;
 
 	// TODO: Check if TLS data size has changed
-	auto diff = binary_hash->diff(*(file.current->binary_hash));
+	auto diff = binary_hash->diff(*(file.current->binary_hash), file.loader.config.dependency_check);
 	LOG_DEBUG << "Found " << diff.size() << " differences in " << this->file << " (compared to the current version)" << endl;
+	uint16_t ignore = Bean::Symbol::Section::SECTION_RELRO | Bean::Symbol::Section::SECTION_EH_FRAME | Bean::Symbol::Section::SECTION_DYNAMIC;
+
 	if (!Bean::patchable(diff)) {
 		LOG_WARNING << "New version of " << this->file << " has non-trivial changes in the data section..." << endl;
 		if (!file.loader.config.force_update)
