@@ -127,9 +127,11 @@ $(BUILDINFO): FORCE
 	'const char * build_$(NAME)_compatibility() { return "$(OS) $(OSVERSION) on $(PLATFORM)"; }' | $(CXX) $(CXXFLAGS) -x c++ -c -o $@ -
 
 $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
+	$(VERBOSE) mkdir -p $(dir $@)
 	$(VERBOSE) ./gen-libpath.sh $< | grep -v "i386\|i486\|i686\|lib32\|libx32" > $@ || true
 
 $(LDLUCI_CONF): example.conf
+	$(VERBOSE) mkdir -p $(dir $@)
 	$(VERBOSE) cp $< $@
 
 clean::

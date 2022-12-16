@@ -37,7 +37,7 @@ test-debian-stretch-gcc:
     - build-luci
     - fetch-artifacts
   before_script:
-    - apt-get update && apt-get install -y gcc g++ make
+    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
   script:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
@@ -51,7 +51,7 @@ test-debian-buster-gcc:
     - build-luci
     - fetch-artifacts
   before_script:
-    - apt-get update && apt-get install -y gcc g++ make
+    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
   script:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
@@ -65,7 +65,7 @@ test-debian-bullseye-gcc:
     - build-luci
     - fetch-artifacts
   before_script:
-    - apt-get update && apt-get install -y gcc g++ make
+    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
   script:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
@@ -79,7 +79,7 @@ test-ubuntu-focal-gcc:
     - build-luci
     - fetch-artifacts
   before_script:
-    - apt-get update && apt-get install -y gcc g++ make
+    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
   script:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
@@ -93,7 +93,7 @@ test-debian-stretch-llvm:
     - build-luci
     - fetch-artifacts
   before_script:
-    - apt-get update && apt-get install -y clang-11 make
+    - apt-get update && apt-get install -y clang-11 make libcap2-bin
     - update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
     - update-alternatives --install /usr/bin/cc cc /usr/bin/clang 110 --slave /usr/bin/c++ c++ /usr/bin/clang++
   script:
@@ -109,7 +109,7 @@ test-debian-buster-llvm:
     - build-luci
     - fetch-artifacts
   before_script:
-    - apt-get update && apt-get install -y clang make
+    - apt-get update && apt-get install -y clang make libcap2-bin
   script:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
@@ -123,7 +123,7 @@ test-debian-bullseye-llvm:
     - build-luci
     - fetch-artifacts
   before_script:
-    - apt-get update && apt-get install -y clang make
+    - apt-get update && apt-get install -y clang make libcap2-bin
   script:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
@@ -137,7 +137,7 @@ test-ubuntu-focal-llvm:
     - build-luci
     - fetch-artifacts
   before_script:
-    - apt-get update && apt-get install -y clang make
+    - apt-get update && apt-get install -y clang make libcap2-bin
   script:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM

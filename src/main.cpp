@@ -180,7 +180,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		if (debughash_uri == nullptr) {
 			debughash_uri = config_file.value("LD_DEBUG_HASH");
 		}
-		if (debughash_uri != nullptr) {
+		if (debughash_uri != nullptr && String::len(debughash_uri) > 0) {
 			if (loader->debug_hash_socket.connect(debughash_uri)) {
 				LOG_DEBUG << "Using URI " << debughash_uri << " for debug (DWARF) hashing" << endl;
 			} else {
