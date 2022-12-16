@@ -251,12 +251,13 @@ bool Loader::prepare() {
 	// Init GLIBC globals
 	GLIBC::RTLD::init_globals(*this);
 
+	// Initialize TLS
+	main_thread = tls.allocate(nullptr, true);
+
 	// Relocate all libraries
 	if (!relocate(false))
 		return false;
 
-	// Initialize TLS
-	main_thread = tls.allocate(nullptr, true);
 	auto random = Auxiliary::vector(Auxiliary::AT_RANDOM);
 	if (random.valid()) {
 		main_thread->setup_guards(random.a_un.a_ptr);
