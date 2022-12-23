@@ -51,7 +51,7 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
 
 	// Add vDSO (if available)
 	if (auto vdso = Auxiliary::vector(Auxiliary::AT_SYSINFO_EHDR)) {
-		if (open("linux-vdso.so.1", static_flags, false, NAMESPACE_BASE, vdso.value()) == nullptr)
+		if (open("linux-vdso.so.1", static_flags, true, NAMESPACE_BASE, vdso.value()) == nullptr)
 			LOG_WARNING << "Unable to load vDSO!" << endl;
 	}
 
