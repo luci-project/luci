@@ -40,7 +40,11 @@ struct ObjectDynamic : public ObjectExecutable {
 	Optional<VersionedSymbol> resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version) const override;
 	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr) const override;
 
-	void* relocate(const Elf::Relocation & reloc, bool fix) const;
+	void* relocate(const Elf::Relocation & reloc, bool fix, bool & fatal) const;
+	void* relocate(const Elf::Relocation & reloc, bool fix) const {
+		bool fatal;
+		return relocate(reloc, fix, fatal);
+	}
 
 	bool initialize() override;
 

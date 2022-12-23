@@ -195,14 +195,15 @@ bool ObjectDynamic::fix() {
 
 bool ObjectDynamic::prepare() {
 	LOG_INFO << "Prepare " << *this << " with " << (void*)global_offset_table << endl;
-	bool success = true;
+	bool error = false;
 
 	// Perform initial relocations
 	for (auto & reloc : dynamic_relocations)
-		relocate(reloc, true);
+		if (relocate(reloc, true, error) == nullptr && error)
+			break;
 
 	// PLT relocations
-	if (global_offset_table != 0) {
+	if (!error && global_offset_table != 0) {
 		auto got = reinterpret_cast<uintptr_t *>(base + global_offset_table);
 		// 3 predefined got entries:
 		// got[0] is pointer to _DYNAMIC
@@ -211,13 +212,15 @@ bool ObjectDynamic::prepare() {
 
 		// Remainder for relocations
 		for (const auto & reloc : dynamic_relocations_plt)
-			if (file.flags.bind_now == 1)
-				relocate(reloc, true);
-			else
+			if (file.flags.bind_now == 1) {
+				if (relocate(reloc, true, error) == nullptr && error)
+					break;
+			} else {
 				Relocator(reloc).increment_value(base, base);
+			}
 	}
 
-	return success;
+	return !error;
 }
 
 bool ObjectDynamic::in_data(const Elf::Relocation & reloc) const {
@@ -240,7 +243,7 @@ bool ObjectDynamic::update() {
 	return true;
 }
 
-void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
+void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fatal) const {
 	// Initialize relocator object
 	Relocator relocator(reloc, this->global_offset_table);
 
@@ -308,7 +311,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix) const {
 			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "..." << endl;
 		} else {
 			LOG_ERROR << "Unable to resolve symbol " << need_symbol << " for relocation..." << file << endl;
-			assert(false);
+			fatal = true;
 		}
 	}
 	return nullptr;
