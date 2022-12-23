@@ -104,14 +104,14 @@ struct Loader {
 	~Loader();
 
 	/*! \brief Search & load libary */
-	ObjectIdentity * library(const char * file, ObjectIdentity::Flags flags, const Vector<const char *> & rpath = {}, const Vector<const char *> & runpath = {}, namespace_t ns = NAMESPACE_BASE, bool load = true);
+	ObjectIdentity * library(const char * file, ObjectIdentity::Flags flags, bool priority = false, const Vector<const char *> & rpath = {}, const Vector<const char *> & runpath = {}, namespace_t ns = NAMESPACE_BASE, bool load = true);
 	inline ObjectIdentity * library(const char * file) {
 		return library(file, default_flags);
 	}
 
 	/*! \brief Load file */
-	ObjectIdentity * open(const char * filename, const char * directory, ObjectIdentity::Flags flags, namespace_t ns = NAMESPACE_BASE);
-	ObjectIdentity * open(const char * path, ObjectIdentity::Flags flags, namespace_t ns = NAMESPACE_BASE, uintptr_t addr = 0, Elf::ehdr_type type = Elf::ET_NONE);
+	ObjectIdentity * open(const char * filename, const char * directory, ObjectIdentity::Flags flags, bool priority = false, namespace_t ns = NAMESPACE_BASE);
+	ObjectIdentity * open(const char * path, ObjectIdentity::Flags flags, bool priority = false, namespace_t ns = NAMESPACE_BASE, uintptr_t addr = 0, Elf::ehdr_type type = Elf::ET_NONE);
 	inline ObjectIdentity * open(const char * path) {
 		return open(path, default_flags);
 	}
@@ -161,6 +161,9 @@ struct Loader {
  private:
 	friend void* kickoff_filemodification_handler(void * ptr);
 	friend void* kickoff_userfault_handler(void * ptr);
+
+	/*! \brief Iterator to first pure dependency library in lookup list */
+	ObjectIdentityList::Iterator dependencies;
 
 	/*! \brief Next Namespace */
 	mutable namespace_t next_namespace;

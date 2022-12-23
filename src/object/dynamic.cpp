@@ -172,7 +172,7 @@ bool ObjectDynamic::preload_libraries() {
 				skip = true;
 			}
 		if (!skip) {
-			auto o = file.loader.library(lib, flags, this->rpath, this->runpath, file.ns);
+			auto o = file.loader.library(lib, flags, false, this->rpath, this->runpath, file.ns);
 			if (o == nullptr) {
 				LOG_WARNING << "Unresolved dependency: " << lib << endl;
 				success = false;

@@ -107,7 +107,7 @@ static void vector_append_unique(Vector<const char *> &dest, Vector<const char *
 
 
 // Setup commands
-static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts & opts) {
+static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts & opts, Vector<const char *> & preload) {
 	// Use config from environment vars and files
 	Parser::Config config_file(opts.luciconf, Parser::Config::ENV_CONFIG, true);
 
@@ -241,16 +241,13 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		}
 
 		// Preload Library
-		for (auto & preload : opts.preload) {
-			LOG_DEBUG << "Loading '" << preload << "' (from --preload)..." << endl;
-			loader->library(preload);
-		}
+		for (auto & lib: opts.preload)
+			preload.push_back(lib);
 
-		char * preload = const_cast<char*>(config_file.value("LD_PRELOAD"));
-		if (preload != nullptr && *preload != '\0') {
-			LOG_DEBUG << "Loading '" << preload << "' (from LD_PRELOAD)..." << endl;
-			for (auto & lib : String::split_inplace(preload, ';'))
-				loader->library(lib);
+		char * preload_libs = const_cast<char*>(config_file.value("LD_PRELOAD"));
+		if (preload_libs != nullptr && *preload_libs != '\0') {
+			for (auto & lib : String::split_inplace(preload_libs, ';'))
+				preload.push_back(lib);
 		}
 	}
 
@@ -263,6 +260,7 @@ int main(int argc, char* argv[]) {
 
 	assert(Auxiliary::vector(Auxiliary::AT_PHENT).value() == sizeof(Elf::Phdr));
 	uintptr_t base = base_from_phdr(Auxiliary::vector(Auxiliary::AT_PHDR).pointer(), Auxiliary::vector(Auxiliary::AT_PHNUM).value());
+	Vector<const char *> preload;
 
 	// Luci explicitly started from command line?
 	if (base == BASEADDRESS) {
@@ -311,7 +309,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		// Setup
-		Loader * loader = setup(base, argv[0], args);
+		Loader * loader = setup(base, argv[0], args, preload);
 
 		// Binary Arguments
 		if (args.has_positional()) {
@@ -320,7 +318,7 @@ int main(int argc, char* argv[]) {
 			for (auto & bin : args.get_positional()) {
 				auto flags = loader->default_flags;
 				flags.updatable = 0;
-				ObjectIdentity * o = loader->open(bin, flags);
+				ObjectIdentity * o = loader->open(bin, flags, true);
 				if (o == nullptr) {
 					LOG_ERROR << "Failed loading " << bin << endl;
 					return EXIT_FAILURE;
@@ -331,6 +329,15 @@ int main(int argc, char* argv[]) {
 			}
 
 			assert(start != nullptr);
+
+			for (auto & lib: preload) {
+				LOG_INFO << "Preloading " << lib << endl;
+				loader->library(lib, loader->default_flags, true);
+			}
+
+			LOG_DEBUG << "Library search order:" << endl;
+			for (auto & obj: loader->lookup)
+				LOG_DEBUG_APPEND << " - " << obj << endl;
 
 			start_args += args.get_terminal();
 			if (!loader->run(start, start_args)) {
@@ -347,18 +354,27 @@ int main(int argc, char* argv[]) {
 
 		// Setup interpreter (luci)
 		uintptr_t luci_base = Auxiliary::vector(Auxiliary::AT_BASE).value();
-		Loader * loader = setup(luci_base == 0 ? BASEADDRESS : luci_base, nullptr, opts);
+		Loader * loader = setup(luci_base == 0 ? BASEADDRESS : luci_base, nullptr, opts, preload);
 
 		// Load target binary
 		const char * bin = reinterpret_cast<const char *>(Auxiliary::vector(Auxiliary::AT_EXECFN).pointer());
 		auto flags = loader->default_flags;
 		flags.updatable = 0;
 		flags.premapped = 1;
-		ObjectIdentity * start = loader->open(bin, flags, NAMESPACE_BASE, base);
+		ObjectIdentity * start = loader->open(bin, flags, true, NAMESPACE_BASE, base);
 		if (start == nullptr) {
 			LOG_ERROR << "Failed loading " << bin << endl;
 			return EXIT_FAILURE;
 		}
+
+		for (auto & lib: preload) {
+			LOG_INFO << "Preloading " << lib << endl;
+			loader->library(lib, loader->default_flags, true);
+		}
+
+		LOG_DEBUG << "Library search order:" << endl;
+		for (auto & obj: loader->lookup)
+			LOG_DEBUG_APPEND << " - " << obj << endl;
 
 		// Use initial luci stack (contents are the same anyways)
 		extern uintptr_t __dlh_stack_pointer;

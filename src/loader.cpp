@@ -31,7 +31,7 @@ void* kickoff_userfault_handler(void * ptr) {
 
 
 Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
- : config(config) {
+ : config(config), dependencies(lookup.end()) {
 	default_flags.bind_global = 1;
 
 	if (config.dynamic_update) {
@@ -51,13 +51,13 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
 
 	// Add vDSO (if available)
 	if (auto vdso = Auxiliary::vector(Auxiliary::AT_SYSINFO_EHDR)) {
-		if (open("linux-vdso.so.1", static_flags, NAMESPACE_BASE, vdso.value()) == nullptr)
+		if (open("linux-vdso.so.1", static_flags, false, NAMESPACE_BASE, vdso.value()) == nullptr)
 			LOG_WARNING << "Unable to load vDSO!" << endl;
 	}
 
 	// add self as dynamic exec
 	assert(luci_self != 0);
-	if ((self = open(sopath, static_flags, NAMESPACE_BASE, luci_self)) == nullptr) {
+	if ((self = open(sopath, static_flags, true, NAMESPACE_BASE, luci_self)) == nullptr) {
 		LOG_ERROR << "Unable to load Luci (" << sopath << ")..." << endl;
 		assert(false);
 	}
@@ -104,7 +104,7 @@ Loader::~Loader() {
 }
 
 
-ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags flags, const Vector<const char *> & rpath, const Vector<const char *> & runpath, namespace_t ns, bool load) {
+ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags flags, bool priority, const Vector<const char *> & rpath, const Vector<const char *> & runpath, namespace_t ns, bool load) {
 	assert(filename != nullptr);
 	StrPtr path(filename);
 	auto name = path.find_last('/');
@@ -119,12 +119,12 @@ ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags fl
 		if (path == name) {
 			for (const auto & path : { rpath, library_path_runtime, runpath, library_path_config, library_path_default }) {
 				for (auto & dir : path)
-					if ((lib = open(filename, dir, flags, ns)) != nullptr)
+					if ((lib = open(filename, dir, flags, priority, ns)) != nullptr)
 						return lib;
 			}
 		} else {
 			// Full path
-			if ((lib = open(filename, flags, ns)) != 0)
+			if ((lib = open(filename, flags, priority, ns)) != 0)
 				return lib;
 		}
 
@@ -134,7 +134,7 @@ ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags fl
 }
 
 
-ObjectIdentity * Loader::open(const char * filename, const char * directory, ObjectIdentity::Flags flags, namespace_t ns) {
+ObjectIdentity * Loader::open(const char * filename, const char * directory, ObjectIdentity::Flags flags, bool priority, namespace_t ns) {
 	auto filename_len = String::len(filename);
 	auto directory_len = String::len(directory);
 	char path[directory_len + filename_len + 2];
@@ -142,11 +142,11 @@ ObjectIdentity * Loader::open(const char * filename, const char * directory, Obj
 	path[directory_len] = '/';
 	String::copy(path + directory_len + 1, filename, filename_len + 1);
 
-	return open(path, flags, ns);
+	return open(path, flags, priority, ns);
 }
 
 
-ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags, namespace_t ns, uintptr_t addr, Elf::ehdr_type type) {
+ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags, bool priority, namespace_t ns, uintptr_t addr, Elf::ehdr_type type) {
 	// Does file contain a valid full path or do we have a memory address?
 	if (addr != 0 || File::exists(filepath)) {
 		if (ns == NAMESPACE_NEW)
@@ -158,9 +158,11 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 		LOG_DEBUG_APPEND << "..." << endl;
 
 		GDB::notify(GDB::RT_ADD);
-		auto i = lookup.emplace_back(*this, flags, filepath, ns, nullptr);
+		auto i = lookup.emplace(priority ? dependencies : lookup.end(), *this, flags, filepath, ns, nullptr);
 		assert(i);
 
+		if (!priority && dependencies == lookup.end())
+			dependencies = i;
 		auto o = i->load(addr, type);
 		GDB::notify(GDB::RT_CONSISTENT);
 		if (o != nullptr) {
@@ -175,7 +177,7 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 
 
 ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, namespace_t ns, bool load) {
-	ObjectIdentity * o = file == nullptr ? target : library(file, flags, {}, {}, ns, load);
+	ObjectIdentity * o = file == nullptr ? target : library(file, flags, false, {}, {}, ns, load);
 	if (o != nullptr) {
 		// Update flags
 		o->flags.bind_now = flags.bind_now;  // TODO: if change to true, resolve all relocations
