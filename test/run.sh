@@ -10,6 +10,7 @@ STOP_ON_ERROR=false
 LD_SYSTEM=false
 LD_LOGLEVEL=3
 LD_DYNAMIC_UPDATE=0
+LD_RELAX_CHECK=0
 LD_PRELOAD=""
 LD_DEBUG_HASH=""
 EXEC="run"
@@ -17,7 +18,7 @@ TIMEOUT=120
 TIMEOUT_KILLDELAY=1
 
 # Options
-while getopts "c:d:hl:or:st:uR" OPT; do
+while getopts "c:d:hi:l:or:st:uR" OPT; do
 	case "${OPT}" in
 		c)
 			COMPILER=${OPTARG}
@@ -33,6 +34,9 @@ while getopts "c:d:hl:or:st:uR" OPT; do
 			;;
 		d)
 			LD_DEBUG_HASH=${OPTARG}
+			;;
+		i)
+			LD_RELAX_CHECK=${OPTARG}
 			;;
 		s)
 			STOP_ON_ERROR=true
@@ -55,6 +59,7 @@ while getopts "c:d:hl:or:st:uR" OPT; do
 			echo "	-r PATH      (Short) Path for RTLD (default: $LD_PATH_SHORT)" >&2
 			echo "	-t SECONDS   set maximum run time per test case (default: $TIMEOUT)" >&2
 			echo "	-d SOCKET    Socket for debug hash (elfvarsd)" >&2
+			echo "	-i MODE      Relax patchabilitiy check requirements" >&2
 			echo "	-s           Stop on (first) Error" >&2
 			echo "	-o           Debug: Print output" >&2
 			echo "	-h           Show this help" >&2
@@ -270,6 +275,7 @@ for TEST in ${TESTS} ; do
 		export LD_DYNAMIC_UPDATE
 		export LD_DETECT_OUTDATED
 		export LD_DEBUG_HASH
+		export LD_RELAX_CHECK
 		export LD_RELOCATE_OUTDATED=1
 		export LD_STATUS_INFO=$STATUS
 		export LD_LIBRARY_PATH=$(readlink -f "${TEST}")

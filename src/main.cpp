@@ -35,15 +35,16 @@
 // Parse Arguments
 struct Opts {
 	int loglevel{Log::WARNING};
-	bool logtimeAbs{};
+	int relaxPatchCheck{0};
 	const char * logfile{};
-	bool logfileAppend{};
 	Vector<const char *> libpath{};
 	const char * libpathconf{ STR(LIBPATH_CONF) };
 	const char * luciconf{ STR(LDLUCI_CONF) };
 	Vector<const char *> preload{};
 	const char * debughash{};
 	const char * statusinfo{};
+	bool logtimeAbs{};
+	bool logfileAppend{};
 	bool dynamicUpdate{};
 	bool dynamicDlUpdate{};
 	bool dependencyCheck{};
@@ -156,7 +157,11 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	config_loader.update_outdated_relocations = config_loader.dynamic_update ? (opts.relocateOutdated || config_file.value_or_default<bool>("LD_RELOCATE_OUTDATED", false)) : false;
 	// Detect access of outdated varsions
 	config_loader.detect_outdated_access = config_loader.dynamic_update ? (opts.detectOutdated || config_file.value_or_default<bool>("LD_DETECT_OUTDATED", false)) : false;
+	// Set comparison mode for patchability checks
+	config_loader.relax_comparison = Math::max(config_loader.relax_comparison, config_file.value_or_default<int>("LD_RELAX_CHECK",0));
 
+	if (config_loader.relax_comparison > 0)
+		LOG_DEBUG << "Relaxing comparison of patchability to mode " << config_loader.relax_comparison << endl;
 
 	Loader * loader = new Loader(luci_base,	luci_path, config_loader);
 	if (loader == nullptr) {
@@ -277,6 +282,7 @@ int main(int argc, char* argv[]) {
 				{'u',  "update",          nullptr,  &Opts::dynamicUpdate,    false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
 				{'U',  "dlupdate",        nullptr,  &Opts::dynamicDlUpdate,  false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1" },
 				{'D',  "func-dep-check",  nullptr,  &Opts::dependencyCheck,  false, "Check (recursively) all dependencies of each function for patchability -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DEPENDENCY_CHECK to 1" },
+				{'i',  "relax-check",     "MODE",   &Opts::relaxPatchCheck,  false, "Relax binary comparison check (0 will use an extended ID check [default], 1 will releax check for writeable sections, 2 for all sections except executable, 3 will only use internal ID for comparisonSet log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_RELAX_CHECK." },
 				{'F',  "force",           nullptr,  &Opts::forceUpdate,      false, "Force dynamic update of changed files, even if they seem to be incompatible -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_FORCE_UPDATE to 1" },
 				{'T',  "tracing",         nullptr,  &Opts::tracing,          false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
 				{'r',  "reloc-check",     nullptr,  &Opts::relocateCheck,    false, "Check if contents of relocation targets in data section have been altered during execution by the user. This option can also be enabled by setting the environment variable LD_RELOCATE_CHECK to 1"},

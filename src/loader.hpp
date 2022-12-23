@@ -40,6 +40,9 @@ struct Loader {
 		/*! \brief detect execution of outdated files?*/
 		bool detect_outdated_access = false;
 
+		/*! \brief set comparison mode to relax patchability checks */
+		int relax_comparison = 0;
+
 		/* Default constructor */
 		Config() {}
 	} config;
