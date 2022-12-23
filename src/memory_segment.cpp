@@ -142,9 +142,10 @@ bool MemorySegment::disable() {
 				// register Userfault
 				uffdio_register reg(target.page_start(), target.page_size(), UFFDIO_REGISTER_MODE_MISSING);
 				if (auto ioctl = Syscall::ioctl(identity.loader.userfaultfd, UFFDIO_REGISTER, &reg)) {
+					LOG_DEBUG << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) disabled!" << endl;
 					return true;
 				} else {
-				LOG_ERROR << "Registering " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) for userfault failed!" << endl;
+					LOG_ERROR << "Registering " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) for userfault failed!" << endl;
 					return false;
 				}
 			}
