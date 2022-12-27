@@ -4,6 +4,7 @@
 #include <dlh/container/vector.hpp>
 #include <dlh/container/tree.hpp>
 #include <dlh/container/list.hpp>
+#include <dlh/container/pair.hpp>
 #include <dlh/socket_client.hpp>
 #include <dlh/rwlock.hpp>
 #include <dlh/mutex.hpp>
@@ -37,8 +38,8 @@ struct Loader {
 		/*! \brief update relocations in outdated (old) versions as well? */
 		bool update_outdated_relocations = false;
 
-		/*! \brief detect execution of outdated files?*/
-		bool detect_outdated_access = false;
+		/*! \brief detect execution of outdated files? (value is delay in seconds after update) */
+		int detect_outdated_access = -1;
 
 		/*! \brief set comparison mode to relax patchability checks */
 		int relax_comparison = 0;
@@ -159,8 +160,7 @@ struct Loader {
 	bool start_handler_threads();
 
  private:
-	friend void* kickoff_filemodification_handler(void * ptr);
-	friend void* kickoff_userfault_handler(void * ptr);
+	friend void* kickoff_helper_loop(void * ptr);
 
 	/*! \brief Iterator to first pure dependency library in lookup list */
 	ObjectIdentityList::Iterator dependencies;
@@ -171,11 +171,20 @@ struct Loader {
 	/*! \brief Main thread (for TLS) */
 	Thread * main_thread = nullptr;
 
-	/*! \brief file modification handler (executed in thread) */
-	void filemodification_handler();
+	/*! \brief helper loop for file modification detection and userfault handling (executed in new thread) */
+	void helper_loop();
 
-	/*! \brief userfault handler (executed in thread) */
-	void userfault_handler();
+	/*! \brief File modification detection (called in helper loop) */
+	void filemodification_detect(unsigned long now, TreeSet<Pair<unsigned long, ObjectIdentity*>> & worklist_load);
+
+	/*! \brief Delayed object loading after file modifiaction (called in helper loop) */
+	void filemodification_load(unsigned long now, TreeSet<Pair<unsigned long, ObjectIdentity*>> & worklist_load, TreeSet<Pair<unsigned long, Object*>> & worklist_protect);
+
+	/*! \brief Delayed object protection after file modifiaction (called in helper loop) */
+	void filemodification_protect(unsigned long now, TreeSet<Pair<unsigned long, Object*>> & worklist_protect);
+
+	/*! \brief userfault handler (called in helper loop) */
+	void userfault_handle();
 
 	/*! \brief relocate all loaded files for execution */
 	bool relocate(bool update = false);

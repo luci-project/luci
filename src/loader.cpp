@@ -19,16 +19,10 @@
 
 static Loader * _instance = nullptr;
 
-void* kickoff_filemodification_handler(void * ptr) {
-	reinterpret_cast<Loader *>(ptr)->filemodification_handler();
+void* kickoff_helper_loop(void * ptr) {
+	reinterpret_cast<Loader *>(ptr)->helper_loop();
 	return nullptr;
 }
-
-void* kickoff_userfault_handler(void * ptr) {
-	reinterpret_cast<Loader *>(ptr)->userfault_handler();
-	return nullptr;
-}
-
 
 Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
  : config(config), dependencies(lookup.end()) {
@@ -493,13 +487,34 @@ bool Loader::start_handler_threads() {
 		Syscall::close(filemodification_inotifyfd);
 		filemodification_inotifyfd = -1;
 	}
+	if (userfaultfd != -1) {
+		Syscall::close(userfaultfd);
+		userfaultfd = -1;
+	}
 	if (config.dynamic_update) {
-		if (auto inotify = Syscall::inotify_init(IN_CLOEXEC)) {
+		if (config.detect_outdated_access >= 0) {
+			if (auto userfault = Syscall::userfaultfd(O_CLOEXEC | O_NONBLOCK)) {
+				userfaultfd = userfault.value();
+				uffdio_api api;
+				auto ioctl = Syscall::ioctl(userfaultfd, UFFDIO_API, &api);
+				if (ioctl.failed()) {
+					LOG_ERROR << "Enabling userfault failed: " << ioctl.error_message() << endl;
+					success = false;
+				}
+			} else {
+				LOG_ERROR << "Initializing userfaultfd failed: " << userfault.error_message() << endl;
+				success = false;
+			}
+		} else {
+			LOG_WARNING << "There is no detection of outdated executable sections" << endl;
+		}
+
+		if (auto inotify = Syscall::inotify_init(IN_CLOEXEC | IN_NONBLOCK)) {
 			filemodification_inotifyfd = inotify.value();
 			for (auto & object_file : lookup)
 				object_file.watch(true, false);
 
-			if (Thread::create(&kickoff_filemodification_handler, this, true) == nullptr) {
+			if (Thread::create(&kickoff_helper_loop, this, true) == nullptr) {
 				LOG_ERROR << "Creating file modification handler thread failed" << endl;
 				success = false;
 			} else {
@@ -513,32 +528,5 @@ bool Loader::start_handler_threads() {
 		LOG_WARNING << "Not starting file modification handler thread since there are no dynamic updates" << endl;
 	}
 
-	if (userfaultfd != -1) {
-		Syscall::close(userfaultfd);
-		userfaultfd = -1;
-	}
-	if (config.detect_outdated_access) {
-		if (auto userfault = Syscall::userfaultfd(O_CLOEXEC)) {
-			userfaultfd = userfault.value();
-			uffdio_api api;
-			if (auto ioctl = Syscall::ioctl(userfaultfd, UFFDIO_API, &api)) {
-				if (Thread::create(&kickoff_userfault_handler, this, true) == nullptr) {
-					LOG_ERROR << "Creating userfault handler thread failed" << endl;
-					success = false;
-				} else {
-					LOG_INFO << "Created userfault handler thread" << endl;
-				}
-
-			} else {
-				LOG_ERROR << "Enabling userfault failed: " << ioctl.error_message() << endl;
-				success = false;
-			}
-		} else {
-			LOG_ERROR << "Initializing userfaultfd failed: " << userfault.error_message() << endl;
-			success = false;
-		}
-	} else {
-		LOG_WARNING << "Not starting userfault handler thread since there is no detection of outdated executable sections" << endl;
-	}
 	return success;
 }

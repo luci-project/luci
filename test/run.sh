@@ -322,7 +322,7 @@ for TEST in ${TESTS} ; do
 		fi
 
 		# Compare stdout + stderr with example
-		if ! ( check "${TEST}/.stdout" < "$STDOUT" && check "${TEST}/.stderr" < "$STDERR" && check "${TEST}/.status" < <(sed -e "s/) for .*$/)/" "$STATUS")  ) ; then
+		if ! ( check "${TEST}/.stdout" < "$STDOUT" && check "${TEST}/.stderr" < "$STDERR" && check "${TEST}/.status" < <(test -f "$STATUS" && sed -e "s/) for .*$/)/" "$STATUS" || true)  ) ; then
 			echo -e "\e[31mUnexpected output content of ${EXEC} (${TEST}) -- runtime ${SECONDS}s\e[0m" >&2
 			if ${STOP_ON_ERROR} ; then
 				exit ${EXITCODE}
