@@ -110,7 +110,7 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 		}
 
 		// Check if already loaded (using modification time)
-		if (!flags.ignore_mtime)
+		if (loader.config.use_mtime && !flags.ignore_mtime)
 			for (Object * obj = current; obj != nullptr; obj = obj->file_previous)
 				if (obj->data.modification_time.tv_sec == data.modification_time.tv_sec && obj->data.modification_time.tv_nsec == data.modification_time.tv_nsec && obj->data.size == data.size) {
 					LOG_INFO << "Already loaded " << *this << " with same modification time -- abort loading..." << endl;

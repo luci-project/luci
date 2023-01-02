@@ -49,6 +49,7 @@ struct Opts {
 	bool dynamicUpdate{};
 	bool dynamicDlUpdate{};
 	bool dependencyCheck{};
+	bool modificationTime{};
 	bool forceUpdate{};
 	bool dynamicWeak{};
 	bool relocateCheck{};
@@ -149,6 +150,8 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	config_loader.dependency_check = config_loader.dynamic_update ? (opts.dependencyCheck || config_file.value_or_default<bool>("LD_DEPENDENCY_CHECK", false)) : false;
 	// Force dynamic updates
 	config_loader.force_update = config_loader.dynamic_update ? (opts.forceUpdate || config_file.value_or_default<bool>("LD_FORCE_UPDATE", false)) : false;
+	// Use modification time to detect changes
+	config_loader.use_mtime = opts.modificationTime || config_file.value_or_default<bool>("LD_USE_MTIME", false);
 	// Weak linking
 	config_loader.dynamic_weak = opts.dynamicWeak ||  config_file.value_or_default<bool>("LD_DYNAMIC_WEAK", false);
 	// Check relocation targets for modifications before updating
@@ -246,6 +249,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 
 		char * preload_libs = const_cast<char*>(config_file.value("LD_PRELOAD"));
 		if (preload_libs != nullptr && *preload_libs != '\0') {
+			// TODO: Split by ';' and ':'
 			for (auto & lib : String::split_inplace(preload_libs, ';'))
 				preload.push_back(lib);
 		}
@@ -286,6 +290,7 @@ int main(int argc, char* argv[]) {
 				{'r',  "reloc-check",     nullptr,  &Opts::relocateCheck,    false, "Check if contents of relocation targets in data section have been altered during execution by the user. This option can also be enabled by setting the environment variable LD_RELOCATE_CHECK to 1"},
 				{'R',  "reloc-outdated",  nullptr,  &Opts::relocateOutdated, false, "Fix relocations of outdated versions as well. This option can also be enabled by setting the environment variable LD_RELOCATE_OUTDATED to 1"},
 				{'o',  "detect-outdated", "DELAY",  &Opts::detectOutdated,   false, "Unmap outdated executable segments and use user space page fault handler to detect code access in old versions after DELAY seconds -- negative value to disable (default). This option can also be enabled by setting the delay in environment variable LD_DETECT_OUTDATED."},
+				{'m',  "mtime",           nullptr,  &Opts::modificationTime, false, "Consider modification time when detecting changed libraries. This option can also be enabled by setting the delay in environment variable LD_USE_MITME."},
 				{'w',  "weak",            nullptr,  &Opts::dynamicWeak,      false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
 				{'n',  "bind-now",        nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
 				{'N',  "bind-not",        nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },

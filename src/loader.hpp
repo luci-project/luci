@@ -32,6 +32,9 @@ struct Loader {
 		/*! \brief support dynamic weak definitions? */
 		bool dynamic_weak = false;
 
+		/*! \brief use modification time to detect changes? */
+		bool use_mtime = false;
+
 		/*! \brief check if content of relocation target in data section has been altered by the user */
 		bool check_relocation_content = false;
 
