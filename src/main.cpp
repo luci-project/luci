@@ -186,14 +186,8 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			config_loader.detect_outdated = Loader::Config::DETECT_OUTDATED_VIA_UPROBES;
 			LOG_ERROR << "Invalid mode '" << opts.detectOutdated << "' for uprobe to detect outdated -- will use default uprobe" << endl;
 		}
-
-		if (!File::exists("/sys/kernel/debug/tracing/events/uprobes/enable")) {
-			LOG_ERROR << "Uprobes not available" << endl;
-		} else {
-			File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "1");
-			File::contents::set("/sys/kernel/debug/tracing/tracing_on", "1");
-			LOG_INFO << "Started uprobe tracing" << endl;
-		}
+		if (File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "0"))
+			File::contents::set("/sys/kernel/debug/tracing/uprobe_events", nullptr);
 	} else {
 		LOG_ERROR << "Yet unsupported mode to detect outdated: " << opts.detectOutdated << endl;
 	}

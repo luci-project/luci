@@ -184,7 +184,8 @@ bool Object::disable() const {
 				return false;
 			}
 
-			if (auto fd = Syscall::open("/sys/kernel/debug/tracing/uprobe_events", O_APPEND)) {
+			//File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "0");
+			if (auto fd = Syscall::open("/sys/kernel/debug/tracing/uprobe_events", O_WRONLY | O_APPEND)) {
 				OutputStream<1024> uprobe_events(fd.value());
 				char name[65];
 				BufferStream name_stream(name, 65);
@@ -209,12 +210,18 @@ bool Object::disable() const {
 
 						// write to uprove
 						uprobe_events << "p:" << name << ' ' << path << ":0x" << hex << d.address << endl;
+						uprobe_events.flush();
 						uprobes++;
 						LOG_DEBUG << "adding uprobe 'p:" << name << ' ' << path << ":0x" << hex << d.address << '\'' << endl;
 					}
 				}
-				LOG_INFO << "Installed " << uprobes << " uprobes for " << *this << endl;
+
 				Syscall::close(fd.value());
+				if (uprobes > 0) {
+					File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "1");
+					File::contents::set("/sys/kernel/debug/tracing/tracing_on", "1");
+					LOG_INFO << "Installed " << uprobes << " uprobes for " << *this << endl;
+				}
 				return true;
 			} else {
 				LOG_ERROR << "Opening file " << path << " failed: " << fd.error_message() << endl;
