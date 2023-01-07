@@ -42,7 +42,16 @@ struct Loader {
 		bool update_outdated_relocations = false;
 
 		/*! \brief detect execution of outdated files? (value is delay in seconds after update) */
-		int detect_outdated_access = -1;
+		enum {
+			DETECT_OUTDATED_DISABLED,
+			DETECT_OUTDATED_VIA_USERFAULTFD,
+			DETECT_OUTDATED_VIA_UPROBES,
+			DETECT_OUTDATED_WITH_DEPS_VIA_UPROBES,
+			DETECT_OUTDATED_VIA_PTRACE
+		} detect_outdated = DETECT_OUTDATED_DISABLED;
+
+		/*! \brief delay (in seconds) after an update before enabling detection of access of outdated libs */
+		unsigned detect_outdated_delay = 1;
 
 		/*! \brief set comparison mode to relax patchability checks */
 		int relax_comparison = 0;

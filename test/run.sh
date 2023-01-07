@@ -161,18 +161,17 @@ else
 fi
 
 # Check userfaultfd permission
-LD_DETECT_OUTDATED=0
+USERFAULTFD="nouserfaultfd"
+LD_DETECT_OUTDATED=disabled
+LD_DETECT_OUTDATED_DELAY=1
 if [ -f /proc/sys/vm/unprivileged_userfaultfd ] ; then
 	if getcap "$(readlink -f "${LD_PATH}")" | grep -i "cap_sys_ptrace=eip" ; then
-		LD_DETECT_OUTDATED=1
-	else
-		LD_DETECT_OUTDATED=$(cat /proc/sys/vm/unprivileged_userfaultfd)
+		LD_DETECT_OUTDATED=userfaultfd
+		USERFAULTFD="userfaultfd"
+	elif [[ $(cat /proc/sys/vm/unprivileged_userfaultfd) -eq 1 ]] ; then
+		LD_DETECT_OUTDATED=userfaultfd
+		USERFAULTFD="userfaultfd"
 	fi
-fi
-if [[ ${LD_DETECT_OUTDATED} -eq 0 ]] ; then
-	USERFAULTFD="nouserfaultfd"
-else
-	USERFAULTFD="userfaultfd"
 fi
 
 # generate config

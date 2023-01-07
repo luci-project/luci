@@ -10,5 +10,7 @@ int main() {
 		foo_ptr(i);
 		bar_ptr(i);
 		baz(i);
+		boring(i);
 	}
+	sleep(3);
 }

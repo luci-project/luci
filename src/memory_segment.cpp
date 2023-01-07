@@ -127,7 +127,7 @@ bool MemorySegment::disable() {
 			}
 
 			auto & identity = source.object.file;
-			if (identity.loader.config.detect_outdated_access) {
+			if (identity.loader.config.detect_outdated == Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD) {
 				// TODO: This code is racy
 
 				// create private anonymous mapping
@@ -164,7 +164,7 @@ bool MemorySegment::unmap() {
 		return false;
 	} else {
 		auto & identity = source.object.file;
-		if (target.status != MEMSEG_MAPPED && identity.loader.config.detect_outdated_access) {
+		if (target.status != MEMSEG_MAPPED && identity.loader.config.detect_outdated == Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD) {
 			uffdio_range range(target.page_start(), target.page_size());
 			Syscall::ioctl(identity.loader.userfaultfd, UFFDIO_UNREGISTER, &range);
 		}

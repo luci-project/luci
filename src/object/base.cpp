@@ -3,6 +3,7 @@
 #include <dlh/syscall.hpp>
 #include <dlh/auxiliary.hpp>
 #include <dlh/utility.hpp>
+#include <dlh/file.hpp>
 #include <dlh/log.hpp>
 
 #include "object/identity.hpp"
@@ -147,11 +148,88 @@ bool Object::unprotect() const {
 }
 
 bool Object::disable() const {
-	bool success = true;
-	for (auto & seg : memory_map)
-		if ((seg.target.protection & PROT_EXEC) != 0)
-			success &= seg.disable();
-	return success;
+	switch (file.loader.config.detect_outdated) {
+		case Loader::Config::DETECT_OUTDATED_DISABLED:
+			return false;
+
+		case Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD:
+		{
+			bool success = true;
+			for (auto & seg : memory_map)
+				if ((seg.target.protection & PROT_EXEC) != 0)
+					success &= seg.disable();
+			return success;
+		}
+
+		case Loader::Config::DETECT_OUTDATED_VIA_UPROBES:
+		case Loader::Config::DETECT_OUTDATED_WITH_DEPS_VIA_UPROBES:
+		{
+			if (!file.current->binary_hash) {
+				LOG_WARNING << *(file.current) << " has no binary hash, hence no uprobe detection possible!" << endl;
+				return false;
+			} else if (!this->binary_hash) {
+				LOG_WARNING << *this << " has no binary hash, hence no uprobe detection possible!" << endl;
+				return false;
+			} else if (data.fd < 0) {
+				LOG_WARNING << *this << " is not loaded from a file!" << endl;
+				return false;
+			}
+
+			// TODO: fix this assumption
+			assert(file.current->file_previous == this);
+
+			char path[PATH_MAX + 1];
+			if (!File::absolute(data.fd, path, PATH_MAX)) {
+				LOG_WARNING << "Unable to get absolute path of file for " << *this << "!" << endl;
+				return false;
+			}
+
+			if (auto fd = Syscall::open("/sys/kernel/debug/tracing/uprobe_events", O_APPEND)) {
+				OutputStream<1024> uprobe_events(fd.value());
+				char name[65];
+				BufferStream name_stream(name, 65);
+				const auto diff = binary_hash->diff(*(file.current->binary_hash), file.loader.config.detect_outdated == Loader::Config::DETECT_OUTDATED_WITH_DEPS_VIA_UPROBES, static_cast<Bean::ComparisonMode>(file.loader.config.relax_comparison));
+				size_t uprobes = 0;
+				for (const auto & d : diff) {
+					if (d.section.executable) {
+						name_stream.clear();
+						// set name
+						name_stream << file.name << "_v" << dec << version() << '_';
+						if (d.name != nullptr)
+							name_stream << d.name;
+						else
+							name_stream << "0x" << hex << d.address;
+						name_stream.str();
+						// sanitize name
+						for (size_t i = 0; i < 65 ; i++)
+							if (name[i] == '\0')
+								break;
+							else if ((name[i] < 'a' || name[i] > 'z') && (name[i] < 'A' || name[i] > 'Z') && (name[i] < '0' || name[i] > '9'))
+								name[i] = '_';
+
+						// write to uprove
+						uprobe_events << "p:" << name << ' ' << path << ":0x" << hex << d.address << endl;
+						uprobes++;
+						LOG_DEBUG << "adding uprobe 'p:" << name << ' ' << path << ":0x" << hex << d.address << '\'' << endl;
+					}
+				}
+				LOG_INFO << "Installed " << uprobes << " uprobes for " << *this << endl;
+				Syscall::close(fd.value());
+				return true;
+			} else {
+				LOG_ERROR << "Opening file " << path << " failed: " << fd.error_message() << endl;
+				return false;
+			}
+		}
+
+		case Loader::Config::DETECT_OUTDATED_VIA_PTRACE:
+			LOG_ERROR << "Ptrace outdated detection not implemented yet" << endl;
+			return false;
+
+		default:
+			LOG_ERROR << "Invalid disable outdated mode " << static_cast<int>(file.loader.config.detect_outdated) << endl;
+			return false;
+	}
 }
 
 size_t Object::version() const {

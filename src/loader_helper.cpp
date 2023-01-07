@@ -69,9 +69,9 @@ void Loader::filemodification_load(unsigned long now, TreeSet<Pair<unsigned long
 			LOG_INFO << "Loading " << *(i->second) << endl;
 			if (i->second->load() != nullptr) {
 				updated = true;
-				if (config.detect_outdated_access >= 0) {
+				if (config.detect_outdated != Loader::Config::DETECT_OUTDATED_DISABLED) {
 					assert(i->second->current != nullptr && i->second->current->file_previous != nullptr);
-					worklist_protect.emplace(now + config.detect_outdated_access * SECOND_NS, i->second->current->file_previous);
+					worklist_protect.emplace(now + config.detect_outdated_delay * SECOND_NS, i->second->current->file_previous);
 				}
 			}
 			worklist_load.erase(i);

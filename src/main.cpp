@@ -43,7 +43,8 @@ struct Opts {
 	Vector<const char *> preload{};
 	const char * debughash{};
 	const char * statusinfo{};
-	int detectOutdated{-1};
+	const char * detectOutdated{};
+	unsigned delayOutdated{1};
 	bool logtimeAbs{};
 	bool logfileAppend{};
 	bool dynamicUpdate{};
@@ -134,6 +135,8 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		LOG_ERROR << "Tracing not implemented yet!" << endl;
 	}
 
+
+
 	// New Loader
 	if (luci_path == nullptr || luci_path[0] == '\0') {
 		luci_path = config_file.value("LD_PATH");
@@ -145,23 +148,63 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	// Dynamic updates
 	config_loader.dynamic_update = opts.dynamicUpdate || config_file.value_or_default<bool>("LD_DYNAMIC_UPDATE", false);
 	// Dynamic updates of dl-funcs
-	config_loader.dynamic_dlupdate = config_loader.dynamic_update ? (opts.dynamicDlUpdate || config_file.value_or_default<bool>("LD_DYNAMIC_DLUPDATE", false)) : false;
+	if (config_loader.dynamic_update)
+		config_loader.dynamic_dlupdate = opts.dynamicDlUpdate || config_file.value_or_default<bool>("LD_DYNAMIC_DLUPDATE", false);
 	// Dynamic updates of dl-funcs
-	config_loader.dependency_check = config_loader.dynamic_update ? (opts.dependencyCheck || config_file.value_or_default<bool>("LD_DEPENDENCY_CHECK", false)) : false;
+	if (config_loader.dynamic_update)
+		config_loader.dependency_check = opts.dependencyCheck || config_file.value_or_default<bool>("LD_DEPENDENCY_CHECK", false);
 	// Force dynamic updates
-	config_loader.force_update = config_loader.dynamic_update ? (opts.forceUpdate || config_file.value_or_default<bool>("LD_FORCE_UPDATE", false)) : false;
+	if (config_loader.dynamic_update)
+		config_loader.force_update = opts.forceUpdate || config_file.value_or_default<bool>("LD_FORCE_UPDATE", false);
 	// Use modification time to detect changes
 	config_loader.use_mtime = opts.modificationTime || config_file.value_or_default<bool>("LD_USE_MTIME", false);
 	// Weak linking
 	config_loader.dynamic_weak = opts.dynamicWeak ||  config_file.value_or_default<bool>("LD_DYNAMIC_WEAK", false);
 	// Check relocation targets for modifications before updating
-	config_loader.check_relocation_content = config_loader.dynamic_update ? (opts.relocateCheck || config_file.value_or_default<bool>("LD_RELOCATE_CHECK", false)) : false;
+	if (config_loader.dynamic_update)
+		config_loader.check_relocation_content = opts.relocateCheck || config_file.value_or_default<bool>("LD_RELOCATE_CHECK", false);
 	// Fix relocations in outdated varsions
-	config_loader.update_outdated_relocations = config_loader.dynamic_update ? (opts.relocateOutdated || config_file.value_or_default<bool>("LD_RELOCATE_OUTDATED", false)) : false;
+	if (config_loader.dynamic_update)
+		config_loader.update_outdated_relocations = (opts.relocateOutdated || config_file.value_or_default<bool>("LD_RELOCATE_OUTDATED", false));
+
 	// Detect access of outdated varsions
-	config_loader.detect_outdated_access = config_loader.dynamic_update ? Math::max(opts.detectOutdated, config_file.value_or_default<int>("LD_DETECT_OUTDATED", -1)) : -1;
+	if (opts.detectOutdated == nullptr || String::len(opts.detectOutdated) == 0)
+		opts.detectOutdated = config_file.value_or_default<const char *>("LD_DETECT_OUTDATED", "disabled");
+	if (!config_loader.dynamic_update || opts.detectOutdated == nullptr || String::len(opts.detectOutdated) == 0 || String::compare_case(opts.detectOutdated, "disabled") == 0) {
+		config_loader.detect_outdated = Loader::Config::DETECT_OUTDATED_DISABLED;
+	} else if (String::compare_case(opts.detectOutdated, "userfaultfd") == 0) {
+		config_loader.detect_outdated = Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD;
+		LOG_DEBUG << "Detecting outdated access via userfaultfd" << endl;
+	} else if (String::compare_case(opts.detectOutdated, "uprobes", 7) == 0) {
+		if (String::compare_case(opts.detectOutdated, "uprobes") == 0) {
+			config_loader.detect_outdated = Loader::Config::DETECT_OUTDATED_VIA_UPROBES;
+			LOG_DEBUG << "Detecting outdated access via uprobes" << endl;
+		} else if (String::compare_case(opts.detectOutdated, "uprobes_deps") == 0) {
+			config_loader.detect_outdated = Loader::Config::DETECT_OUTDATED_WITH_DEPS_VIA_UPROBES;
+			LOG_DEBUG << "Detecting outdated access (inc. dependencies) via uprobes" << endl;
+		} else {
+			config_loader.detect_outdated = Loader::Config::DETECT_OUTDATED_VIA_UPROBES;
+			LOG_ERROR << "Invalid mode '" << opts.detectOutdated << "' for uprobe to detect outdated -- will use default uprobe" << endl;
+		}
+
+		if (!File::exists("/sys/kernel/debug/tracing/events/uprobes/enable")) {
+			LOG_ERROR << "Uprobes not available" << endl;
+		} else {
+			File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "1");
+			File::contents::set("/sys/kernel/debug/tracing/tracing_on", "1");
+			LOG_INFO << "Started uprobe tracing" << endl;
+		}
+	} else {
+		LOG_ERROR << "Yet unsupported mode to detect outdated: " << opts.detectOutdated << endl;
+	}
+	// Delay before detecting access of outdated varsions
+	if (config_loader.detect_outdated != Loader::Config::DETECT_OUTDATED_DISABLED) {
+		config_loader.detect_outdated_delay = Math::max(opts.delayOutdated, config_file.value_or_default<unsigned>("LD_DETECT_OUTDATED_DELAY", config_loader.detect_outdated_delay));
+		LOG_DEBUG << "Delay for detecting outdated access is " << config_loader.detect_outdated_delay << "s" << endl;
+	}
+
 	// Set comparison mode for patchability checks
-	config_loader.relax_comparison = Math::max(config_loader.relax_comparison, config_file.value_or_default<int>("LD_RELAX_CHECK",0));
+	config_loader.relax_comparison = Math::max(config_loader.relax_comparison, config_file.value_or_default<int>("LD_RELAX_CHECK", config_loader.relax_comparison));
 
 	if (config_loader.relax_comparison > 0)
 		LOG_DEBUG << "Relaxing comparison of patchability to mode " << config_loader.relax_comparison << endl;
@@ -289,7 +332,8 @@ int main(int argc, char* argv[]) {
 				{'T',  "tracing",         nullptr,  &Opts::tracing,          false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
 				{'r',  "reloc-check",     nullptr,  &Opts::relocateCheck,    false, "Check if contents of relocation targets in data section have been altered during execution by the user. This option can also be enabled by setting the environment variable LD_RELOCATE_CHECK to 1"},
 				{'R',  "reloc-outdated",  nullptr,  &Opts::relocateOutdated, false, "Fix relocations of outdated versions as well. This option can also be enabled by setting the environment variable LD_RELOCATE_OUTDATED to 1"},
-				{'o',  "detect-outdated", "DELAY",  &Opts::detectOutdated,   false, "Unmap outdated executable segments and use user space page fault handler to detect code access in old versions after DELAY seconds -- negative value to disable (default). This option can also be enabled by setting the delay in environment variable LD_DETECT_OUTDATED."},
+				{'o',  "detect-outdated", "MODE",   &Opts::detectOutdated,   false, "Detect access in old versions, allowed values are 'disabled' (default), 'userfaultfd', 'uprobes', 'uprobes_deps' and 'ptrace'. This option can also be enabled by setting the delay in environment variable LD_DETECT_OUTDATED."},
+				{'O',  "delay-outdated",  "DELAY",  &Opts::delayOutdated,    false, "Delay the installation for outdated access -- default is 1 second (default). This option can also be set using the environment variable LD_DETECT_OUTDATED_DELAY."},
 				{'m',  "mtime",           nullptr,  &Opts::modificationTime, false, "Consider modification time when detecting changed libraries. This option can also be enabled by setting the delay in environment variable LD_USE_MITME."},
 				{'w',  "weak",            nullptr,  &Opts::dynamicWeak,      false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
 				{'n',  "bind-now",        nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },

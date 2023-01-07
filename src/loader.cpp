@@ -84,7 +84,7 @@ Loader::~Loader() {
 		}
 	}
 
-	if (config.detect_outdated_access && userfaultfd >= 0) {
+	if (config.detect_outdated == Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD && userfaultfd >= 0) {
 		if (auto close = Syscall::close(userfaultfd)) {
 			LOG_INFO << "Destroyed userfault handle" << endl;
 		} else {
@@ -492,7 +492,7 @@ bool Loader::start_handler_threads() {
 		userfaultfd = -1;
 	}
 	if (config.dynamic_update) {
-		if (config.detect_outdated_access >= 0) {
+		if (config.detect_outdated == Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD) {
 			if (auto userfault = Syscall::userfaultfd(O_CLOEXEC | O_NONBLOCK)) {
 				userfaultfd = userfault.value();
 				uffdio_api api;
