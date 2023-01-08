@@ -7,6 +7,7 @@
 #include <dlh/xxhash.hpp>
 #include <dlh/error.hpp>
 #include <dlh/file.hpp>
+#include <dlh/math.hpp>
 #include <dlh/log.hpp>
 
 #include "comp/glibc/rtld/global.hpp"
@@ -15,6 +16,7 @@
 #include "comp/gdb.hpp"
 #include "object/base.hpp"
 #include "process.hpp"
+#include "page.hpp"
 
 
 static Loader * _instance = nullptr;
@@ -448,8 +450,8 @@ Object * Loader::resolve_object(uintptr_t addr, namespace_t ns) const {
 }
 
 
-uintptr_t Loader::next_address() const {
-	uintptr_t start = 0, end = 0, next = 0;
+uintptr_t Loader::next_address(size_t size) const {
+	uintptr_t start = 0, end = 0, next = next_library_address;
 	for (const auto & object_file : lookup)
 		for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous)
 			if (obj->memory_range(start, end) && end > next && (BASEADDRESS < LIBADDRESS || end < BASEADDRESS))
@@ -459,6 +461,8 @@ uintptr_t Loader::next_address() const {
 	if (next == 0) {
 		next = LIBADDRESS;
 	}
+	next = Math::align_up(next, Page::SIZE);
+	next_library_address = Math::align_up(next + size, Page::SIZE);
 	return next;
 }
 
@@ -505,8 +509,6 @@ bool Loader::start_handler_threads() {
 				LOG_ERROR << "Initializing userfaultfd failed: " << userfault.error_message() << endl;
 				success = false;
 			}
-		} else {
-			LOG_WARNING << "There is no detection of outdated executable sections" << endl;
 		}
 
 		if (auto inotify = Syscall::inotify_init(IN_CLOEXEC | IN_NONBLOCK)) {

@@ -34,7 +34,15 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
 	// Set base address
 	if (position_independent) {
 		// Base is not defined, hence
-		this->base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
+		if (file.flags.premapped == 1) {
+			this->base = data.addr;
+		} else {
+			size_t max_size = 0;
+			for (auto & segment : this->segments)
+				if (Elf::PT_LOAD == segment.type() && segment.virt_addr() + segment.virt_size() > max_size)
+					max_size = segment.virt_addr() + segment.virt_size();
+			this->base = file.loader.next_address(max_size);
+		}
 		LOG_DEBUG << "Set Base of " << file.filename << " to " << (void*)(this->base) << endl;
 	}
 }

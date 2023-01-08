@@ -160,7 +160,7 @@ struct Loader {
 	Object * resolve_object(uintptr_t addr, namespace_t ns = NAMESPACE_BASE) const;
 
 	/*! \brief get next (page aligned) memory address */
-	uintptr_t next_address() const;
+	uintptr_t next_address(size_t size) const;
 
 	/*! \brief check if object is already loaded */
 	bool is_loaded(const ObjectIdentity * ptr) const;
@@ -179,6 +179,9 @@ struct Loader {
 
 	/*! \brief Next Namespace */
 	mutable namespace_t next_namespace;
+
+	/*! \brief next unused address for library */
+	mutable uintptr_t next_library_address = LIBADDRESS;
 
 	/*! \brief Main thread (for TLS) */
 	Thread * main_thread = nullptr;

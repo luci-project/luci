@@ -199,7 +199,7 @@ bool Object::disable() const {
 						if (d.name != nullptr)
 							name_stream << d.name;
 						else
-							name_stream << "0x" << hex << d.address;
+							continue;  // name_stream << "0x" << hex << d.address; -- but results to Error 524
 						name_stream.str();
 						// sanitize name
 						for (size_t i = 0; i < 65 ; i++)
@@ -224,7 +224,7 @@ bool Object::disable() const {
 				}
 				return true;
 			} else {
-				LOG_ERROR << "Opening file " << path << " failed: " << fd.error_message() << endl;
+				LOG_ERROR << "Opening /sys/kernel/debug/tracing/uprobe_events for " << file.name << " failed: " << fd.error_message() << endl;
 				return false;
 			}
 		}
