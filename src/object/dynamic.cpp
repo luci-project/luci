@@ -386,7 +386,8 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const char * name, uint3
 */
 		if (naked_sym.section_index() != SHN_UNDEF && naked_sym.bind() != Elf::STB_LOCAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
 			auto symbol_version_index = dynamic_symbols.version(found);
-			return VersionedSymbol{naked_sym, get_version(symbol_version_index), hash, gnu_hash};
+			VersionedSymbol vs{naked_sym, get_version(symbol_version_index), hash, gnu_hash};
+			return { vs };
 		}
 	}
 	return {};
@@ -396,8 +397,10 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(uintptr_t addr) const {
 	if (addr > base) {
 		uintptr_t offset = addr - base;
 		for (const auto & sym : dynamic_symbols)
-			if (sym.section_index() != Elf::STN_UNDEF && offset >= sym.value() && offset <= sym.value() + sym.size())
-				return VersionedSymbol{sym, get_version(dynamic_symbols.version(dynamic_symbols.index(sym)))} ;
+			if (sym.section_index() != Elf::STN_UNDEF && offset >= sym.value() && offset <= sym.value() + sym.size()) {
+				VersionedSymbol vs{sym, get_version(dynamic_symbols.version(dynamic_symbols.index(sym)))};
+				return { vs };
+			}
 	}
 	return {};
 }
