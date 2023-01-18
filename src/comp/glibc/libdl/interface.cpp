@@ -213,7 +213,7 @@ static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, con
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
-	GuardedReader _{loader->lookup_sync};
+	GuardedWriter _{loader->lookup_sync};
 	Optional<VersionedSymbol> r;
 	if (handle == RTLD_DEFAULT || handle == RTLD_NEXT) {
 		auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(caller));
