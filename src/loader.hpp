@@ -134,8 +134,8 @@ struct Loader {
 	ObjectIdentity * dlopen(const char * file, ObjectIdentity::Flags flags, namespace_t ns = NAMESPACE_BASE, bool load = true);
 
 	/*! \brief Run */
-	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0);
-	bool run(ObjectIdentity * file, uintptr_t stack_pointer);
+	bool run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer = 0, size_t stack_size = 0, const char * entry_point = nullptr);
+	bool run(ObjectIdentity * file, uintptr_t stack_pointer, const char * entry_point = nullptr);
 
 	/*! \brief find Symbol with same name and version from other objects in same namespace */
 	enum ResolveSymbolMode {
@@ -203,6 +203,9 @@ struct Loader {
 
 	/*! \brief relocate all loaded files for execution */
 	bool relocate(bool update = false);
+
+	/*! \brief resolve address of entry point */
+	uintptr_t get_entry_point(Object * start, const char * custom_entry_point = nullptr);
 
 	/*! \brief prepare all loaded files for execution */
 	bool prepare();

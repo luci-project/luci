@@ -23,7 +23,7 @@ bool MemorySegment::map() {
 	int offset = 0;
 	int protection = target.protection | (writable || target.relro ? PROT_WRITE : 0);
 
-	if (identity.loader.config.dynamic_update && writable) {
+	if (writable && source.object.use_data_alias()) {
 		// Shared memory for updatable writable sections (if set, it is already initialized)
 		if ((copy = (target.fd == -1))) {
 			// Only first version
@@ -47,7 +47,7 @@ bool MemorySegment::map() {
 		flags |= MAP_SHARED;
 		fd = target.fd;
 	} else if (copy || source.size == 0) {
-		// Anonymous mapping if not updatable and writable, emtpy or not aligned
+		// Anonymous mapping if not aliased and writable, emtpy or not aligned
 		flags |= MAP_ANONYMOUS | MAP_PRIVATE;
 	} else {
 		// File backed mapping
@@ -250,5 +250,55 @@ int MemorySegment::shmemfd() {
 	} else {
 		LOG_ERROR << "Creating memory file " << shdata << " failed: " << memfd.error_message() << endl;
 		return -1;
+	}
+}
+
+
+extern bool capstone_dump(BufferStream & out, void * ptr, size_t size, uintptr_t start);
+void MemorySegment::dump(Log::Level level) const {
+	if (!logger.visible(level))
+		return;
+
+	logger.entry(level, __BASE_FILE__, __LINE__, __MODULE_NAME__)
+	   << "Dump of " << source.object << " (@ " << (void*) source.offset << ", " << source.size << "B)" << endl
+	   << (target.status == MEMSEG_MAPPED ? "currently" : "to be") << " mapped at " << (void*)(target.address()) << " (" << target.size << "B "
+	   << ((target.protection & PROT_READ) != 0 ? "R": "")
+	   << ((target.protection & PROT_WRITE) != 0 ? "W": "")
+	   << ((target.protection & PROT_EXEC) != 0 ? "X": "")
+	   << ")";
+
+	void * data;
+	size_t size;
+	uintptr_t offset;
+	if (target.status == MEMSEG_MAPPED) {
+		data = reinterpret_cast<void*>(target.address());
+		size = target.size;
+		offset = target.offset;
+	} else {
+		data = reinterpret_cast<void*>(source.object.data.addr);
+		size = source.size;
+		offset = source.offset;
+	}
+
+	if ((target.protection & PROT_EXEC) != 0) {
+		capstone_dump(logger.append() << endl, data, size, target.offset);
+	} else {
+		char buf[17] = {};
+		for (size_t i = 0;; i++) {
+			if (i % 16 == 0) {
+				logger.append() << "  " << buf << endl;
+				if (i >= size)
+					break;
+				logger.append().format("%10llx: ", offset + i);
+			}
+			if (i < size) {
+				uint8_t byte = reinterpret_cast<uint8_t*>(data)[i];
+				logger.append().format("%02x ", byte);
+				buf[i % 16] = byte >= 32 && byte < 127 ? byte : '.';
+			} else {
+				logger.append().format("   ");
+				buf[i % 16] = ' ';
+			}
+		}
 	}
 }

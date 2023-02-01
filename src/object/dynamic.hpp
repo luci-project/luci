@@ -21,6 +21,10 @@ struct ObjectDynamic : public ObjectExecutable {
  protected:
 	using ObjectExecutable::resolve_symbol;
 
+	bool use_data_alias() const override {
+		return this->file.flags.updatable == 1;
+	};
+
 	bool preload() override;
 
 	bool fix() override;

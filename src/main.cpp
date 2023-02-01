@@ -38,9 +38,12 @@ struct Opts {
 	int relaxPatchCheck{0};
 	const char * logfile{};
 	Vector<const char *> libpath{};
+	Vector<const char *> libload{};
+	Vector<const char *> preload{};
 	const char * libpathconf{ STR(LIBPATH_CONF) };
 	const char * luciconf{ STR(LDLUCI_CONF) };
-	Vector<const char *> preload{};
+	const char * argv0{ nullptr };
+	const char * entry{ nullptr };
 	const char * debughash{};
 	const char * statusinfo{};
 	const char * detectOutdated{};
@@ -58,6 +61,7 @@ struct Opts {
 	bool bindNow{};
 	bool bindNot{};
 	bool tracing{};
+	bool linkstatic{};
 	bool showVersion{};
 	bool showHelp{};
 };
@@ -308,15 +312,17 @@ int main(int argc, char* argv[]) {
 		// Available commandline options
 		auto args = Parser::Arguments<Opts>({
 				/* short & long name,     argument, element               required, help text,  optional validation function */
-				{'l',  "log",             "LEVEL",  &Opts::loglevel,         false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
+				{'v',  "verbosity",       "LEVEL",  &Opts::loglevel,         false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
 				{'A',  "logtimeabs",      nullptr,  &Opts::logtimeAbs,       false, "Use absolute time (instead of delta) in log. This option can also be enabled by setting the environment variable LD_LOGTIME_ABS to 1"},
 				{'f',  "logfile",         "FILE",   &Opts::logfile,          false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
 				{'a',  "logfile-append",  nullptr,  &Opts::logfileAppend,    false, "Append output to log file (instead of truncate). Requires logfile, can also be enabled by setting the environment variable LD_LOGFILE_APPEND to 1" },
-				{'p',  "library-path",    "DIR",    &Opts::libpath,          false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
+				{'e',  "entry",           "SYM",    &Opts::entry,            false, "Overwrite default start entry point with custom symbol or address (use preceeding '+' for relative adressing)" },
+				{'l',  "library",         "NAME",   &Opts::libload,          false, "Add library namespec to link/load (in the given order). Prefix with ':' for filename" },
+				{'L',  "library-path",    "DIR",    &Opts::libpath,          false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
 				{'c',  "library-conf",    "FILE",   &Opts::libpathconf,      false, "Library path configuration" },
 				{'C',  "luci-conf",       "FILE",   &Opts::luciconf,         false, "Luci loader configuration file" },
 				{'P',  "preload",         "FILE",   &Opts::preload,          false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
-				{'s',  "statusinfo",      "FILE",   &Opts::statusinfo,       false, "File (named pipe) for logging successful and failed updates (latter would require a restart). Disabled if empty. This option can also be activated by setting the environment variable LD_STATUS_INFO" },
+				{'S',  "statusinfo",      "FILE",   &Opts::statusinfo,       false, "File (named pipe) for logging successful and failed updates (latter would require a restart). Disabled if empty. This option can also be activated by setting the environment variable LD_STATUS_INFO" },
 				{'d',  "debughash",       "SOCKET", &Opts::debughash,        false, "Socket URI (unix / tcp / udp) for retrieving debug data hashes. Disabled if empty. This option can also be activated by setting the environment variable LD_DEBUG_HASH" },
 				{'u',  "update",          nullptr,  &Opts::dynamicUpdate,    false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
 				{'U',  "dlupdate",        nullptr,  &Opts::dynamicDlUpdate,  false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1" },
@@ -333,9 +339,11 @@ int main(int argc, char* argv[]) {
 				{'n',  "bind-now",        nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
 				{'N',  "bind-not",        nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
 				{'V',  "version",         nullptr,  &Opts::showVersion,      false, "Show version information" },
+				{'s',  "static",          nullptr,  &Opts::linkstatic,       false, "Perform static linking as well" },
+				{'\0', "argv0",           nullptr,  &Opts::argv0,            false, "Explicitly specify program name (argv[0])" },
 				{'h',  "help",            nullptr,  &Opts::showHelp,         false, "Show this help" }
 			},
-			File::executable,
+			File::exists,
 			[](const char *) -> bool { return true; }
 		);
 
@@ -374,16 +382,49 @@ int main(int argc, char* argv[]) {
 			assert(start != nullptr);
 
 			for (auto & lib: preload) {
-				LOG_INFO << "Preloading " << lib << endl;
-				loader->library(lib, loader->default_flags, true);
+				if (auto loaded = loader->library(lib, loader->default_flags, true)) {
+					LOG_INFO << "Preloaded " << lib << ": " << *loaded << endl;
+				} else {
+					LOG_WARNING << "Unable to preload '" << lib << "'!" << endl;
+				}
 			}
 
+			if (args.linkstatic)
+				for (auto & lib: args.libload) {
+					if (lib[0] == ':') {
+						// Try as filename
+						lib++;
+						if (auto loaded = loader->library(lib, loader->default_flags)) {
+							LOG_INFO << "Loaded " << lib << ": " << *loaded << endl;
+						} else {
+							LOG_ERROR << "Library file '" << lib << "' not found!" << endl;
+							return EXIT_FAILURE;
+						}
+					} else {
+						// Try as namespec
+						StringStream<255> filename;
+						// TODO: static libraries (.a)
+						filename << "lib" << lib << ".so";
+						if (auto loaded = loader->library(filename.str(), loader->default_flags)) {
+							LOG_INFO << "Loaded " << lib << ": " << *loaded << endl;
+						} else {
+							LOG_ERROR << "Library file '" << filename.str() << "' not found!" << endl;
+							return EXIT_FAILURE;
+						}
+					}
+				}
+
 			LOG_DEBUG << "Library search order:" << endl;
-			for (auto & obj: loader->lookup)
+			for (auto & obj: loader->lookup) {
 				LOG_DEBUG_APPEND << " - " << obj << endl;
+			}
+
+			if (args.argv0 != nullptr) {
+				start_args[0] = args.argv0;
+			}
 
 			start_args += args.get_terminal();
-			if (!loader->run(start, start_args)) {
+			if (!loader->run(start, start_args, 0, 0, args.entry)) {
 				LOG_ERROR << "Start failed" << endl;
 				return EXIT_FAILURE;
 			}
@@ -411,13 +452,17 @@ int main(int argc, char* argv[]) {
 		}
 
 		for (auto & lib: preload) {
-			LOG_INFO << "Preloading " << lib << endl;
-			loader->library(lib, loader->default_flags, true);
+			if (auto loaded = loader->library(lib, loader->default_flags, true)) {
+				LOG_INFO << "Preloaded " << lib << ": " << *loaded << endl;
+			} else {
+				LOG_WARNING << "Unable to preload '" << lib << "'!" << endl;
+			}
 		}
 
 		LOG_DEBUG << "Library search order:" << endl;
-		for (auto & obj: loader->lookup)
+		for (auto & obj: loader->lookup) {
 			LOG_DEBUG_APPEND << " - " << obj << endl;
+		}
 
 		// Use initial luci stack (contents are the same anyways)
 		extern uintptr_t __dlh_stack_pointer;

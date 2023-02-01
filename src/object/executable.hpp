@@ -6,7 +6,6 @@
 struct ObjectExecutable : public Object {
 	ObjectExecutable(ObjectIdentity & file, const Object::Data & data) : Object{file, data} {}
 
-
  protected:
 	virtual bool preload() override {
 		return preload_segments();

@@ -2,6 +2,7 @@
 
 #include <dlh/stream/output.hpp>
 #include <dlh/stream/buffer.hpp>
+#include <dlh/parser/string.hpp>
 #include <dlh/auxiliary.hpp>
 #include <dlh/syscall.hpp>
 #include <dlh/xxhash.hpp>
@@ -12,6 +13,7 @@
 
 #include "comp/glibc/rtld/global.hpp"
 #include "comp/glibc/rtld/dl.hpp"
+#include "comp/glibc/start.hpp"
 #include "comp/glibc/init.hpp"
 #include "comp/gdb.hpp"
 #include "object/base.hpp"
@@ -93,8 +95,6 @@ Loader::~Loader() {
 			LOG_ERROR << "Closing userfault handle failed: " << close.error_message() << endl;
 		}
 	}
-
-
 
 	lookup.clear();
 }
@@ -284,7 +284,40 @@ bool Loader::prepare() {
 }
 
 
-bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer, size_t stack_size) {
+uintptr_t Loader::get_entry_point(Object * start, const char * custom_entry_point) {
+	uintptr_t entry = 0;
+	if (custom_entry_point != nullptr) {
+		// Check if symbol
+		if (auto sym = resolve_symbol(custom_entry_point, nullptr, NAMESPACE_BASE, self, RESOLVE_EXCEPT_OBJECT)) {
+			entry = reinterpret_cast<uintptr_t>(sym->pointer());
+			LOG_VERBOSE << "Overwritten entry point with symbol " << custom_entry_point << sym->object() << endl;
+		} else if (Parser::string(entry, custom_entry_point)) {
+			LOG_VERBOSE << "Overwritten entry point with address " << (void*)entry << endl;
+			// Check if relative (starting with '+' after trimming)
+			for (const char * e = custom_entry_point; *e != '\0'; e++) {
+				if (*e == '+')
+					entry += start->base;
+				if (*e != ' ')
+					break;
+			}
+		} else {
+			LOG_ERROR << "Unable to resolve custom entry " << custom_entry_point << " -- using default!" << endl;
+		}
+	}
+	if (entry == 0) {
+		if (start->header.type() == Elf::ET_REL) {
+			// for relocatable objects imitate glibc _start
+			entry = reinterpret_cast<uintptr_t>(GLIBC::start_entry(*this));
+		} else {
+			// for executable objects use provided entry function descriped in ELF header
+			entry = start->base + start->header.entry();
+		}
+	}
+	return entry;
+}
+
+
+bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer, size_t stack_size, const char * entry_point) {
 	assert(file != nullptr);
 	target = file;
 	Object * start = file->current;
@@ -294,8 +327,9 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	if (start->memory_map.size() == 0)
 		return false;
 
-	// Executed binary will be initialized in _start automatically
-	file->flags.initialized = 1;
+	// Executables (and dyn. Objects) will be initialized in _start automatically
+	if (start->header.type() != Elf::ET_REL)
+		file->flags.initialized = 1;
 
 	// Prepare execution
 	Process p(stack_pointer, stack_size);
@@ -321,15 +355,13 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	}
 
 	// Start
-	uintptr_t entry = start->header.entry();
-	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << endl;
-	p.start(start->base + entry);
+	p.start(get_entry_point(start, entry_point));
 
 	return true;
 }
 
 
-bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
+bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * entry_point) {
 	assert(file != nullptr);
 	target = file;
 	Object * start = file->current;
@@ -367,9 +399,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer) {
 	}
 
 	// Start
-	uintptr_t entry = start->header.entry();
-	LOG_INFO << "Start at " << (void*)start->base << " + " << (void*)(entry) << " (using existing stack at " << (void*) stack_pointer << ")"<< endl;
-	Process::start(start->base + entry, stack_pointer, this->envp);
+	Process::start(get_entry_point(start, entry_point), stack_pointer, this->envp);
 
 	return true;
 }

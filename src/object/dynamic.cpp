@@ -255,6 +255,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 	// Initialize relocator object
 	Relocator relocator(reloc, this->global_offset_table);
 
+	// Detect changes in data relocation
 	Pair<int,uintptr_t> datarel_key{-1,0};
 	if (file.loader.config.check_relocation_content && is_latest_version())
 		for (auto &mem : memory_map)
@@ -304,6 +305,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 			auto & symobj = symbol->object();
 			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << endl;
 			if (fix) {
+				// Relocation read-only is protected
 				if (mapping_protected)
 					unprotect();
 				auto r = relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset);

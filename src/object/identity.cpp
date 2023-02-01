@@ -308,6 +308,9 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 			o = new ObjectDynamic{*this, data, true};
 			break;
 		case Elf::ET_REL:
+			// Make object [copy-on-]writeable
+			if (auto mprotect = Syscall::mprotect(data.addr, data.size, PROT_READ | PROT_WRITE); mprotect.failed())
+				LOG_ERROR << "Unable to add write permission to relocatable object: " << mprotect.error_message() << endl;
 			o = new ObjectRelocatable{*this, data};
 			break;
 		default:

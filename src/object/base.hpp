@@ -120,6 +120,9 @@ struct Object : public Elf {
 	/*! \brief Update relocations */
 	virtual bool update() { return true; };
 
+	/*! \brief Does this object use memory aliasing for data? */
+	virtual bool use_data_alias() const { return false; };
+
 	/*! \brief Set protection flags in memory */
 	virtual bool protect() const;
 
