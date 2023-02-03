@@ -2,6 +2,7 @@
 
 #include <dlh/file.hpp>
 #include <dlh/string.hpp>
+#include <dlh/syscall.hpp>
 #include <dlh/utility.hpp>
 
 static bool parse_decimal(size_t & target, const char * buf, size_t len) {
@@ -133,12 +134,22 @@ AR::Entry& AR::Entry::operator*() {
 }
 
 
-AR::AR(void * data, size_t size) : data(reinterpret_cast<char *>(data)), size(size) {}
+AR::AR(uintptr_t addr, size_t size) : data(reinterpret_cast<char *>(addr)), size(size) {
+	if (!is_valid() && data != nullptr) {
+		Syscall::munmap(addr, size);
+		data = nullptr;
+	}
+}
 
-AR::AR(const char * path) : data(File::contents::get(path, size)) {}
+AR::AR(const char * path) : data(File::contents::get(path, size)) {
+	if (!is_valid() && data != nullptr) {
+		Syscall::munmap(reinterpret_cast<uintptr_t>(data), size);
+		data = nullptr;
+	}
+}
 
 bool AR::is_valid() const {
-	return data != nullptr && String::compare(data, "!<arch>\n", 8) == 0;
+	return data != nullptr && size > 8 && String::compare(data, "!<arch>\n", 8) == 0;
 }
 
 AR::Entry AR::begin() {

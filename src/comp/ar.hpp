@@ -76,7 +76,7 @@ class AR {
 	};
 
 	/*! \brief Open archive already mapped in memory (must be writable / cow!) */
-	AR(void * data, size_t size);
+	AR(uintptr_t addr, size_t size);
 
 	/*! \brief Open archive from filesystem (it will never be unmapped!) */
 	AR(const char * path);

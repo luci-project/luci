@@ -160,7 +160,7 @@ struct Loader {
 	Object * resolve_object(uintptr_t addr, namespace_t ns = NAMESPACE_BASE) const;
 
 	/*! \brief get next (page aligned) memory address */
-	uintptr_t next_address(size_t size) const;
+	uintptr_t next_address(size_t size = 0) const;
 
 	/*! \brief check if object is already loaded */
 	bool is_loaded(const ObjectIdentity * ptr) const;

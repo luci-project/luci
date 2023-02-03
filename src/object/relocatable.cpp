@@ -17,23 +17,40 @@
  * TODO Linker symbols: etext edata end
  */
 
-uintptr_t ObjectRelocatable::offset = 0;
-//uintptr_t ObjectRelocatable::base = 0x300000000000UL;
-
-static uintptr_t freeaddr = 0x300000000000UL;  // TODO: replace by (extended) next_address
+//uintptr_t ObjectRelocatable::offset = 0;
 
 ObjectRelocatable::ObjectRelocatable(ObjectIdentity & file, const Object::Data & data)
   : Object{file, data},
     symbols{this->symbol_table()} {
-	base = freeaddr; // TODO!
+	base = file.loader.next_address();
 }
 
 bool ObjectRelocatable::preload() {
 	// TODO flags.immutable_source  (should always be set, right?)
 
+	Optional<Elf::Section> tdata;
+	Optional<Elf::Section> tbss;
 	for (auto & section : this->sections) {
 		if (section.size() == 0)
 			continue;
+
+		if (section.tls() && section.allocate()) {
+			// Fixup section entry,
+			assert(section.virt_addr() == 0);
+			auto data = const_cast<Elf::Shdr *>(section.ptr());
+			data->sh_addr = offset;
+
+			if (section.type() == SHT_NOBITS) {
+				tbss = section;
+			} else {
+				tdata = section;
+				// Mapping
+				auto mem = memory_map.emplace_back(*this, section, offset, 0, base);
+				// increase offset to next free page
+				offset += mem->target.page_size();
+			}
+			continue;
+		}
 
 		switch (section.type()) {
 			case SHT_NOBITS:
@@ -42,7 +59,6 @@ bool ObjectRelocatable::preload() {
 			case SHT_FINI_ARRAY:
 			case SHT_PREINIT_ARRAY:
 				if (section.allocate()) {
-					// (writeable) data
 					if (section.writeable() && this->file_previous != nullptr) {
 						// TODO: Fix symbol table [offsets] to point to file_previous' symbols
 
@@ -77,9 +93,35 @@ bool ObjectRelocatable::preload() {
 			case SHT_RELA:
 				relocation_tables.push_back(section.get_relocations());
 				break;
-
-
 		}
+	}
+
+	// Setup TLS
+	if ((tdata.has_value() || tbss.has_value()) && this->file.tls_module_id == 0) {
+		size_t tls_size = 0;
+		size_t tls_alignment = 0;
+		uintptr_t tls_image = 0;
+		size_t tls_image_size = 0;
+
+		if (tdata.has_value()) {
+			tls_size = tdata->size();
+			tls_alignment = tdata->alignment();
+			tls_image = tdata->virt_addr();
+			tls_image_size = tdata->size();
+		}
+
+		if (tbss.has_value()) {
+			if (tls_size != 0) {
+				auto data = const_cast<Elf::Shdr *>(tdata->ptr());
+				data->sh_addr = tls_size;
+				// Fixup symbols & relocations
+				adjust_offsets(this->sections.index(tbss.value()), tls_size);
+			}
+			tls_size += tdata->size();
+			tls_alignment = Math::max(tls_alignment, tdata->alignment());
+		}
+
+		this->file.tls_module_id = this->file.loader.tls.add_module(this->file, tls_size, tls_alignment, tls_image, tls_image_size, this->file.tls_offset);
 	}
 
 	// Allocate global bss
@@ -105,7 +147,7 @@ bool ObjectRelocatable::preload() {
 		}
 	}
 
-	freeaddr = Math::align_up(base + offset + 0x10000, Page::SIZE);
+	//freeaddr = Math::align_up(base + offset + 0x10000, Page::SIZE);
 
 	return memory_map.size() > 0;
 }
@@ -120,7 +162,7 @@ bool ObjectRelocatable::fix() {
 void ObjectRelocatable::adjust_offsets(int16_t index, uintptr_t offset) {
 	// Symbol table
 	for (auto sym : symbols)
-		if (sym.section_index() == index && (sym.type() == STT_OBJECT || sym.type() == STT_FUNC || sym.type() == STT_SECTION || sym.type() == STT_GNU_IFUNC)) {
+		if (sym.section_index() == index && (sym.type() == STT_OBJECT || sym.type() == STT_FUNC || sym.type() == STT_SECTION || sym.type() == STT_GNU_IFUNC || sym.type() == STT_TLS)) {
 			// This is only allowed since we have a COW mapping
 			auto data = const_cast<Elf::Sym *>(sym.ptr());
 			// Fixup value (= offset)

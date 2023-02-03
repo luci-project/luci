@@ -32,8 +32,7 @@ struct ObjectRelocatable : public Object {
 	bool initialize() override;
 
  private:
-	static uintptr_t offset;
-	//static uintptr_t base;
+	uintptr_t offset = 0;
 
 	Vector<Elf::Array<Elf::Relocation>> relocation_tables;
 	Vector<Elf::Section> init_sections;

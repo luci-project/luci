@@ -16,6 +16,7 @@
 #include "comp/glibc/start.hpp"
 #include "comp/glibc/init.hpp"
 #include "comp/gdb.hpp"
+#include "comp/ar.hpp"
 #include "object/base.hpp"
 #include "process.hpp"
 #include "page.hpp"
@@ -153,19 +154,41 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 			LOG_DEBUG_APPEND << " from memory at " << (void*)addr;
 		LOG_DEBUG_APPEND << "..." << endl;
 
-		GDB::notify(GDB::RT_ADD);
-		auto i = lookup.emplace(priority ? dependencies : lookup.end(), *this, flags, filepath, ns, nullptr);
-		assert(i);
+		// Check format
+		auto format = type != Elf::ET_NONE ? File::contents::FORMAT_ELF : (addr != 0 ? File::contents::format(reinterpret_cast<const char *>(addr), 6) : File::contents::format(filepath));
 
-		if (!priority && dependencies == lookup.end())
-			dependencies = i;
-		auto o = i->load(addr, type);
-		GDB::notify(GDB::RT_CONSISTENT);
-		if (o != nullptr) {
-			return i.operator->();
+		if (format == File::contents::FORMAT_AR) {
+			if (addr != 0) {
+				LOG_WARNING << "Loading static libraries mapped into memory not supported!" << endl;
+			}
+			AR archive(filepath);
+			if (archive.is_valid()) {
+				ObjectIdentity * obj = nullptr;
+				for (auto & entry : archive) {
+					if (entry.is_regular()) {
+						LOG_DEBUG << "Loading " << entry.name() << " from library " << filepath << endl;
+						obj = open(filepath, flags, priority, ns, reinterpret_cast<uintptr_t>(entry.data()));
+					}
+				}
+				return obj;
+			}
+		} else if (format == File::contents::FORMAT_ELF) {
+			GDB::notify(GDB::RT_ADD);
+			auto i = lookup.emplace(priority ? dependencies : lookup.end(), *this, flags, filepath, ns, nullptr);
+			assert(i);
+
+			if (!priority && dependencies == lookup.end())
+				dependencies = i;
+			auto o = i->load(addr, type);
+			GDB::notify(GDB::RT_CONSISTENT);
+			if (o != nullptr) {
+				return i.operator->();
+			} else {
+				LOG_ERROR << "Unable to open " << filepath << endl;
+				lookup.pop_back();
+			}
 		} else {
-			LOG_ERROR << "Unable to open " << filepath << endl;
-			lookup.pop_back();
+			LOG_ERROR << filepath << " has unsupported format: " << File::contents::format_description(format) << endl;
 		}
 	}
 	return nullptr;
