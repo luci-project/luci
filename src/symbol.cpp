@@ -1,4 +1,4 @@
-#include "versioned_symbol.hpp"
+#include "symbol.hpp"
 
 #include "object/identity.hpp"
 #include "object/base.hpp"

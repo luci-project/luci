@@ -1,9 +1,12 @@
 #pragma once
 
 #include <dlh/container/vector.hpp>
+#include <dlh/string.hpp>
+#include <elfo/elf.hpp>
 
 #include "object/identity.hpp"
 #include "object/base.hpp"
+#include "symbol.hpp"
 
 struct ObjectRelocatable : public Object {
 	ObjectRelocatable(ObjectIdentity & file, const Object::Data & data);
@@ -26,6 +29,7 @@ struct ObjectRelocatable : public Object {
 
 	Optional<VersionedSymbol> resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version) const override;
 	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr) const override;
+	Optional<ElfSymbolHelper> resolve_internal_symbol(const SymbolHelper & sym) const override;
 
 	void* relocate(const Elf::Relocation & reloc) const;
 
@@ -36,9 +40,9 @@ struct ObjectRelocatable : public Object {
 
 	Vector<Elf::Array<Elf::Relocation>> relocation_tables;
 	Vector<Elf::Section> init_sections;
-	Elf::SymbolTable symbols;
 
-	/*! \brief Fixup symbols & relocations after assigning an offset to a section*/
-	void adjust_offsets(int16_t index, uintptr_t offset);
+	HashSet<ElfSymbolHelper, SymbolComparison> symbols;
 
+	/*! \brief Fixup symbols & relocations after assigning an offset to a section */
+	bool adjust_offsets(uintptr_t offset, const Elf::Section & section);
 };

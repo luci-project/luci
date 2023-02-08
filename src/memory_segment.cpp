@@ -21,7 +21,7 @@ bool MemorySegment::map() {
 	int flags =  MAP_FIXED_NOREPLACE;
 	int fd = -1;
 	int offset = 0;
-	int protection = target.protection | (writable || target.relro ? PROT_WRITE : 0);
+	int protection = target.protection | (copy || writable || target.relro ? PROT_WRITE : 0);
 
 	if (writable && source.object.use_data_alias()) {
 		// Shared memory for updatable writable sections (if set, it is already initialized)
@@ -281,7 +281,7 @@ void MemorySegment::dump(Log::Level level) const {
 	}
 
 	if ((target.protection & PROT_EXEC) != 0) {
-		capstone_dump(logger.append() << endl, data, size, target.offset);
+		capstone_dump(logger.append() << endl, data, size, target.address());
 	} else {
 		char buf[17] = {};
 		for (size_t i = 0;; i++) {

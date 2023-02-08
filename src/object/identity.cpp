@@ -119,14 +119,30 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 				}
 
 		// Map file
-		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ, MAP_PRIVATE | (flags.immutable_source ? 0 : MAP_POPULATE), data.fd, 0)) {
-			data.addr = mmap.value();
+		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, data.fd, 0)) {
+			if (flags.immutable_source) {
+				data.addr = mmap.value();
+			} else {
+				// It seems like a populated privated mapping is not enough if the underlying file is changed (= undefined behaviour in linux).
+				// So we have to copy the content into an anonymous, non-file backed memory
+				if (auto anon = Syscall::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) {
+					LOG_INFO << "Creating a full in-memory copy of " << *this << endl;
+					data.addr = Memory::copy(anon.value(), mmap.value(), data.size);
+					// cleaning up
+					Syscall::munmap(mmap.value(), data.size);
+					Syscall::close(data.fd);
+					data.fd = -1;
+				} else {
+					LOG_ERROR << "Mapping anonymous memory for " << *this << " failed: " << anon.error_message() << endl;
+					Syscall::close(data.fd);
+					return INFO_ERROR_MAP;
+				}
+			}
 		} else {
 			LOG_ERROR << "Mapping " << *this << " failed: " << mmap.error_message() << endl;
 			Syscall::close(data.fd);
 			return INFO_ERROR_MAP;
 		}
-
 	} else {
 		data.addr = addr;
 		data.size = Elf(addr).size(true);
@@ -144,6 +160,13 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 		type = header->type();
 	}
 
+	// Adjust permission if required
+	if (addr != 0 && ((flags.immutable_source && type == Elf::ET_REL) || (!flags.immutable_source && type != Elf::ET_REL))) {
+		// Keep it writable for relocatable Objects only
+		if (auto mprotect = Syscall::mprotect(data.addr, data.size, PROT_READ | (type == Elf::ET_REL ? PROT_WRITE : 0)); mprotect.failed())
+			LOG_WARNING << "Unable to adjust protection of target memory: " << mprotect.error_message() << endl;
+	}
+
 	return INFO_CONTINUE_LOAD;
 }
 
@@ -159,7 +182,7 @@ bool ObjectIdentity::watch(bool force, bool close_existing) {
 				LOG_WARNING << "Cannot remove old watch for modification of " << this->path << ": " << inotify.error_message() << endl;
 			}
 		}
-		if (auto inotify = Syscall::inotify_add_watch(loader.filemodification_inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
+		if (auto inotify = Syscall::inotify_add_watch(loader.filemodification_inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW )) {
 			LOG_DEBUG << "Watching for modifications at " << this->path << endl;
 			wd = inotify.value();
 		} else {
@@ -178,6 +201,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 		this->flags.updatable = 0;
 		this->flags.immutable_source = 1;  // Without updates, don't expect changes to the binaries during runtime
 	} else if (this->flags.updatable == 1) {
+		this->flags.update_outdated |= loader.config.update_outdated_relocations;
 		assert(this->flags.initialized == 0 && this->flags.premapped == 0);
 	}
 
@@ -308,9 +332,6 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 			o = new ObjectDynamic{*this, data, true};
 			break;
 		case Elf::ET_REL:
-			// Make object [copy-on-]writeable
-			if (auto mprotect = Syscall::mprotect(data.addr, data.size, PROT_READ | PROT_WRITE); mprotect.failed())
-				LOG_ERROR << "Unable to add write permission to relocatable object: " << mprotect.error_message() << endl;
 			o = new ObjectRelocatable{*this, data};
 			break;
 		default:
@@ -324,7 +345,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 	o->file_previous = current;
 
 	// If dynamic updates are enabled, compare hashes
-	if (flags.updatable == 1) {
+	if (flags.updatable == 1 && type != Elf::ET_REL) {
 		LOG_INFO << "Calculate Binary hash of " << *o << endl;
 		o->binary_hash.emplace(*o);
 		// if previous version exist, check if we can patch it
@@ -435,7 +456,7 @@ bool ObjectIdentity::update() {
 	for (Object * c = current; c != nullptr; c = c->file_previous) {
 		LOG_DEBUG << "Updating relocations at " << *c << endl;
 		success &= c->update();
-		if (!loader.config.update_outdated_relocations)
+		if (!flags.update_outdated)
 			break;
 	}
 	return success;
@@ -448,7 +469,7 @@ bool ObjectIdentity::protect() {
 			LOG_DEBUG << "Protecting " << *c << endl;
 			success &= c->protect();
 			c->mapping_protected = true;
-			if (!loader.config.update_outdated_relocations)
+			if (!flags.update_outdated)
 				break;
 		}
 	return success;
@@ -461,7 +482,7 @@ bool ObjectIdentity::unprotect() {
 			LOG_DEBUG << "Unprotecting " << *c << endl;
 			success &= c->unprotect();
 			c->mapping_protected = false;
-			if (!loader.config.update_outdated_relocations)
+			if (!flags.update_outdated)
 				break;
 		}
 	return success;

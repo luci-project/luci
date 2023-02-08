@@ -64,6 +64,7 @@ struct ObjectIdentity {
 			         bind_deep        : 1,  // First lookup in own scope
 			         persistent       : 1,  // This cannot be unloaded
 			         updatable        : 1,  // Object can be updated during runtime
+			         update_outdated  : 1,  // On update also rewrite outdated relocations
 			         immutable_source : 1,  // ELF Source (file / memory) is immutable (no changes during runtime)
 			         ignore_mtime     : 1,  // Do not rely on modification time when checking for file modifications
 			         initialized      : 1,  // Do not executed INIT functions / constructors (again)

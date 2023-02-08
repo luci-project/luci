@@ -127,7 +127,6 @@ bool ObjectDynamic::compatibility_setup() {
 	return GLIBC::init(*this);
 }
 
-
 bool ObjectDynamic::preload_libraries() {
 	bool success = true;
 
@@ -150,6 +149,10 @@ bool ObjectDynamic::preload_libraries() {
 			case Elf::DT_FLAGS:
 				if ((dyn.value() & Elf::DF_BIND_NOW) != 0)
 					file.flags.bind_now = 1;
+				if ((dyn.value() & Elf::DF_STATIC_TLS) != 0 && file.loader.tls.gen > 0) {
+					LOG_WARNING << "Cannot dynamically load library " << *this << " with static TLS " << endl;
+					return false;
+				}
 				break;
 
 			case Elf::DT_FLAGS_1:

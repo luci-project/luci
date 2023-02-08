@@ -11,8 +11,8 @@
 #include <dlh/thread.hpp>
 
 #include "object/identity.hpp"
-#include "versioned_symbol.hpp"
 #include "trampoline.hpp"
+#include "symbol.hpp"
 #include "tls.hpp"
 
 struct Loader {

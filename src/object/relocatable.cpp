@@ -20,16 +20,37 @@
 //uintptr_t ObjectRelocatable::offset = 0;
 
 ObjectRelocatable::ObjectRelocatable(ObjectIdentity & file, const Object::Data & data)
-  : Object{file, data},
-    symbols{this->symbol_table()} {
-	base = file.loader.next_address();
+  : Object{file, data} {
+
+	// Updates require rewriting of old files
+	if (file.flags.updatable)
+		file.flags.update_outdated = 1;
+
+	auto address = file.loader.next_address();
+	if (file.current == nullptr) {
+		base = address;
+		offset = 0;
+	} else {
+		base = file.current->base;
+		assert(address > base);
+		offset = address - base;
+		// Adress offsets are signed > 1 GB -- this could be an issue
+		if (offset > 1UL * 1024 * 1024 * 1024) {
+			if (offset > 2UL * 1024 * 1024 * 1024) {
+				LOG_ERROR << "Beyond two giga byte limit -- this *will* fail!" << endl;
+			} else {
+				LOG_WARNING << "Beyond one giga byte!" << endl;
+			}
+		}
+	}
 }
+
 
 bool ObjectRelocatable::preload() {
 	// TODO flags.immutable_source  (should always be set, right?)
 
-	Optional<Elf::Section> tdata;
-	Optional<Elf::Section> tbss;
+	Optional<Elf::Section> tdata, tbss;
+
 	for (auto & section : this->sections) {
 		if (section.size() == 0)
 			continue;
@@ -59,29 +80,28 @@ bool ObjectRelocatable::preload() {
 			case SHT_FINI_ARRAY:
 			case SHT_PREINIT_ARRAY:
 				if (section.allocate()) {
-					if (section.writeable() && this->file_previous != nullptr) {
-						// TODO: Fix symbol table [offsets] to point to file_previous' symbols
+					size_t additional_size = 0;
+					if (this->file_previous == nullptr && section.type() == SHT_PROGBITS &&  (strcmp(section.name(), ".init", 5) == 0 || strcmp(section.name(), ".fini", 5) == 0)) {
+						// The init/fini section consists only from calls.
+						// They need to be fixed after mapping
+						init_sections.push_back(section);
+						// We need an additional byte for the return instruction
+						additional_size = 1;
+					}
 
-						// FEATURE: New symbols should be possible (in theory)
-					} else {
-						size_t additional_size = 0;
-						if (strcmp(section.name(), ".init") == 0 || strcmp(section.name(), ".fini") == 0) {
-							// The init/fini section consists only from calls.
-							// They need to be fixed after mapping
-							init_sections.push_back(section);
-							// We need an additional byte for the return instruction
-							additional_size = 1;
-						}
-						// Mapping
+					// Fixup section entry,
+					assert(section.virt_addr() == 0);
+					auto data = const_cast<Elf::Shdr *>(section.ptr());
+					data->sh_addr = offset;
+
+					// Fixup symbols & relocations
+					bool changed = adjust_offsets(offset, section);
+
+					// If the whole writeable data/bss can be used from previous sections,
+					// there is no need to allocate it
+					if (this->file_previous == nullptr || changed || !section.writeable()) {
+						// Create mapping
 						auto mem = memory_map.emplace_back(*this, section, offset, additional_size, base);
-
-						// Fixup section entry,
-						assert(section.virt_addr() == 0);
-						auto data = const_cast<Elf::Shdr *>(section.ptr());
-						data->sh_addr = offset;
-
-						// Fixup symbols & relocations
-						adjust_offsets(this->sections.index(section), offset);
 
 						// increase offset to next free page
 						offset += mem->target.page_size();
@@ -114,40 +134,16 @@ bool ObjectRelocatable::preload() {
 			if (tls_size != 0) {
 				auto data = const_cast<Elf::Shdr *>(tdata->ptr());
 				data->sh_addr = tls_size;
-				// Fixup symbols & relocations
-				adjust_offsets(this->sections.index(tbss.value()), tls_size);
+				// Fixup BSS symbols & relocations
+				adjust_offsets(tls_size, tbss.value());
 			}
 			tls_size += tdata->size();
+			// Adjust BSS
 			tls_alignment = Math::max(tls_alignment, tdata->alignment());
 		}
 
 		this->file.tls_module_id = this->file.loader.tls.add_module(this->file, tls_size, tls_alignment, tls_image, tls_image_size, this->file.tls_offset);
 	}
-
-	// Allocate global bss
-	if (this->file_previous == nullptr) {
-		size_t global_bss = 0;
-		// Check symbol table for uninitialized block entries
-		for (const auto & sym : symbols)
-			if (sym.size() != 0 && sym.section_index() == Elf::SHN_COMMON) {
-				// Value is alignment
-				auto start = Math::align_up(global_bss, sym.value());
-				// Add to global bss size
-				global_bss = start + sym.size();
-				// This is only allowed since we have a COW mapping
-				auto data = const_cast<Elf::Sym *>(sym.ptr());
-				// Fixup value (= offset)
-				data->st_value = offset + start;
-			}
-		// Allocate
-		if (global_bss > 0) {
-			auto mem = memory_map.emplace_back(*this, offset, global_bss, base);
-			// increase offset to next free page
-			offset += mem->target.page_size();
-		}
-	}
-
-	//freeaddr = Math::align_up(base + offset + 0x10000, Page::SIZE);
 
 	return memory_map.size() > 0;
 }
@@ -159,16 +155,10 @@ bool ObjectRelocatable::fix() {
 
 }
 
-void ObjectRelocatable::adjust_offsets(int16_t index, uintptr_t offset) {
-	// Symbol table
-	for (auto sym : symbols)
-		if (sym.section_index() == index && (sym.type() == STT_OBJECT || sym.type() == STT_FUNC || sym.type() == STT_SECTION || sym.type() == STT_GNU_IFUNC || sym.type() == STT_TLS)) {
-			// This is only allowed since we have a COW mapping
-			auto data = const_cast<Elf::Sym *>(sym.ptr());
-			// Fixup value (= offset)
-			data->st_value += offset;
-			LOG_INFO << sym.name() << " @ " << (void*)sym.value() << endl;
-	}
+
+bool ObjectRelocatable::adjust_offsets(uintptr_t offset, const Elf::Section & section) {
+	int64_t index = this->sections.index(section);
+	bool changed = false;
 
 	// Relocations
 	for (auto & linked : this->sections) {
@@ -176,6 +166,37 @@ void ObjectRelocatable::adjust_offsets(int16_t index, uintptr_t offset) {
 			continue;
 
 		switch (linked.type()) {
+			case SHT_SYMTAB:
+				// fix symbols
+				for (auto sym : linked.get_symbol_table())
+					if (sym.section_index() == index) {
+						// For updated versions, check previous writable data sections
+						if (this->file_previous != nullptr && section.writeable()) {
+							auto prev_sym = this->file_previous->resolve_internal_symbol(sym.name());
+							// if we have an old matching symbol, use its address
+							if (prev_sym.has_value() && prev_sym->type() == sym.type() && prev_sym->size() == sym.size()) {
+								auto new_data = const_cast<Elf::Sym *>(sym.ptr());
+								// Fixup value (= offset)
+								new_data->st_value = prev_sym->value();
+								// Insert into lookup list
+								symbols.insert(prev_sym.value());
+								continue;
+							}
+						}
+						// For general symbols adjust entry
+						if (sym.type() == STT_OBJECT || sym.type() == STT_FUNC || sym.type() == STT_SECTION || sym.type() == STT_GNU_IFUNC || sym.type() == STT_TLS) {
+							// This is only allowed since we have a COW mapping
+							auto data = const_cast<Elf::Sym *>(sym.ptr());
+							// Fixup value (= offset)
+							data->st_value += offset;
+							// Add to symbol list
+							symbols.insert(sym);
+							// Store change of symbol table
+							changed = true;
+						}
+					}
+				break;
+
 			case SHT_REL:
 				// Fixup relocations to this section
 				if (linked.info_link() && static_cast<int16_t>(linked.info()) == index)
@@ -184,6 +205,8 @@ void ObjectRelocatable::adjust_offsets(int16_t index, uintptr_t offset) {
 						auto data = const_cast<Elf::Rel *>(rel.ptr());
 						// Fixup offset
 						data->r_offset += offset;
+						// Store change of relocation table
+						changed = true;
 					}
 				break;
 
@@ -195,16 +218,63 @@ void ObjectRelocatable::adjust_offsets(int16_t index, uintptr_t offset) {
 						auto data = const_cast<Elf::Rela *>(rel.ptr());
 						// Fixup offset
 						data->r_offset += offset;
+						// Store change of relocation table
+						changed = true;
 					}
 				break;
 		}
 	}
+	return changed;
 }
 
 
 bool ObjectRelocatable::prepare() {
 	LOG_INFO << "Prepare " << *this << " with " << (void*)global_offset_table << endl;
 	bool success = true;
+
+	// Allocate bss space for tentative definitions
+	// this has to be done after all other relocatable objects have been preloaded
+	size_t global_bss = 0;
+	// Check symbol table for tentative definitions
+	for (const auto & sym : symbol_table())
+		if (sym.size() != 0 && sym.section_index() == Elf::SHN_COMMON) {
+			bool found = false;
+			for (const auto & object_file : file.loader.lookup) {
+				auto init_sym = object_file.current->resolve_internal_symbol(sym.name());
+				if (init_sym.has_value() && init_sym->type() == sym.type() && init_sym->size() == sym.size()) {
+					auto data = const_cast<Elf::Sym *>(sym.ptr());
+					// Fixup value (= offset)
+					data->st_value = object_file.base + init_sym->value() - base;
+					// Insert into lookup list
+					symbols.insert(init_sym.value());
+					// Mark found
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				// Check if such a symbol was already defined within
+				// Value is alignment
+				auto start = Math::align_up(global_bss, sym.value());
+				// Add to global bss size
+				global_bss = start + sym.size();
+				// This is only allowed since we have a COW mapping
+				auto data = const_cast<Elf::Sym *>(sym.ptr());
+				// Fixup value (= offset)
+				data->st_value = offset + start;
+				// Add to symbol list
+				symbols.insert(sym);
+			}
+		}
+	// Allocate
+	if (global_bss > 0) {
+		auto mem = memory_map.emplace_back(*this, offset, global_bss, base);
+		// increase offset to next free page
+		offset += mem->target.page_size();
+		// And map target
+		mem->map();
+	}
+
 
 	// Perform initial relocations
 	for (auto & relocations : relocation_tables)
@@ -230,31 +300,54 @@ bool ObjectRelocatable::prepare() {
 
 
 bool ObjectRelocatable::update() {
-	// Adjust relocations:
-	// - Fix all relocations to STT_FUNC
-	// - Load RODATA STT_OBJECTs?
+	for (const auto & r : relocations) {
+		// Update only if target has changed (relocation does not point to latest version).
+		// And if this is not the latest version, then omit (shared) data section relocations
+		// since they are performed in the latest version of this object
+		if (!r.value.object().is_latest_version() && r.value.type() == STT_FUNC)
+			relocate(r.key);
+	}
+
 	return true;
 }
 
 
 bool ObjectRelocatable::patchable() const {
 	// check if updateable
+	if (file_previous == nullptr
+	 || file_previous->header.identification != this->header.identification
+	 || file_previous->header.type()         != this->header.type()
+	 || file_previous->header.machine()      != this->header.machine()
+	 || file_previous->header.version()      != this->header.version())
+		return false;
+
+	// TLS must not change
+
 	return true;
+}
+
+
+Optional<ElfSymbolHelper> ObjectRelocatable::resolve_internal_symbol(const SymbolHelper & needle) const {
+	const auto sym = symbols.find(needle);
+	if (sym != symbols.end() && sym->section_index() != Elf::SHN_UNDEF) {
+		return { *sym };
+	}
+
+	// hand over to previous version to resurrect old data fields -- TODO is this intuitive or counter intuitive?
+	//if (file_previous != nullptr)
+	//	return reinterpret_cast<ObjectRelocatable*>(this->file_previous)->resolve_internal_symbol(needle);
+	return {};
 }
 
 
 Optional<VersionedSymbol> ObjectRelocatable::resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version) const {
 	(void) hash;
-	(void) gnu_hash;
 	(void) version;
-
-	// TODO: Use hash map with global symbol names for faster lookup.
-	for (const auto & sym : symbols)
-		if (sym.section_index() != Elf::SHN_UNDEF && sym.bind() != Elf::STB_LOCAL && sym.visibility() == Elf::STV_DEFAULT && String::compare(name, sym.name()) == 0) {
-			VersionedSymbol vs{ sym };
-			return { vs };
-		}
-
+	const auto sym = symbols.find(SymbolHelper{name, gnu_hash});
+	if (sym != symbols.end() && sym->section_index() != Elf::SHN_UNDEF && sym->bind() != Elf::STB_LOCAL && sym->visibility() == Elf::STV_DEFAULT) {
+		VersionedSymbol vs{ *sym };
+		return { vs };
+	}
 	return {};
 }
 
@@ -284,16 +377,25 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 		// We omit the PLT and directly link the target, hence replacing `plt_entry` with `base + symbol.value()``
 		auto plt_entry = base + needed_symbol.value();
 		if (needed_symbol.section_index() != Elf::SHN_UNDEF) {
+			// Special case: We have a newer version of a function
+			if (!is_latest_version() && (needed_symbol.type() == STT_FUNC || needed_symbol.type() == STT_GNU_IFUNC)) {
+				auto latest_symbol = this->file.current->resolve_internal_symbol(needed_symbol.name());
+				if (latest_symbol.has_value() && needed_symbol.type() == latest_symbol->type()) {
+					relocations.insert(reloc, latest_symbol.value());
+					LOG_INFO << "Updating symbol " << needed_symbol.name() << " in " << *this << " with " << latest_symbol->name() << " from " << *file.current << endl;
+					return reinterpret_cast<void*>(relocator.fix_external(this->base, latest_symbol.value(), file.current->base, file.current->base + latest_symbol->value(), this->file.tls_module_id, this->file.tls_offset));
+				}
+			}
 			// Local symbol
-			//relocations.insert(reloc, needed_symbol.value());
-			LOG_INFO << "Relocating local symbol in " << *this << " with " << needed_symbol.name() << " at " << (void*)needed_symbol.value()  << endl;
+			relocations.insert(reloc, needed_symbol);
+			LOG_INFO << "Relocating local symbol " << needed_symbol.name() << " @ " << (void*)(base + needed_symbol.value()) << " in " << *this << endl;
 			return reinterpret_cast<void*>(relocator.fix_internal(this->base, plt_entry, this->file.tls_module_id, this->file.tls_offset));
 		} else {
 			// external symbol
 			// COPY Relocations have a defined symbol with the same name
 			Loader::ResolveSymbolMode mode = relocator.is_copy() ? Loader::RESOLVE_EXCEPT_OBJECT : (file.flags.bind_deep == 1 ? Loader::RESOLVE_OBJECT_FIRST : Loader::RESOLVE_DEFAULT);
 			if (auto external_symbol = file.loader.resolve_symbol(needed_symbol.name(), nullptr, file.ns, &file, mode)) {
-				//relocations.insert(reloc, external_symbol.value());
+				relocations.insert(reloc, external_symbol.value());
 				auto & external_symobj = external_symbol->object();
 				LOG_INFO << "Relocating symbol " << needed_symbol.name() << " in " << *this << " with " << external_symbol->name() << " from " << external_symobj << endl;
 				return reinterpret_cast<void*>(relocator.fix_external(this->base, external_symbol.value(), external_symobj.base, external_symobj.base + external_symbol->value(), file.tls_module_id, file.tls_offset));
@@ -309,7 +411,7 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 
 bool ObjectRelocatable::initialize() {
 	LOG_DEBUG << "Initialize " << *this << endl;
-/*
+
 	// Preinit array
 	for (auto & section : this->sections)
 		if (section.size() > 0 && section.type() == SHT_PREINIT_ARRAY) {
@@ -319,9 +421,9 @@ bool ObjectRelocatable::initialize() {
 		}
 
 	// init func
-	auto init = symbols["_init"];
-	if (init.type() == Elf::STT_FUNC) {
-		auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + init.value());
+	auto init = symbols.find(SymbolHelper{"_init"});
+	if (init != symbols.end() && init->type() == Elf::STT_FUNC) {
+		auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + init->value());
 		f(file.loader.argc, file.loader.argv, file.loader.envp);
 	} else {
 		// In case there is no _init function, we have to use the .init function
@@ -337,9 +439,10 @@ bool ObjectRelocatable::initialize() {
 	for (auto & section : this->sections)
 		if (section.size() > 0 && section.type() == SHT_INIT_ARRAY) {
 			auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + section.virt_addr());
-			for (size_t i = 0; i < section.size() / sizeof(void*); i++)
+			for (size_t i = 0; i < section.size() / sizeof(void*); i++) {
 				f[i](file.loader.argc, file.loader.argv, file.loader.envp);
+			}
 		}
-*/
+
 	return true;
 }

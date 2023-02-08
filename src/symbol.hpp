@@ -9,6 +9,67 @@
 
 struct Object;
 
+// For Hash Set/Map
+struct SymbolHelper {
+	SymbolHelper(const char * name, uint32_t gnu_hash) : _name(name), _gnu_hash_value(gnu_hash) {}
+	SymbolHelper(const char * name) : SymbolHelper(name, ELF_Def::gnuhash(name)) {}
+	SymbolHelper(const SymbolHelper & other) = default;
+	SymbolHelper(SymbolHelper && other) = default;
+
+	const char * name() const {
+		return _name;
+	}
+
+	uint32_t gnu_hash_value() const {
+		return _gnu_hash_value;
+	}
+
+	template <typename T>
+	bool operator==(const T & o) const {
+		return gnu_hash_value() == o.gnu_hash_value() && (name() == o.name() || String::compare(name(), o.name()) == 0);
+	}
+
+	template <typename T>
+	bool operator!=(const T & o) const {
+		return !operator==(o);
+	}
+
+ private:
+	const char * _name;
+	const uint32_t _gnu_hash_value;
+};
+
+struct ElfSymbolHelper : Elf::Symbol {
+	using Elf::Symbol::name;
+	using Elf::Symbol::value;
+	using Elf::Symbol::size;
+	using Elf::Symbol::bind;
+	using Elf::Symbol::type;
+	using Elf::Symbol::visibility;
+	using Elf::Symbol::section_index;
+
+	ElfSymbolHelper(const Elf::Symbol & sym) : Elf::Symbol(sym), _gnu_hash_value(ELF_Def::gnuhash(sym.name())) {}
+	ElfSymbolHelper(const ElfSymbolHelper & other) = default;
+	ElfSymbolHelper(ElfSymbolHelper && other) = default;
+
+	uint32_t gnu_hash_value() const {
+		return _gnu_hash_value;
+	}
+
+	template <typename T>
+	bool operator==(const T & o) const {
+		return gnu_hash_value() == o.gnu_hash_value() && (name() == o.name() || String::compare(name(), o.name()) == 0);
+	}
+
+	template <typename T>
+	bool operator!=(const T & o) const {
+		return !operator==(o);
+	}
+
+ private:
+	const uint32_t _gnu_hash_value;
+};
+
 /*! \brief Symbol with version */
 struct VersionedSymbol : Elf::Symbol {
 	using Elf::Symbol::valid;
@@ -45,9 +106,18 @@ struct VersionedSymbol : Elf::Symbol {
 	VersionedSymbol(const VersionedSymbol & other) = default;
 	VersionedSymbol(VersionedSymbol && other) = default;
 
+	bool operator==(const SymbolHelper & o) const {
+		return gnu_hash_value() == o.gnu_hash_value() && (name() == o.name() || String::compare(name(), o.name()) == 0);
+	}
+
+	bool operator==(const ElfSymbolHelper & o) const {
+		return gnu_hash_value() == o.gnu_hash_value() && (name() == o.name() || String::compare(name(), o.name()) == 0);
+	}
+
 	bool operator==(const VersionedSymbol & o) const;
 
-	bool operator!=(const VersionedSymbol & o) const {
+	template <typename T>
+	bool operator!=(const T & o) const {
 		return !operator==(o);
 	}
 
@@ -73,6 +143,19 @@ struct VersionedSymbol : Elf::Symbol {
 	mutable Optional<uint32_t> _hash_value;
 	mutable Optional<uint32_t> _gnu_hash_value;
 };
+
+struct SymbolComparison {
+	template <typename T, typename O>
+	static inline bool equal(const T & a, const O & b) {
+		return a.operator==(b);
+	}
+
+	template <typename T>
+	static inline uint32_t hash(const T & v) {
+		return v.gnu_hash_value();
+	}
+};
+
 
 BufferStream& operator<<(BufferStream& bs, const VersionedSymbol & s);
 BufferStream& operator<<(BufferStream& bs, const Optional<VersionedSymbol> & s);

@@ -368,7 +368,7 @@ int main(int argc, char* argv[]) {
 			ObjectIdentity * start = nullptr;
 			for (auto & bin : args.get_positional()) {
 				auto flags = loader->default_flags;
-				flags.updatable = 0;
+				flags.updatable = 1;
 				ObjectIdentity * o = loader->open(bin, flags, true);
 				if (o == nullptr) {
 					LOG_ERROR << "Failed loading " << bin << endl;
@@ -405,6 +405,9 @@ int main(int argc, char* argv[]) {
 						StringStream<255> filename;
 						// TODO: static libraries (.a)
 						filename << "lib" << lib << ".so";
+						// Special case: shared libc is suffixed by '.6'
+						if (lib[0] == 'c' && lib[1] == '\0')
+							filename << ".6";
 						if (auto loaded = loader->library(filename.str(), loader->default_flags)) {
 							LOG_INFO << "Loaded " << lib << ": " << *loaded << endl;
 						} else {

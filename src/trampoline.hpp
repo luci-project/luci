@@ -2,7 +2,7 @@
 
 #include <dlh/container/vector.hpp>
 
-#include "versioned_symbol.hpp"
+#include "symbol.hpp"
 
 class Trampoline {
 	Vector<uintptr_t> blocks;  // a block starts with two code pages (similar to PLT) and an additional redirection table (GOT)

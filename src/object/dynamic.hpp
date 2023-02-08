@@ -7,7 +7,7 @@
 #include "object/relocatable.hpp"
 #include "object/executable.hpp"
 
-#include "versioned_symbol.hpp"
+#include "symbol.hpp"
 
 
 struct ObjectDynamic : public ObjectExecutable {

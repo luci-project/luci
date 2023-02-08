@@ -14,7 +14,7 @@
 #include <elfo/elf.hpp>
 #include <bean/bean.hpp>
 
-#include "versioned_symbol.hpp"
+#include "symbol.hpp"
 #include "memory_segment.hpp"
 
 struct ObjectIdentity;
@@ -140,6 +140,12 @@ struct Object : public Elf {
 
 	/*! \brief Get (internal) version = number of updates */
 	size_t version() const;
+
+	/*! \brief Find (even internal) symbols in this object with same name */
+	virtual Optional<ElfSymbolHelper> resolve_internal_symbol(const SymbolHelper & sym) const {
+		(void) sym;
+		return {};
+	}
 
 	/*! \brief Find (external visible) symbol in this object with same name and version */
 	Optional<VersionedSymbol> resolve_symbol(const VersionedSymbol & sym) const {
