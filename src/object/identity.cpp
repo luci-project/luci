@@ -161,7 +161,7 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 	}
 
 	// Adjust permission if required
-	if (addr != 0 && ((flags.immutable_source && type == Elf::ET_REL) || (!flags.immutable_source && type != Elf::ET_REL))) {
+	if (addr != 0 && flags.premapped == 0 && ((flags.immutable_source && type == Elf::ET_REL) || (!flags.immutable_source && type != Elf::ET_REL))) {
 		// Keep it writable for relocatable Objects only
 		if (auto mprotect = Syscall::mprotect(data.addr, data.size, PROT_READ | (type == Elf::ET_REL ? PROT_WRITE : 0)); mprotect.failed())
 			LOG_WARNING << "Unable to adjust protection of target memory: " << mprotect.error_message() << endl;
@@ -182,7 +182,7 @@ bool ObjectIdentity::watch(bool force, bool close_existing) {
 				LOG_WARNING << "Cannot remove old watch for modification of " << this->path << ": " << inotify.error_message() << endl;
 			}
 		}
-		if (auto inotify = Syscall::inotify_add_watch(loader.filemodification_inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW )) {
+		if (auto inotify = Syscall::inotify_add_watch(loader.filemodification_inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
 			LOG_DEBUG << "Watching for modifications at " << this->path << endl;
 			wd = inotify.value();
 		} else {
@@ -342,6 +342,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 		LOG_ERROR << "unable to create object" << endl;
 		return { nullptr, INFO_ERROR_CREATE };
 	}
+	assert(o->valid(data.size, true));
 	o->file_previous = current;
 
 	// If dynamic updates are enabled, compare hashes
