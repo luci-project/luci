@@ -54,6 +54,9 @@ Object::~Object() {
 	for (auto & seg : memory_map)
 		seg.unmap();
 
+	// Reset adress checker
+	file.loader.reset_address(base);
+
 	if (auto unmap = Syscall::munmap(data.addr, data.size); unmap.failed()) {
 		LOG_ERROR << "Unmapping data from " << *this << " failed: " << unmap.error_message() << endl;
 	}

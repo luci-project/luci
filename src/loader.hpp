@@ -161,6 +161,8 @@ struct Loader {
 
 	/*! \brief get next (page aligned) memory address */
 	uintptr_t next_address(size_t size = 0) const;
+	/*! \brief reset start address (required to free allocated address on aborting loading */
+	void reset_address(uintptr_t addr) const;
 
 	/*! \brief check if object is already loaded */
 	bool is_loaded(const ObjectIdentity * ptr) const;

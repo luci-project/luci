@@ -519,6 +519,9 @@ uintptr_t Loader::next_address(size_t size) const {
 	return next;
 }
 
+void Loader::reset_address(uintptr_t addr) const {
+	next_library_address = Math::min(next_library_address, Math::align_up(addr, Page::SIZE));
+}
 
 bool Loader::is_loaded(const ObjectIdentity * ptr) const {
 	for (const auto & object_file : lookup)

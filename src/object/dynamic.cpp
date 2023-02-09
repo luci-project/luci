@@ -149,8 +149,8 @@ bool ObjectDynamic::preload_libraries() {
 			case Elf::DT_FLAGS:
 				if ((dyn.value() & Elf::DF_BIND_NOW) != 0)
 					file.flags.bind_now = 1;
-				if ((dyn.value() & Elf::DF_STATIC_TLS) != 0 && file.loader.tls.gen > 0) {
-					LOG_WARNING << "Cannot dynamically load library " << *this << " with static TLS " << endl;
+				if ((dyn.value() & Elf::DF_STATIC_TLS) != 0 && file_previous == nullptr && this->file.tls_module_id != 0 && file.loader.tls.gen > 0) {
+					LOG_ERROR << *this << " has a static TLS block which cannot be initialized dynamically. Try preloading!" << endl;
 					return false;
 				}
 				break;
@@ -185,7 +185,7 @@ bool ObjectDynamic::preload_libraries() {
 		if (!skip) {
 			auto o = file.loader.library(lib, flags, false, this->rpath, this->runpath, file.ns);
 			if (o == nullptr) {
-				LOG_WARNING << "Unresolved dependency: " << lib << endl;
+				LOG_WARNING << *this << " has an unresolved dependency: " << lib << endl;
 				success = false;
 			} else {
 				dependencies.push_back(o);
