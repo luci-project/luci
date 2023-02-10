@@ -51,6 +51,15 @@ bool ObjectRelocatable::preload() {
 
 	Optional<Elf::Section> tdata, tbss;
 
+	// Check availability of external symbols on updates
+	if (this->file_previous != nullptr && !file.loader.config.force_update)
+		for (const auto & sym : symbol_table())
+			if (sym.section_index() == Elf::SHN_UNDEF && sym.bind() == STB_GLOBAL && !file.loader.resolve_symbol(sym.name(), nullptr, file.ns, &file).has_value()) {
+				LOG_WARNING << "Missing external symbol " << sym.name() << " -- abort updating object!" << endl;
+				return false;
+			}
+
+
 	for (auto & section : this->sections) {
 		if (section.size() == 0)
 			continue;
@@ -406,6 +415,8 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 			}
 		}
 	}
+
+	// TODO: Weak symbols!
 	return nullptr;
 }
 
