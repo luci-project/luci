@@ -147,19 +147,14 @@ void Loader::userfault_handle() {
 							mem.source.object.file.status(ObjectIdentity::INFO_FAILED_REUSE);
 
 							// Copy data
-							if (mem.source.size > 0) {
+							if (mem.buffer == 0) {
+								LOG_WARNING << "No memory backbuffer for " << (void*)mem.target.page_start() << " (" <<  mem.target.page_size() << " Bytes) -- copying from source" << endl;
 								cpy.src = mem.source.object.data.addr + mem.source.offset - (mem.target.address() - mem.target.page_start());
-								cpy.dst = mem.target.page_start();
-								cpy.len = mem.target.page_size();
-								// TODO For zeroing set cpy.mode = UFFDIO_COPY_MODE_DONTWAKE; and issue UFFDIO_WAKE at the end
+							} else {
+								cpy.src = mem.buffer;
 							}
-							// zero
-							if (mem.source.size < mem.target.size) {
-								LOG_ERROR << "Usefault memory segment " << reinterpret_cast<void*>(mem.target.address()) << " with " << mem.target.size << " bytes"
-								          << " (Source " << mem.source.object << " at " << reinterpret_cast<void*>(mem.source.offset) << " with " << mem.source.size << " bytes)"
-								          << " for pagefault at " << reinterpret_cast<void*>(msg.arg.pagefault.address) << " requires zeroing memory -- but not implemented!" << endl;
-								// TODO: For data or rel obj: What about relocations?
-							}
+							cpy.dst = mem.target.page_start();
+							cpy.len = mem.target.page_size();
 							break;
 						}
 					}

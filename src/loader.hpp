@@ -93,6 +93,12 @@ struct Loader {
 	/*! \brief socket to receive elf hash */
 	Socket::Client debug_hash_socket;
 
+	/*! \brief Main thread (for TLS) */
+	Thread * main_thread = nullptr;
+
+	/*! \brief Pointer to handler thread */
+	Thread * handler_thread = nullptr;
+
 	/*! \brief Descriptor for status info output */
 	int statusinfofd = -1;
 
@@ -185,9 +191,6 @@ struct Loader {
 	/*! \brief next unused address for library */
 	mutable uintptr_t next_library_address = LIBADDRESS;
 
-	/*! \brief Main thread (for TLS) */
-	Thread * main_thread = nullptr;
-
 	/*! \brief helper loop for file modification detection and userfault handling (executed in new thread) */
 	void helper_loop();
 
@@ -210,5 +213,5 @@ struct Loader {
 	uintptr_t get_entry_point(Object * start, const char * custom_entry_point = nullptr);
 
 	/*! \brief prepare all loaded files for execution */
-	bool prepare();
+	bool prepare(Object * start);
 };
