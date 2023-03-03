@@ -130,7 +130,7 @@ struct Object : public Elf {
 	virtual bool unprotect() const;
 
 	/*! \brief Initialisation method */
-	virtual bool initialize() { return true; };
+	virtual bool initialize(bool preinit = false) { (void)preinit; return true; };
 
 	/*! \brief Check if current object can patch a previous version */
 	virtual bool patchable() const { return false; };

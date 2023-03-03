@@ -50,7 +50,7 @@ struct ObjectDynamic : public ObjectExecutable {
 		return relocate(reloc, fix, fatal);
 	}
 
-	bool initialize() override;
+	bool initialize(bool preinit = false) override;
 
  private:
 	Elf::DynamicTable dynamic_table;

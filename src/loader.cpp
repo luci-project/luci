@@ -250,7 +250,7 @@ bool Loader::relocate(bool update) {
 }
 
 extern "C" uintptr_t __stack_chk_guard;
-bool Loader::prepare() {
+bool Loader::prepare(Object * start) {
 	// Setup DLH vdso
 	if (auto sym = resolve_symbol("__vdso_clock_gettime")) {
 		Syscall::__clock_gettime = reinterpret_cast<int (*)(clockid_t, struct timespec *)>(sym->object().base + sym->value());
@@ -294,6 +294,9 @@ bool Loader::prepare() {
 
 	// Initialize GDB
 	GDB::init(*this);
+
+	// Preinitizalize executable
+	start->initialize(true);
 
 	// Initialize (but not executable itself)
 	for (auto & o : reverse(lookup))
@@ -371,7 +374,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	lookup.push_front(file);
 
 	// Prepare libraries
-	if (!prepare()) {
+	if (!prepare(start)) {
 		LOG_ERROR << "Preparation for execution of " << file << " failed..." << endl;
 		file->flags.initialized = false;
 		return false;
@@ -415,7 +418,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 	lookup.push_front(file);
 
 	// Prepare libraries
-	if (!prepare()) {
+	if (!prepare(start)) {
 		LOG_ERROR << "Preparation for execution of " << file << " failed..." << endl;
 		file->flags.initialized = false;
 		return false;
@@ -572,11 +575,11 @@ bool Loader::start_handler_threads() {
 			for (auto & object_file : lookup)
 				object_file.watch(true, false);
 
-			if (Thread::create(&kickoff_helper_loop, this, true) == nullptr) {
-				LOG_ERROR << "Creating file modification handler thread failed" << endl;
+			if ((handler_thread = Thread::create(&kickoff_helper_loop, this, true, true, true)) == nullptr) {
+				LOG_ERROR << "Creating (file modification) handler thread failed" << endl;
 				success = false;
 			} else {
-				LOG_INFO << "Created file modification handler thread" << endl;
+				LOG_INFO << "Created (file modification) handler thread" << endl;
 			}
 		} else {
 			LOG_ERROR << "Initializing file modification failed: " << inotify.error_message() << endl;

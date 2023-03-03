@@ -33,7 +33,7 @@ struct ObjectRelocatable : public Object {
 
 	void* relocate(const Elf::Relocation & reloc) const;
 
-	bool initialize() override;
+	bool initialize(bool preinit = false) override;
 
  private:
 	uintptr_t offset = 0;

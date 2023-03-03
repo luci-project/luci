@@ -410,9 +410,14 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(uintptr_t addr) const {
 	return {};
 }
 
-bool ObjectDynamic::initialize() {
+bool ObjectDynamic::initialize(bool preinit) {
 	// use mapped memory (due to relocations)
-	LOG_DEBUG << "Initialize " << *this << endl;
-	dynamic_table.init(file.loader.argc, file.loader.argv, file.loader.envp, base);
+	if (preinit) {
+		LOG_DEBUG << "Preinitialize " << *this << endl;
+		dynamic_table.preinit(file.loader.argc, file.loader.argv, file.loader.envp, base);
+	} else {
+		LOG_DEBUG << "Initialize " << *this << endl;
+		dynamic_table.init(file.loader.argc, file.loader.argv, file.loader.envp, base);
+	}
 	return true;
 }

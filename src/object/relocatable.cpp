@@ -420,40 +420,41 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 	return nullptr;
 }
 
-bool ObjectRelocatable::initialize() {
-	LOG_DEBUG << "Initialize " << *this << endl;
-
-	// Preinit array
-	for (auto & section : this->sections)
-		if (section.size() > 0 && section.type() == SHT_PREINIT_ARRAY) {
-			auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + section.virt_addr());
-			for (size_t i = 0; i < section.size() / sizeof(void*); i++)
-				f[i](this->file.loader.argc, this->file.loader.argv, this->file.loader.envp);
+bool ObjectRelocatable::initialize(bool preinit) {
+	if (preinit) {
+		LOG_DEBUG << "Preinitialize " << *this << endl;
+		// Preinit array
+		for (auto & section : this->sections)
+			if (section.size() > 0 && section.type() == SHT_PREINIT_ARRAY) {
+				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + section.virt_addr());
+				for (size_t i = 0; i < section.size() / sizeof(void*); i++)
+					f[i](this->file.loader.argc, this->file.loader.argv, this->file.loader.envp);
+			}
+	} else {
+		LOG_DEBUG << "Initialize " << *this << endl;
+		// init func
+		auto init = symbols.find(SymbolHelper{"_init"});
+		if (init != symbols.end() && init->type() == Elf::STT_FUNC) {
+			auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + init->value());
+			f(file.loader.argc, file.loader.argv, file.loader.envp);
+		} else {
+			// In case there is no _init function, we have to use the .init function
+			for (auto & section : this->init_sections)
+				if (strcmp(section.name(), ".init") == 0) {
+					assert(section.size() > 0 && section.type() == SHT_PROGBITS);
+					auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + section.virt_addr());
+					f(file.loader.argc, file.loader.argv, file.loader.envp);
+				}
 		}
 
-	// init func
-	auto init = symbols.find(SymbolHelper{"_init"});
-	if (init != symbols.end() && init->type() == Elf::STT_FUNC) {
-		auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + init->value());
-		f(file.loader.argc, file.loader.argv, file.loader.envp);
-	} else {
-		// In case there is no _init function, we have to use the .init function
-		for (auto & section : this->init_sections)
-			if (strcmp(section.name(), ".init") == 0) {
-				assert(section.size() > 0 && section.type() == SHT_PROGBITS);
-				auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + section.virt_addr());
-				f(file.loader.argc, file.loader.argv, file.loader.envp);
+		// init array
+		for (auto & section : this->sections)
+			if (section.size() > 0 && section.type() == SHT_INIT_ARRAY) {
+				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + section.virt_addr());
+				for (size_t i = 0; i < section.size() / sizeof(void*); i++) {
+					f[i](file.loader.argc, file.loader.argv, file.loader.envp);
+				}
 			}
 	}
-
-	// init array
-	for (auto & section : this->sections)
-		if (section.size() > 0 && section.type() == SHT_INIT_ARRAY) {
-			auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + section.virt_addr());
-			for (size_t i = 0; i < section.size() / sizeof(void*); i++) {
-				f[i](file.loader.argc, file.loader.argv, file.loader.envp);
-			}
-		}
-
 	return true;
 }
