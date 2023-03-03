@@ -110,7 +110,7 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 		}
 
 		// Check if already loaded (using modification time)
-		if (loader.config.use_mtime && !flags.ignore_mtime)
+		if (loader.config.use_mtime && !flags.ignore_mtime && !flags.ignore_identical)
 			for (Object * obj = current; obj != nullptr; obj = obj->file_previous)
 				if (obj->data.modification_time.tv_sec == data.modification_time.tv_sec && obj->data.modification_time.tv_nsec == data.modification_time.tv_nsec && obj->data.size == data.size) {
 					LOG_INFO << "Already loaded " << *this << " with same modification time -- abort loading..." << endl;
@@ -277,7 +277,7 @@ ObjectIdentity::~ObjectIdentity() {
 
 Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 	// Hash file contents
-	if (flags.updatable) {
+	if (flags.updatable && !flags.ignore_identical) {
 		XXHash64 datahash(name.hash);  // Name hash as seed
 		datahash.add(data.addr, data.size);
 		data.hash = datahash.hash();
@@ -332,6 +332,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 			o = new ObjectDynamic{*this, data, true};
 			break;
 		case Elf::ET_REL:
+			flags.ignore_identical = true;
 			o = new ObjectRelocatable{*this, data};
 			break;
 		default:

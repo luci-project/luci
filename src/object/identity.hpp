@@ -67,6 +67,7 @@ struct ObjectIdentity {
 			         update_outdated  : 1,  // On update also rewrite outdated relocations
 			         immutable_source : 1,  // ELF Source (file / memory) is immutable (no changes during runtime)
 			         ignore_mtime     : 1,  // Do not rely on modification time when checking for file modifications
+			         ignore_identical : 1,  // Ignore if identical file was already loaded
 			         initialized      : 1,  // Do not executed INIT functions / constructors (again)
 			         premapped        : 1;  // Already mapped into target memory
 		};
