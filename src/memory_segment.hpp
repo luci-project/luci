@@ -51,6 +51,9 @@ struct MemorySegment {
 		/*! \brief Memory file descriptor for shared data */
 		int fd;
 
+		/* Mapping flags */
+		int flags;
+
 		/*! \brief read-only relocation */
 		bool relro;
 
@@ -89,10 +92,12 @@ struct MemorySegment {
 		}
 	} target;
 
+	uintptr_t buffer = 0;
+
 	/*! \brief Constructor for Segments */
 	MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base = 0, uintptr_t offset_delta = 0)
 	  : source{object, segment.offset() + offset_delta, segment.size() - offset_delta},
-	    target{base, segment.virt_addr() + offset_delta, segment.virt_size() - offset_delta, PROT_NONE | (segment.readable() ? PROT_READ : 0) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, segment.type() == Elf::PT_GNU_RELRO, MEMSEG_NOT_MAPPED} {
+	    target{base, segment.virt_addr() + offset_delta, segment.virt_size() - offset_delta, (segment.readable() ? PROT_READ : PROT_NONE) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, 0, segment.type() == Elf::PT_GNU_RELRO, MEMSEG_NOT_MAPPED} {
 		assert(!(target.relro && segment.writeable()));
 		assert(target.size >= source.size);
 	}
@@ -100,18 +105,24 @@ struct MemorySegment {
 	/*! \brief Constructor for Sections */
 	MemorySegment(const Object & object, const Elf::Section & section, size_t target_offset, size_t target_size_delta = 0, uintptr_t base = 0)
 	  : source{object, section.offset(), section.type() == Elf::SHT_NOBITS ? 0 : section.size() },
-	    target{base, target_offset, section.size() + target_size_delta, PROT_NONE | PROT_READ | PROT_WRITE | (section.writeable() ? PROT_WRITE : 0) | (section.executable() ? PROT_EXEC : 0), PROT_NONE, -1, false, MEMSEG_NOT_MAPPED} {
+	    target{base, target_offset, section.size() + target_size_delta, PROT_READ | PROT_WRITE | (section.writeable() ? PROT_WRITE : 0) | (section.executable() ? PROT_EXEC : 0), PROT_NONE, -1, 0, false, MEMSEG_NOT_MAPPED} {
 			assert((target.address() % section.alignment()) == 0);
 		}
 
 	/*! \brief Constructor for pure BSS */
 	MemorySegment(const Object & object, size_t target_offset, size_t target_size, uintptr_t base = 0)
 	  : source{object, 0, 0 },
-		target{base, target_offset, target_size, PROT_NONE | PROT_READ | PROT_WRITE, PROT_NONE, -1, false, MEMSEG_NOT_MAPPED} {}
+		target{base, target_offset, target_size, PROT_READ | PROT_WRITE, PROT_NONE, -1, 0, false, MEMSEG_NOT_MAPPED} {}
 
 
 	/*! \brief Destructor (clean up) */
 	~MemorySegment();
+
+	/*! \brief Allocate/get address of temporary (back) buffer to modify contents offline */
+	uintptr_t compose();
+
+	/*! \brief Use compositing buffer (if set) and adjust protection  */
+	bool finalize(bool force = false);
 
 	/*! \brief allocate in memory */
 	bool map();
@@ -124,6 +135,9 @@ struct MemorySegment {
 
 	/* \brief set (non writeable) memory inactive */
 	bool disable();
+
+	/* \brief reactivate (non writeable) memory */
+	bool enable();
 
 	/*! \brief release memory allocation */
 	bool unmap();

@@ -78,6 +78,58 @@ bool MemorySegment::map() {
 	return true;
 }
 
+static const int flags_privanon = MAP_ANONYMOUS | MAP_PRIVATE;
+uintptr_t MemorySegment::compose() {
+	if (buffer == 0) {
+		// Memory segment must be mapped
+		if (target.status != MEMSEG_MAPPED) {
+			if (!map())
+				return 0;
+		}
+		// Compositing is only used for non-writable segments
+		if ((target.protection & PROT_WRITE) != 0) {
+			LOG_WARNING << "No need to compose back buffer for " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << " since it is writable!" << endl;
+			return target.address();
+		}
+		// Create anonymous writable mapping with same size as source
+		if (auto mmap = Syscall::mmap(0, target.page_size(), PROT_READ | PROT_WRITE, flags_privanon, -1, 0)) {
+			// Duplicate full pages (just for debugging)
+			buffer = Memory::copy(mmap.value(), target.page_start(), target.page_size());
+			LOG_DEBUG << "Created compose back buffer at " << (void*)buffer << " for " << (void*)target.page_start() << " (" << target.page_size() << " Bytes)" << endl;
+		} else {
+			LOG_ERROR << "Mapping back buffer for " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) failed: " << mmap.error_message() << endl;
+		}
+	}
+	return buffer;
+}
+
+bool MemorySegment::finalize(bool force) {
+	bool result = true;
+	if (!force && target.status == MEMSEG_INACTIVE) {
+		LOG_WARNING << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) is currently disabled, hence ignoring finalize request" << endl;
+	} else if (buffer != 0) {
+
+		// Adjust permissions
+		if (auto mprotect = Syscall::mprotect(buffer, target.page_size(), target.protection)) {
+			target.effective_protection = target.protection;
+		} else {
+			LOG_WARNING << "Unable to adjust protection for " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << ": " << mprotect.error_message() << endl;
+			result = false;
+		}
+
+		// Remap
+		if (auto mremap = Syscall::mremap(buffer, target.page_size(), target.page_size(), MREMAP_MAYMOVE | MREMAP_FIXED, target.page_start())) {
+			target.flags = flags_privanon;
+			buffer = 0;
+			LOG_INFO << "Updated " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << " with composite back buffer (private mapping)" << endl;
+		} else {
+			LOG_ERROR << "Protecting " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mremap.error_message() << endl;
+			result = false;
+		}
+	}
+	return result;
+}
+
 bool MemorySegment::protect() {
 	if (target.status == MEMSEG_NOT_MAPPED) {
 		LOG_WARNING << "Cannot protect " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << " since it is not mapped!" << endl;
@@ -115,47 +167,86 @@ bool MemorySegment::unprotect() {
 }
 
 bool MemorySegment::disable() {
-	switch (target.status) {
-		case MEMSEG_INACTIVE:
-			LOG_DEBUG << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) already inactive!" << endl;
-			break;
-		case MEMSEG_MAPPED:
-		case MEMSEG_REACTIVATED:
-		{
-			if ((target.protection & ~(PROT_NONE | PROT_READ | PROT_EXEC)) != 0) {
-				LOG_WARNING << "Memory at " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) has potential unsuitable permissions for disabling!" << endl;
-			}
-
-			auto & identity = source.object.file;
-			if (identity.loader.config.detect_outdated == Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD) {
-				// TODO: This code is racy
-
-				// create private anonymous mapping
-				if (auto mmap = Syscall::mmap(target.page_start(), target.page_size(), target.protection, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) {
-					target.status = MEMSEG_INACTIVE;
-					target.effective_protection = target.protection;
-				} else {
-					LOG_ERROR << "Mapping (inactive) " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mmap.error_message() << endl;
-					return false;
-				}
-
-				// register Userfault
-				uffdio_register reg(target.page_start(), target.page_size(), UFFDIO_REGISTER_MODE_MISSING);
-				if (auto ioctl = Syscall::ioctl(identity.loader.userfaultfd, UFFDIO_REGISTER, &reg)) {
-					LOG_DEBUG << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) disabled!" << endl;
-					return true;
-				} else {
-					LOG_ERROR << "Registering " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) for userfault failed!" << endl;
-					return false;
-				}
-			}
-			break;
+	if (target.status == MEMSEG_NOT_MAPPED) {
+		LOG_WARNING << "Cannot disable " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) since it is not mapped!" << endl;
+		return false;
+	} else if (target.status == MEMSEG_INACTIVE) {
+		LOG_DEBUG << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) already inactive!" << endl;
+		return true;
+	} else {
+		if ((target.protection & ~(PROT_NONE | PROT_READ | PROT_EXEC)) != 0) {
+			LOG_WARNING << "Memory at " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) has potential unsuitable permissions for disabling!" << endl;
 		}
-		default:
-			LOG_WARNING << "Cannot disable " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) since it is not mapped!" << endl;
-			return false;
+
+		auto & identity = source.object.file;
+		if (identity.loader.config.detect_outdated == Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD) {
+			/* The only way to register a page range in userfault without having the code unmapped for few cycles
+			 * is by using a a private anonymous memory with copied contents.
+			 * The approach is
+			 *  - create private anonymous copy of page range (if not already done yet)
+			 *  - use it to replace the active target memory range (using remap)
+			 *  - register range for userfault
+			 *  - remap it again, but do not unmap target memory range -> userfault on access
+			 * To re-enable it, the last step will be reversed.
+			 */
+			uintptr_t page_start = 0;
+			if ((target.flags & flags_privanon) != flags_privanon) {
+				// save old memory address
+				page_start = buffer;
+				// Create & set private mapping
+				if (compose() == 0 || !finalize())
+					return false;
+			} else if (auto mmap = Syscall::mmap(0, target.page_size(), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)) {
+				page_start = mmap.value();
+			} else {
+				// Unable to find a unused memory range
+				LOG_ERROR << "Unable to map a range for " << target.page_size() << " Bytes (for userfault buffer): " << mmap.error_message() << endl;
+				return false;
+			}
+
+			// Register userfaultfd
+			uffdio_register reg(target.page_start(), target.page_size(), UFFDIO_REGISTER_MODE_MISSING);
+			if (auto ioctl = Syscall::ioctl(identity.loader.userfaultfd, UFFDIO_REGISTER, &reg)) {
+				LOG_DEBUG << "Registered Userfault for memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes)!" << endl;
+			} else {
+				LOG_ERROR << "Registering " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) for userfault failed!" << endl;
+				return false;
+			}
+
+			// Move mapping again, but do not unmap old code
+			if (auto mremap = Syscall::mremap(target.page_start(), target.page_size(), target.page_size(), MREMAP_MAYMOVE | MREMAP_FIXED | MREMAP_DONTUNMAP, page_start)) {
+				buffer = mremap.value();
+				target.status = MEMSEG_INACTIVE;
+				target.effective_protection = target.protection;
+				LOG_DEBUG << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) disabled, contents moved to " << (void*)(mremap.value()) << endl;
+
+				// Compose buffer shall be writeable (and not executable);
+				if (auto mprotect = Syscall::mprotect(buffer, target.page_size(), PROT_READ | PROT_WRITE); mprotect.failed()) {
+					LOG_ERROR << "Making compose back buffer " << (void*)buffer << " (" << target.page_size() << " Bytes) writeable failed: " << mprotect.error_message() << endl;
+				}
+			} else {
+				LOG_ERROR << "Remapping " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mremap.error_message() << endl;
+				return false;
+			}
+		}
+		return true;
 	}
-	return true;
+}
+
+bool MemorySegment::enable() {
+	if (target.status != MEMSEG_INACTIVE) {
+		LOG_WARNING << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) not inactive" << endl;
+		return false;
+	} else if (buffer == 0) {
+		LOG_ERROR << "No back buffer for memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes)" << endl;
+		return false;
+	} else if (!finalize(true)) {
+		LOG_WARNING << "Cannot enable memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes)" << endl;
+		return false;
+	} else {
+		LOG_DEBUG << "Manually enabled memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes)" << endl;
+		return true;
+	}
 }
 
 bool MemorySegment::unmap() {
