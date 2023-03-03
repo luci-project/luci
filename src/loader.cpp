@@ -3,6 +3,7 @@
 #include <dlh/stream/output.hpp>
 #include <dlh/stream/buffer.hpp>
 #include <dlh/parser/string.hpp>
+#include <dlh/parser/ar.hpp>
 #include <dlh/auxiliary.hpp>
 #include <dlh/syscall.hpp>
 #include <dlh/xxhash.hpp>
@@ -16,7 +17,6 @@
 #include "comp/glibc/start.hpp"
 #include "comp/glibc/init.hpp"
 #include "comp/gdb.hpp"
-#include "comp/ar.hpp"
 #include "object/base.hpp"
 #include "process.hpp"
 #include "page.hpp"
