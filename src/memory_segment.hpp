@@ -121,12 +121,6 @@ struct MemorySegment {
 	/*! \brief allocate in memory */
 	bool map();
 
-	/*! \brief set protection according to flags */
-	bool protect();
-
-	/*! \brief unprotect (make writable)  */
-	bool unprotect();
-
 	/* \brief set (non writeable) memory inactive */
 	bool disable();
 

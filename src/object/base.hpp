@@ -123,11 +123,18 @@ struct Object : public Elf {
 	/*! \brief Does this object use memory aliasing for data? */
 	virtual bool use_data_alias() const { return false; };
 
-	/*! \brief Set protection flags in memory */
-	virtual bool protect() const;
+	/*! \brief Helper to get pointer in compose buffer corresponding to an active address */
+	template<typename T>
+	T * compose_pointer(T * pointer) {
+		auto ptr = reinterpret_cast<uintptr_t>(pointer);
+		for (auto & seg : memory_map)
+			if (seg.target.contains(ptr))
+				return reinterpret_cast<T *>(seg.compose() + ptr - seg.target.address());
+		return nullptr;
+	}
 
-	/*! \brief Unprotect (make writable)  */
-	virtual bool unprotect() const;
+	/*! \brief Update mapping and set protection in memory */
+	virtual bool finalize() const;
 
 	/*! \brief Initialisation method */
 	virtual bool initialize(bool preinit = false) { (void)preinit; return true; };

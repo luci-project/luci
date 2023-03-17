@@ -136,17 +136,10 @@ bool Object::map() {
 	return success;
 }
 
-bool Object::protect() const {
+bool Object::finalize() const {
 	bool success = true;
 	for (auto & seg : memory_map)
-		success &= seg.protect();
-	return success;
-}
-
-bool Object::unprotect() const {
-	bool success = true;
-	for (auto & seg : memory_map)
-		success &= seg.unprotect();
+		success &= seg.finalize();
 	return success;
 }
 

@@ -113,6 +113,9 @@ struct Loader {
 	const char ** argv = nullptr;
 	const char ** envp = nullptr;
 
+	/*! \brief has the process control? */
+	bool process_started = false;
+
 	/*! \brief Default flags for objects */
 	ObjectIdentity::Flags default_flags;
 

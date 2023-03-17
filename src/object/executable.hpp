@@ -14,6 +14,4 @@ struct ObjectExecutable : public Object {
 	/*! \brief initialize segments */
 	bool preload_segments();
 
-	virtual bool unprotect() const override;
-
 };

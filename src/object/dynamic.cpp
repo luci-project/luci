@@ -258,44 +258,45 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 	// Initialize relocator object
 	Relocator relocator(reloc, this->global_offset_table);
 
+	// Since we have only a few segments, iterating is just fine
+	MemorySegment * seg = nullptr;
+	for (auto &mem : memory_map)
+		if (mem.target.contains(relocator.address(this->base))) {
+			seg = &mem;
+			break;
+		}
+
 	// Detect changes in data relocation
 	Pair<int,uintptr_t> datarel_key{-1,0};
-	if (file.loader.config.check_relocation_content && is_latest_version())
-		for (auto &mem : memory_map)
-			if (mem.target.contains(relocator.address(this->base))) {
-				datarel_key.first = mem.target.fd;
+	if (seg != nullptr && file.loader.config.check_relocation_content && is_latest_version()) {
+		datarel_key.first = seg->target.fd;
 
-				// Address relative to start of segment
-				assert(relocator.address(this->base) >= mem.target.address());
-				datarel_key.second = relocator.address(this->base) - mem.target.address();
+		// Address relative to start of segment
+		assert(relocator.address(this->base) >= seg->target.address());
+		datarel_key.second = relocator.address(this->base) - seg->target.address();
 
-				auto cached = file.datarel_content.find(datarel_key);
-				if (cached != file.datarel_content.end()){
-					uintptr_t current_value = *reinterpret_cast<uintptr_t *>(relocator.address(this->base));
-					if (current_value != cached->value) {
-						LOG_WARNING << "Value at relocation target " << reinterpret_cast<void*>(relocator.address(this->base)) << " has changed: " << reinterpret_cast<void*>(current_value) << " instead of " << reinterpret_cast<void*>(cached->value) << " (skipping!)" << endl;
-						return reinterpret_cast<void*>(cached->value);
-					}
-				}
-				break;
+		auto cached = file.datarel_content.find(datarel_key);
+		if (cached != file.datarel_content.end()){
+			uintptr_t current_value = *reinterpret_cast<uintptr_t *>(relocator.address(this->base));
+			if (current_value != cached->value) {
+				LOG_WARNING << "Value at relocation target " << reinterpret_cast<void*>(relocator.address(this->base)) << " has changed: " << reinterpret_cast<void*>(current_value) << " instead of " << reinterpret_cast<void*>(cached->value) << " (skipping!)" << endl;
+				return reinterpret_cast<void*>(cached->value);
 			}
+		}
+	}
 
 	// find symbol
 	auto need_symbol_index = reloc.symbol_index();
 	if (need_symbol_index == 0) {
 		// Local symbol
-		if (fix) {
-			if (mapping_protected)
-				unprotect();
-			auto r = relocator.fix_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset);
-			if (mapping_protected)
-				protect();
+		auto value = relocator.value_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset);
+		if (relocator.is_copy() || (fix && relocator.read_value(this->base) != value)) {
+			auto r = relocator.fix_value_internal(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), value);
+			assert(r == value);
 			if (datarel_key.first != -1)
 				file.datarel_content[datarel_key] = r;
-			return reinterpret_cast<void*>(r);
-		} else {
-			return reinterpret_cast<void*>(relocator.value_internal(this->base, 0, this->file.tls_module_id, this->file.tls_offset));
 		}
+		return reinterpret_cast<void*>(value);
 	} else /* TODO: if (!dynamic_symbols.ignored(need_symbol_index)) */ {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
 		//assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
@@ -306,20 +307,17 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 			// Update / add symbol to cache
 			relocations.insert(reloc, symbol.value());
 			auto & symobj = symbol->object();
-			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << endl;
-			if (fix) {
-				// Relocation read-only is protected
-				if (mapping_protected)
-					unprotect();
-				auto r = relocator.fix_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset);
-				if (mapping_protected)
-					protect();
+
+			auto value = relocator.value_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset);
+			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << " to " << (void*)value <<  endl;
+			if (relocator.is_copy() || (fix && relocator.read_value(this->base) != value)) {
+				auto r = relocator.fix_value_external(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), symbol.value(), value);
+				assert(r == value);
 				if (datarel_key.first != -1)
 					file.datarel_content[datarel_key] = r;
 				return reinterpret_cast<void*>(r);
-			} else {
-				return reinterpret_cast<void*>(relocator.value_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset));
 			}
+			return reinterpret_cast<void*>(value);
 		} else if (need_symbol.bind() == STB_WEAK) {
 			LOG_DEBUG << "Unable to resolve weak symbol " << need_symbol << "..." << endl;
 		} else {

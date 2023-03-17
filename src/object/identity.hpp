@@ -136,11 +136,8 @@ private:
 	/*! \brief Update relocations */
 	bool update();
 
-	/*! \brief Protect segments */
-	bool protect();
-
-	/*! \brief Unprotect (make writable) relro segments */
-	bool unprotect();
+	/*! \brief Update mapping and set protection in memory */
+	bool finalize();
 
 	/*! \brief call initializer */
 	bool initialize();

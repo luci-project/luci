@@ -52,7 +52,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 							assert(new_fd != -1);
 							m.target.fd = new_fd;
 							m.map();
-							m.protect();
+							m.finalize();
 							remaps++;
 						}
 					}

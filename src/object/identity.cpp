@@ -177,7 +177,7 @@ bool ObjectIdentity::watch(bool force, bool close_existing) {
 			if (auto inotify = Syscall::inotify_rm_watch(loader.filemodification_inotifyfd, wd)) {
 				LOG_DEBUG << "Remove old watch for modifications at " << this->path << endl;
 			} else if (force) {
-				LOG_DEBUG << "Cannot remove old watch for modification of " << this->path << " (" << inotify.error_message() << "). however we have expected this in force mode... (ignored)" << endl;
+				LOG_TRACE << "Cannot remove old watch for modification of " << this->path << " (" << inotify.error_message() << "), however we have expected this in force mode... (ignored)" << endl;
 			} else  {
 				LOG_WARNING << "Cannot remove old watch for modification of " << this->path << ": " << inotify.error_message() << endl;
 			}
@@ -464,29 +464,13 @@ bool ObjectIdentity::update() {
 	return success;
 }
 
-bool ObjectIdentity::protect() {
-	bool success = true;
-	if (flags.premapped == 0)
-		for (Object * c = current; c != nullptr; c = c->file_previous) {
-			LOG_DEBUG << "Protecting " << *c << endl;
-			success &= c->protect();
-			c->mapping_protected = true;
-			if (!flags.update_outdated)
-				break;
-		}
-	return success;
-}
 
-bool ObjectIdentity::unprotect() {
+bool ObjectIdentity::finalize() {
 	bool success = true;
-	if (flags.premapped == 0)
-		for (Object * c = current; c != nullptr; c = c->file_previous) {
-			LOG_DEBUG << "Unprotecting " << *c << endl;
-			success &= c->unprotect();
-			c->mapping_protected = false;
-			if (!flags.update_outdated)
-				break;
-		}
+	for (Object * c = current; c != nullptr; c = c->file_previous) {
+		LOG_DEBUG << "Finalizing " << *c << endl;
+		success &= c->finalize();
+	}
 	return success;
 }
 

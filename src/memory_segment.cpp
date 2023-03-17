@@ -109,7 +109,7 @@ uintptr_t MemorySegment::compose() {
 		if ((target.effective_protection & PROT_WRITE) != 0) {
 			return target.address();
 		}
-		// If process has not started yet -> we can just change permissions
+		// If process has not started yet -> we can just change permissions and use current buffer
 		if (!source.object.file.loader.process_started && Syscall::mprotect(target.page_start(), target.page_size(), target.effective_protection | PROT_WRITE ).success()) {
 			target.effective_protection |= PROT_WRITE;
 			return target.address();
@@ -159,42 +159,6 @@ bool MemorySegment::finalize(bool force) {
 		return true;;
 	} else {
 		LOG_ERROR << "Protecting " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mprotect.error_message() << endl;
-		return false;
-	}
-}
-
-bool MemorySegment::protect() {
-	if (target.status == MEMSEG_NOT_MAPPED) {
-		LOG_WARNING << "Cannot protect " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << " since it is not mapped!" << endl;
-		return false;
-	} else if (target.status == MEMSEG_INACTIVE || target.status == MEMSEG_REACTIVATED) {
-		LOG_DEBUG << "Inactive memory " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << " should be protected -- silently skipping!" << endl;
-		return true;
-	} else if (target.effective_protection == target.protection) {
-		return true;
-	} else if (auto mprotect = Syscall::mprotect(target.page_start(), target.page_size(), target.protection)) {
-		target.effective_protection = target.protection;
-		return true;
-	} else {
-		LOG_ERROR << "Protecting " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mprotect.error_message() << endl;
-		return false;
-	}
-}
-
-bool MemorySegment::unprotect() {
-	if (target.status == MEMSEG_NOT_MAPPED) {
-		LOG_WARNING << "Cannot unprotect " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) since it is not mapped!" << endl;
-		return false;
-	} else if (target.status == MEMSEG_INACTIVE || target.status == MEMSEG_REACTIVATED) {
-		LOG_DEBUG << "Inactive memory " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << " should be unprotected -- silently skipping!" << endl;
-		return true;
-	} else if ((target.effective_protection & PROT_WRITE) != 0) {
-		return true;
-	} else if (auto mprotect = Syscall::mprotect(target.page_start(), target.page_size(), target.effective_protection | PROT_WRITE )) {
-		target.effective_protection |= PROT_WRITE;
-		return true;
-	} else {
-		LOG_ERROR << "Unprotecting " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mprotect.error_message() << endl;
 		return false;
 	}
 }

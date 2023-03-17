@@ -21,7 +21,7 @@ bool ObjectExecutable::preload_segments() {
 	for (auto & segment : this->segments)
 		if (Elf::PT_LOAD == segment.type() && segment.virt_size() > 0) {
 			if (relro != nullptr && segment.offset() == relro->offset() && segment.virt_addr() == relro->virt_addr()) {
-				LOG_DEBUG << "Relocation read-only at " << reinterpret_cast<void*>(relro->virt_addr()) << " with " << relro->size() << "bytes" << endl;
+				LOG_DEBUG << "Relocation read-only at " << reinterpret_cast<void*>(relro->virt_addr()) << " with " << relro->size() << " bytes" << endl;
 				// Relro section
 				memory_map.emplace_back(*this, *relro, base);
 				// Rest of data section (if any)
@@ -50,14 +50,4 @@ bool ObjectExecutable::preload_segments() {
 	}
 
 	return memory_map.size() > 0;
-}
-
-
-bool ObjectExecutable::unprotect() const {
-	// make relocation read-only segments writable
-	bool success = true;
-	for (auto & mem : memory_map)
-		if (& mem.target.relro)
-			success &= mem.unprotect();
-	return success;
 }

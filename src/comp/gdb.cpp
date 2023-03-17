@@ -26,11 +26,8 @@ static bool set_dynamic_debug(const ObjectIdentity * object) {
 			if (dyn->d_tag == Elf::DT_DEBUG) {
 				auto current = object->current;
 				assert(current != nullptr);
-				if (current->mapping_protected)
-					current->unprotect();
-				dyn->d_un.d_ptr = reinterpret_cast<uintptr_t>(&r_debug);
-				if (current->mapping_protected)
-					current->protect();
+				current->compose_pointer(dyn)->d_un.d_ptr = reinterpret_cast<uintptr_t>(&r_debug);
+				current->finalize();
 				LOG_INFO << "GDB debug structure in " << *object << " at *" << &(dyn->d_un.d_ptr) << " = " << &r_debug << endl;
 				return true;
 			}

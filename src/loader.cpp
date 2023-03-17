@@ -228,10 +228,7 @@ bool Loader::relocate(bool update) {
 
 	// Optional: Update relocations
 	if (update) {
-		// TODO: Unmap if relro
 		for (auto & o : reverse(lookup)) {
-			if (!o.unprotect())
-				return false;
 			if (!o.update())
 				return false;
 		}
@@ -241,9 +238,9 @@ bool Loader::relocate(bool update) {
 			dlsyms.update();
 	}
 
-	// Protect memory (TODO: for relro)
+	// Protect memory
 	for (auto & o : reverse(lookup))
-		if (!o.protect())
+		if (!o.finalize())
 			return false;
 
 	return true;
@@ -302,6 +299,8 @@ bool Loader::prepare(Object * start) {
 	for (auto & o : reverse(lookup))
 		if (!o.initialize())
 			return false;
+
+	start->finalize();
 
 	// Mark start of program
 	GLIBC::RTLD::starting();
@@ -381,6 +380,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	}
 
 	// Start
+	process_started = true;
 	p.start(get_entry_point(start, entry_point));
 
 	return true;
@@ -425,6 +425,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 	}
 
 	// Start
+	process_started = true;
 	Process::start(get_entry_point(start, entry_point), stack_pointer, this->envp);
 
 	return true;
