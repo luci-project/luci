@@ -55,7 +55,7 @@ static void lognum(long val, int base) {
 
 
 int open(const char *pathname, int flags) {
-	logmsg("!open(");
+	logmsg("\n!open(");
 	logmsg(pathname);
 	logmsg(",");
 	lognum(flags, 16);
@@ -67,7 +67,7 @@ int open(const char *pathname, int flags) {
 }
 
 ssize_t read(int fd, const char * msg, size_t len) {
-	logmsg("!read(");
+	logmsg("\n!read(");
 	lognum(fd, 10);
 	logmsg(",");
 	lognum((long)msg, 16);
@@ -81,7 +81,7 @@ ssize_t read(int fd, const char * msg, size_t len) {
 }
 
 ssize_t write(int fd, const char * msg, size_t len) {
-	logmsg("!read(");
+	logmsg("\n!read(");
 	lognum(fd, 10);
 	logmsg(",");
 	lognum((long)msg, 16);
@@ -95,10 +95,10 @@ ssize_t write(int fd, const char * msg, size_t len) {
 }
 
 int close(int fd) {
-	logmsg("!sleep(2);\n");
+	logmsg("\n!sleep(2);\n");
 	sleep(2);
 
-	logmsg("!close(");
+	logmsg("\n!close(");
 	lognum(fd, 10);
 	logmsg(") = ");
 	int r = sys_close(fd);
@@ -108,7 +108,7 @@ int close(int fd) {
 }
 
 void exit(int code) {
-	logmsg("!exit(");
+	logmsg("\n!exit(");
 	lognum(code, 10);
 	logmsg(");\n");
 	sys_exit(code);
