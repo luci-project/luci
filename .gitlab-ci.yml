@@ -86,6 +86,20 @@ test-ubuntu-focal-gcc:
     - ./test/run.sh -c GCC -u
   retry: 2
 
+test-ubuntu-jammy-gcc:
+  image: ubuntu:jammy
+  stage: test
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+  retry: 2
+
 test-debian-stretch-llvm:
   image: debian:stretch
   stage: test
@@ -132,6 +146,20 @@ test-debian-bullseye-llvm:
 
 test-ubuntu-focal-llvm:
   image: ubuntu:focal
+  stage: test
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y clang make libcap2-bin
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+  retry: 2
+
+test-ubuntu-jammy-llvm:
+  image: ubuntu:jammy
   stage: test
   dependencies:
     - build-luci
