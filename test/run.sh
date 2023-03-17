@@ -192,7 +192,7 @@ else
 fi
 
 function check() {
-	for file in $1{-${OS,,},}{-${OSVERSION,,},}{-${PLATFORM,,},}{-${COMPILER,,},}{-${UPDATEFLAG},}{,-${USERFAULTFD,,}} ; do
+	for file in $1{-${OS,,},}{-${OS,,}_${OSVERSION,,},}{-${PLATFORM,,},}{-${COMPILER,,},}{-${UPDATEFLAG},}{,-${USERFAULTFD,,}} ; do
 		if [ -f "$file" ] ; then
 			echo "Checking $file" ;
 			if [ -x "$file" ] ; then
@@ -207,7 +207,8 @@ function check() {
 
 function skip() {
 	SKIP=".skip"
-	for SKIPTEST in $1/${SKIP}{,-${OS,,}}{,-${OSVERSION,,}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}}{,-${USERFAULTFD,,}} ; do
+	for SKIPTEST in $1/${SKIP}{,-${OS,,}}{,-${OS,,}_${OSVERSION,,}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}}{,-${USERFAULTFD,,}} ; do
+
 		if [ -f "${SKIPTEST}" ] ; then
 			return 0
 		fi
