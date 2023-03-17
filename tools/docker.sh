@@ -7,7 +7,7 @@ if [ -f "/.dockerenv" ] ; then
 	ln -fs /usr/share/zoneinfo/Europe/Berlin /etc/localtime
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update
-	apt-get install -y make
+	apt-get install -y make libcap2-bin
 	cp -a "${DOCKERBASE}-ro" "$DOCKERBASE"
 	mkdir -p "/opt/luci"
 	make -C "$DOCKERBASE" install-only
