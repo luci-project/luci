@@ -18,16 +18,13 @@ TIMEOUT=120
 TIMEOUT_KILLDELAY=1
 
 # Options
-while getopts "c:d:hi:l:or:st:uR" OPT; do
+while getopts "c:d:hi:or:st:uv:R" OPT; do
 	case "${OPT}" in
 		c)
 			COMPILER=${OPTARG}
 			;;
 		o)
 			DEBUG_OUTPUT=true
-			;;
-		l)
-			LD_LOGLEVEL=${OPTARG}
 			;;
 		r)
 			LD_PATH_SHORT=${OPTARG}
@@ -47,15 +44,18 @@ while getopts "c:d:hi:l:or:st:uR" OPT; do
 		u)
 			LD_DYNAMIC_UPDATE=1
 			;;
+		v)
+			LD_LOGLEVEL=${OPTARG}
+			;;
 		R)
 			LD_SYSTEM=true
 			;;
 		*)
-			echo "$0 [-c COMPILER] [-l LOGLEVEL] [-u] [TESTS]" >&2
+			echo "$0 [-c COMPILER] [-v LOGLEVEL] [-u] [TESTS]" >&2
 			echo >&2
 			echo "Parameters:" >&2
 			echo "	-c COMPILER  Use 'GCC' (default) or 'LLVM'" >&2
-			echo "	-l LOGLEVEL  Specify log level (default: $LD_LOGLEVEL)" >&2
+			echo "	-v LOGLEVEL  Specify log level (default: $LD_LOGLEVEL)" >&2
 			echo "	-r PATH      (Short) Path for RTLD (default: $LD_PATH_SHORT)" >&2
 			echo "	-t SECONDS   set maximum run time per test case (default: $TIMEOUT)" >&2
 			echo "	-d SOCKET    Socket for debug hash (elfvarsd)" >&2
@@ -282,6 +282,7 @@ for TEST in ${TESTS} ; do
 		cd "${TEST}"
 		EXITCODE=0
 		SECONDS=0
+		CHECK_OUTPUT=true
 		if ${DEBUG_OUTPUT} ; then
 			if ../../tools/stdlog -t -e "$STDERR" -e- -o "$STDOUT" -o- "./${EXEC}" ; then
 				echo "(finished after ${SECONDS}s)"
@@ -306,11 +307,12 @@ for TEST in ${TESTS} ; do
 			echo -e "\n\e[4mstatus\e[0m" >&2
 			cat "$STATUS" >&2
 			echo -e "\e[31mExecution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
-			rm "$STDOUT" "$STDERR" "$STATUS"
+			rm -f "$STDOUT" "$STDERR" "$STATUS"
 			if ${STOP_ON_ERROR} ; then
 				exit ${EXITCODE}
 			else
 				FAILED+=( "$TEST (exit code ${EXITCODE})" )
+				CHECK_OUTPUT=false
 			fi
 		fi
 		cd "${TESTDIR}"
@@ -320,18 +322,20 @@ for TEST in ${TESTS} ; do
 			wait $TIMEOUT_PID 2>/dev/null || true
 		fi
 
-		# Compare stdout + stderr with example
-		if ! ( check "${TEST}/.stdout" < "$STDOUT" && check "${TEST}/.stderr" < "$STDERR" && check "${TEST}/.status" < <(test -f "$STATUS" && sed -e "s/) for .*$/)/" "$STATUS" || true)  ) ; then
-			echo -e "\e[31mUnexpected output content of ${EXEC} (${TEST}) -- runtime ${SECONDS}s\e[0m" >&2
-			if ${STOP_ON_ERROR} ; then
-				exit ${EXITCODE}
-			else
-				FAILED+=( "$TEST (output mismatch)" )
+		if ${CHECK_OUTPUT} ; then
+			# Compare stdout + stderr with example
+			if ! ( check "${TEST}/.stdout" < "$STDOUT" && check "${TEST}/.stderr" < "$STDERR" && check "${TEST}/.status" < <(test -f "$STATUS" && sed -e "s/) for .*$/)/" "$STATUS" 2>/dev/null || true)  ) ; then
+				echo -e "\e[31mUnexpected output content of ${EXEC} (${TEST}) -- runtime ${SECONDS}s\e[0m" >&2
+				if ${STOP_ON_ERROR} ; then
+					exit ${EXITCODE}
+				else
+					FAILED+=( "$TEST (output mismatch)" )
+				fi
 			fi
-		fi
 
-		# Remove files
-		rm "$STDOUT" "$STDERR" "$STATUS"
+			# Remove files
+			rm -f "$STDOUT" "$STDERR" "$STATUS"
+		fi
 	elif [ "$TESTS" != "*" ] ; then
 		echo "Test '$TEST' does not exist!" >&2
 		if ${STOP_ON_ERROR} ; then
