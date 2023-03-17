@@ -95,31 +95,25 @@ struct MemorySegment {
 	uintptr_t buffer = 0;
 
 	/*! \brief Constructor for Segments */
-	MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base = 0, uintptr_t offset_delta = 0)
-	  : source{object, segment.offset() + offset_delta, segment.size() - offset_delta},
-	    target{base, segment.virt_addr() + offset_delta, segment.virt_size() - offset_delta, (segment.readable() ? PROT_READ : PROT_NONE) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, 0, segment.type() == Elf::PT_GNU_RELRO, MEMSEG_NOT_MAPPED} {
-		assert(!(target.relro && segment.writeable()));
-		assert(target.size >= source.size);
-	}
+	MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base = 0, uintptr_t offset_delta = 0);
 
 	/*! \brief Constructor for Sections */
-	MemorySegment(const Object & object, const Elf::Section & section, size_t target_offset, size_t target_size_delta = 0, uintptr_t base = 0)
-	  : source{object, section.offset(), section.type() == Elf::SHT_NOBITS ? 0 : section.size() },
-	    target{base, target_offset, section.size() + target_size_delta, PROT_READ | PROT_WRITE | (section.writeable() ? PROT_WRITE : 0) | (section.executable() ? PROT_EXEC : 0), PROT_NONE, -1, 0, false, MEMSEG_NOT_MAPPED} {
-			assert((target.address() % section.alignment()) == 0);
-		}
+	MemorySegment(const Object & object, const Elf::Section & section, size_t target_offset, size_t target_size_delta = 0, uintptr_t base = 0);
 
 	/*! \brief Constructor for pure BSS */
-	MemorySegment(const Object & object, size_t target_offset, size_t target_size, uintptr_t base = 0)
-	  : source{object, 0, 0 },
-		target{base, target_offset, target_size, PROT_READ | PROT_WRITE, PROT_NONE, -1, 0, false, MEMSEG_NOT_MAPPED} {}
-
+	MemorySegment(const Object & object, size_t target_offset, size_t target_size, uintptr_t base = 0);
 
 	/*! \brief Destructor (clean up) */
 	~MemorySegment();
 
 	/*! \brief Allocate/get address of temporary (back) buffer to modify contents offline */
 	uintptr_t compose();
+
+	/*! \brief Helper to get pointer in compose buffer corresponding to an active address */
+	template<typename T>
+	T * compose_pointer(T * pointer) {
+		return reinterpret_cast<T *>(target.contains(pointer) ? buffer + target.offset + reinterpret_cast<uintptr_t>(pointer) - target.address() : nullptr);
+	}
 
 	/*! \brief Use compositing buffer (if set) and adjust protection  */
 	bool finalize(bool force = false);

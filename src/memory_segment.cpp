@@ -5,6 +5,25 @@
 #include "object/base.hpp"
 #include "loader.hpp"
 
+
+MemorySegment::MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base, uintptr_t offset_delta)
+  : source{object, segment.offset() + offset_delta, segment.size() - offset_delta},
+    target{base, segment.virt_addr() + offset_delta, segment.virt_size() - offset_delta, (segment.readable() ? PROT_READ : PROT_NONE) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, 0, segment.type() == Elf::PT_GNU_RELRO, object.file.flags.premapped ? MEMSEG_MAPPED : MEMSEG_NOT_MAPPED} {
+	assert(!(target.relro && segment.writeable()));
+	assert(target.size >= source.size);
+}
+
+MemorySegment::MemorySegment(const Object & object, const Elf::Section & section, size_t target_offset, size_t target_size_delta, uintptr_t base)
+  : source{object, section.offset(), section.type() == Elf::SHT_NOBITS ? 0 : section.size() },
+    target{base, target_offset, section.size() + target_size_delta, PROT_READ | PROT_WRITE | (section.writeable() ? PROT_WRITE : 0) | (section.executable() ? PROT_EXEC : 0), PROT_NONE, -1, 0, false, object.file.flags.premapped ? MEMSEG_MAPPED : MEMSEG_NOT_MAPPED } {
+		assert((target.address() % section.alignment()) == 0);
+	}
+
+MemorySegment::MemorySegment(const Object & object, size_t target_offset, size_t target_size, uintptr_t base)
+  : source{object, 0, 0 },
+	target{base, target_offset, target_size, PROT_READ | PROT_WRITE, PROT_NONE, -1, 0, false, MEMSEG_NOT_MAPPED} {}
+
+
 MemorySegment::~MemorySegment() {
 	unmap();
 }
@@ -87,12 +106,15 @@ uintptr_t MemorySegment::compose() {
 				return 0;
 		}
 		// Compositing is only used for non-writable segments
-		if ((target.protection & PROT_WRITE) != 0) {
-			LOG_WARNING << "No need to compose back buffer for " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << " since it is writable!" << endl;
+		if ((target.effective_protection & PROT_WRITE) != 0) {
 			return target.address();
 		}
+		// If process has not started yet -> we can just change permissions
+		if (!source.object.file.loader.process_started && Syscall::mprotect(target.page_start(), target.page_size(), target.effective_protection | PROT_WRITE ).success()) {
+			target.effective_protection |= PROT_WRITE;
+			return target.address();
 		// Create anonymous writable mapping with same size as source
-		if (auto mmap = Syscall::mmap(0, target.page_size(), PROT_READ | PROT_WRITE, flags_privanon, -1, 0)) {
+		} else if (auto mmap = Syscall::mmap(target.page_start() & (~0x400000000000), target.page_size(), PROT_READ | PROT_WRITE, flags_privanon, -1, 0)) {
 			// Duplicate full pages (just for debugging)
 			buffer = Memory::copy(mmap.value(), target.page_start(), target.page_size());
 			LOG_DEBUG << "Created compose back buffer at " << (void*)buffer << " for " << (void*)target.page_start() << " (" << target.page_size() << " Bytes)" << endl;
@@ -100,15 +122,15 @@ uintptr_t MemorySegment::compose() {
 			LOG_ERROR << "Mapping back buffer for " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) failed: " << mmap.error_message() << endl;
 		}
 	}
-	return buffer;
+	return buffer + (target.offset % Page::SIZE);
 }
 
 bool MemorySegment::finalize(bool force) {
-	bool result = true;
 	if (!force && target.status == MEMSEG_INACTIVE) {
 		LOG_WARNING << "Memory segment " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) is currently disabled, hence ignoring finalize request" << endl;
+		return true;
 	} else if (buffer != 0) {
-
+		bool result = true;
 		// Adjust permissions
 		if (auto mprotect = Syscall::mprotect(buffer, target.page_size(), target.protection)) {
 			target.effective_protection = target.protection;
@@ -126,8 +148,19 @@ bool MemorySegment::finalize(bool force) {
 			LOG_ERROR << "Protecting " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mremap.error_message() << endl;
 			result = false;
 		}
+		return result;
+	} else if (target.status == MEMSEG_NOT_MAPPED) {
+		LOG_WARNING << "Cannot protect " << (void*)target.page_start() << " (" << target.page_size() << " Bytes) of " << source.object << " since it is not mapped!" << endl;
+		return false;
+	} else if (!force && target.effective_protection == target.protection) {
+		return true;
+	} else if (auto mprotect = Syscall::mprotect(target.page_start(), target.page_size(), target.protection)) {
+		target.effective_protection = target.protection;
+		return true;;
+	} else {
+		LOG_ERROR << "Protecting " << target.page_size() << " Bytes at " << (void*)target.page_start() << " failed: " << mprotect.error_message() << endl;
+		return false;
 	}
-	return result;
 }
 
 bool MemorySegment::protect() {
@@ -157,7 +190,7 @@ bool MemorySegment::unprotect() {
 		return true;
 	} else if ((target.effective_protection & PROT_WRITE) != 0) {
 		return true;
-	} else if (auto mprotect = Syscall::mprotect(target.page_start(), target.page_size(), target.effective_protection |PROT_WRITE )) {
+	} else if (auto mprotect = Syscall::mprotect(target.page_start(), target.page_size(), target.effective_protection | PROT_WRITE )) {
 		target.effective_protection |= PROT_WRITE;
 		return true;
 	} else {
@@ -260,6 +293,10 @@ bool MemorySegment::unmap() {
 			Syscall::ioctl(identity.loader.userfaultfd, UFFDIO_UNREGISTER, &range);
 		}
 		if (auto munmap = Syscall::munmap(target.page_start(), target.page_size())) {
+			if (buffer != 0) {
+				Syscall::munmap(buffer, target.page_size());
+				buffer = 0;
+			}
 			target.status = MEMSEG_NOT_MAPPED;
 			target.effective_protection = PROT_NONE;
 			return true;
