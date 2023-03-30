@@ -31,13 +31,21 @@ const Object & VersionedSymbol::object() const {
 
 void * VersionedSymbol::pointer() const {
 	void * fptr = reinterpret_cast<void*>(object().base + value());
-	// Handle ifunc
-	if (type() == Elf::STT_GNU_IFUNC) {
-		typedef void* (*indirect_t)();
-		indirect_t func = reinterpret_cast<indirect_t>(fptr);
-		return func();
+	switch (type()) {
+		// Handle ifunc
+		case Elf::STT_GNU_IFUNC:
+		{
+			typedef void* (*indirect_t)();
+			indirect_t func = reinterpret_cast<indirect_t>(fptr);
+			return func();
+		}
+
+		case Elf::STT_TLS:
+			return reinterpret_cast<void*>(object().tls_address(value()));
+
+		default:
+			return fptr;
 	}
-	return fptr;
 }
 
 BufferStream& operator<<(BufferStream& bs, const VersionedSymbol & s) {

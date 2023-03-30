@@ -242,6 +242,15 @@ size_t Object::version() const {
 	return v;
 }
 
+
+uintptr_t Object::tls_address(uintptr_t value) const {
+	auto thread = Thread::self();
+	assert(thread != nullptr);
+
+	return file.loader.tls.get_addr(thread, file.tls_module_id) + file.tls_offset + value;
+}
+
+
 void* Object::dynamic_resolve(size_t index) const {
 	LOG_ERROR << "Unable to resolve " << index << " -- Object " << file.path << " does not support dynamic loading!" << endl;
 	assert(false);

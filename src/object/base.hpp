@@ -148,6 +148,9 @@ struct Object : public Elf {
 	/*! \brief Get (internal) version = number of updates */
 	size_t version() const;
 
+	/*! \brief Get TLS address (for current thread) */
+	uintptr_t tls_address(uintptr_t value) const;
+
 	/*! \brief Find (even internal) symbols in this object with same name */
 	virtual Optional<ElfSymbolHelper> resolve_internal_symbol(const SymbolHelper & sym) const {
 		(void) sym;
