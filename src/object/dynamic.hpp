@@ -58,6 +58,7 @@ struct ObjectDynamic : public ObjectExecutable {
 	Elf::Array<Elf::Relocation> dynamic_relocations, dynamic_relocations_plt;
 	Elf::List<Elf::VersionNeeded> version_needed;
 	Elf::List<Elf::VersionDefinition> version_definition;
+	const char * soname = nullptr;
 
 	ObjectDynamic(const ObjectDynamic&) = delete;
 	ObjectDynamic& operator=(const ObjectDynamic&) = delete;

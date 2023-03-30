@@ -138,6 +138,10 @@ bool ObjectDynamic::preload_libraries() {
 				libs.emplace_back(dyn.string());
 				break;
 
+			case Elf::DT_SONAME:
+				soname = dyn.string();
+				break;
+
 			case Elf::DT_RPATH:
 				addpath(this->rpath, dyn.string());
 				break;
@@ -198,8 +202,15 @@ bool ObjectDynamic::preload_libraries() {
 
 bool ObjectDynamic::fix() {
 	// Patch glibc
-	if (GLIBC::patch(dynamic_symbols, base))
-		LOG_INFO << "Applied GLIBC Patch at " << *this << endl;
+	if (soname != nullptr && String::compare(soname, "libc.so.6") == 0) {
+		if (GLIBC::patch(*this)) {
+			LOG_INFO << "Applied GLIBC patches at " << *this << endl;
+			return true;
+		} else {
+			LOG_WARNING << "Not able to apply (all) GLIBC patches at " << *this << endl;
+			return false;
+		}
+	}
 
 	return true;
 }
