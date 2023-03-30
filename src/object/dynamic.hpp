@@ -56,6 +56,7 @@ struct ObjectDynamic : public ObjectExecutable {
 	Elf::DynamicTable dynamic_table;
 	Elf::SymbolTable dynamic_symbols;
 	Elf::Array<Elf::Relocation> dynamic_relocations, dynamic_relocations_plt;
+	Elf::RelocationRelativeList relative_relocations;
 	Elf::List<Elf::VersionNeeded> version_needed;
 	Elf::List<Elf::VersionDefinition> version_definition;
 	const char * soname = nullptr;

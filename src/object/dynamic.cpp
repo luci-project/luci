@@ -16,6 +16,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
     dynamic_symbols{dynamic_table.get_symbol_table()},
     dynamic_relocations{dynamic_table.get_relocations()},
     dynamic_relocations_plt{dynamic_table.get_relocations_plt()},
+    relative_relocations{dynamic_table.get_relative_relocations()},
     version_needed{dynamic_table.get_version_needed()},
     version_definition{dynamic_table.get_version_definition()} {
 	// Set Globale Offset Table Pointer
@@ -220,9 +221,15 @@ bool ObjectDynamic::prepare() {
 	bool error = false;
 
 	// Perform initial relocations
-	for (auto & reloc : dynamic_relocations)
+	for (const auto & reloc : dynamic_relocations)
 		if (relocate(reloc, true, error) == nullptr && error)
 			break;
+
+	for (const auto & reloc : relative_relocations) {
+		// Todo use compose section
+		*reinterpret_cast<uintptr_t *>(this->base + reloc.offset()) += this->base;
+	}
+
 
 	// PLT relocations
 	if (!error && global_offset_table != 0) {
