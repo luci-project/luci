@@ -9,18 +9,18 @@ bool ObjectExecutable::preload_segments() {
 	size_t load = 0;
 
 	// Check relocation read-only
-	const Elf::Segment * relro = nullptr;
-	for (auto & segment : this->segments)
+	Optional<Elf::Segment> relro;
+	for (const auto & segment : this->segments)
 		if (Elf::PT_GNU_RELRO == segment.type()) {
 			assert((segment.virt_addr() + segment.size()) % Page::SIZE == 0);
 			assert(segment.virt_size() == segment.size());
-			relro = &segment;
+			relro.emplace(segment);
 		}
 
 	// LOAD segments
-	for (auto & segment : this->segments)
+	for (const auto & segment : this->segments)
 		if (Elf::PT_LOAD == segment.type() && segment.virt_size() > 0) {
-			if (relro != nullptr && segment.offset() == relro->offset() && segment.virt_addr() == relro->virt_addr()) {
+			if (relro && segment.offset() == relro->offset() && segment.virt_addr() == relro->virt_addr()) {
 				LOG_DEBUG << "Relocation read-only at " << reinterpret_cast<void*>(relro->virt_addr()) << " with " << relro->size() << " bytes" << endl;
 				// Relro section
 				memory_map.emplace_back(*this, *relro, base);
