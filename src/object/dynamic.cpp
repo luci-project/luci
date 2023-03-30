@@ -154,9 +154,17 @@ bool ObjectDynamic::preload_libraries() {
 			case Elf::DT_FLAGS:
 				if ((dyn.value() & Elf::DF_BIND_NOW) != 0)
 					file.flags.bind_now = 1;
+				/* According to https://refspecs.linuxbase.org/elf/gabi4+/ch5.dynamic.html
+				 * DF_STATIC_TLS:
+				 * 		If set in a shared object or executable, this flag instructs the dynamic linker to reject attempts to load this file dynamically.
+				 * 		It indicates that the shared object or executable contains code using a static thread-local storage scheme.
+				 * 		Implementations need not support any form of thread-local storage.
+				 *
+				 * However, it seems like glibc ignores it...
+				 */
 				if ((dyn.value() & Elf::DF_STATIC_TLS) != 0 && file_previous == nullptr && this->file.tls_module_id != 0 && file.loader.tls.gen > 0) {
 					LOG_ERROR << *this << " has a static TLS block which cannot be initialized dynamically. Try preloading!" << endl;
-					return false;
+					//return false;
 				}
 				break;
 
