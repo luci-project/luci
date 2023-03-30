@@ -122,6 +122,16 @@
 			GLIBC_MALLOC_TCACHE_MAX \
 			GLIBC_MALLOC_CHECK
 
+  #elif defined(COMPATIBILITY_DEBIAN_BOOKWORM)
+   #define OSVERSION "12 (Bookworm)"
+   #define GLIBC_VERSION GLIBC_2_36
+   #define GLIBC_PTHREAD_IN_LIBC 1
+   #define GLIBC_RTLD_GLOBAL_SIZE 4328
+   #define GLIBC_RTLD_GLOBAL_RO_SIZE 896
+   #define GLIBC_LINK_MAP_SIZE 1184
+   #define GLIBC_TUNABLE_COUNT 35
+   #define GLIBC_TUNABLE_SIZE 3920
+
   #else
    #error Unsupported or unspecified debian version
   #endif

@@ -191,8 +191,10 @@ struct GlobalRO {
 	/* Default floating-point control word.  */
 	unsigned short _dl_fpu_control = 0x037f;
 
+#if GLIBC_VERSION < GLIBC_2_36
 	/* Expected cache ID.  */
 	int _dl_correct_cache_id = 0;
+#endif
 
 	/* Mask for hardware capabilities that are available.  */
 	uint64_t _dl_hwcap = 2;

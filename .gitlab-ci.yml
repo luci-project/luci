@@ -72,6 +72,20 @@ test-debian-bullseye-gcc:
     - ./test/run.sh -c GCC -u
   retry: 2
 
+test-debian-bookworm-gcc:
+  image: debian:bookworm
+  stage: test
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+  retry: 2
+
 test-ubuntu-focal-gcc:
   image: ubuntu:focal
   stage: test
@@ -132,6 +146,20 @@ test-debian-buster-llvm:
 
 test-debian-bullseye-llvm:
   image: debian:bullseye
+  stage: test
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y clang make libcap2-bin
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+  retry: 2
+
+test-debian-bookworm-llvm:
+  image: debian:bookworm
   stage: test
   dependencies:
     - build-luci

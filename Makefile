@@ -73,6 +73,7 @@ define each_version
 	$(call custom_version,$(1),debian,stretch,x64)
 	$(call custom_version,$(1),debian,buster,x64)
 	$(call custom_version,$(1),debian,bullseye,x64)
+	$(call custom_version,$(1),debian,bookworm,x64)
 	$(call custom_version,$(1),ubuntu,focal,x64)
 	$(call custom_version,$(1),ubuntu,jammy,x64)
 endef
