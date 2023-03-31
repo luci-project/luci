@@ -191,8 +191,8 @@ static PatchSymbol symbol_fixes[] = {
 };
 
 static bool patch_using_symbol_fixes(Object & object) {
-	for (auto & section: object.sections)
-		if (section.type() == Elf::SHT_SYMTAB){
+	for (const auto & section: object.sections)
+		if (section.type() == Elf::SHT_DYNSYM) {
 			auto symtab = section.get_symbol_table();
 			bool r = true;
 			for (const auto & fix : symbol_fixes)
