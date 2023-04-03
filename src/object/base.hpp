@@ -13,6 +13,7 @@
 
 #include <elfo/elf.hpp>
 #include <bean/bean.hpp>
+#include <bean/helper/build_id.hpp>
 
 #include "symbol.hpp"
 #include "memory_segment.hpp"
@@ -64,7 +65,7 @@ struct Object : public Elf {
 	mutable Vector<MemorySegment> memory_map;
 
 	/*! \brief Build ID, if available (null terminated) */
-	char build_id[41];
+	BuildID build_id;
 
 	/*! \brief Mapping protected? */
 	bool mapping_protected = false;

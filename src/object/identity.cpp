@@ -412,8 +412,8 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 	}
 
 	LOG_INFO << "Successfully loaded " << path << " v" << o->version() ;
-	if (o->build_id[0] != '\0')
-		LOG_INFO_APPEND << " (Build ID " << o->build_id << ")";
+	if (o->build_id.available())
+		LOG_INFO_APPEND << " (Build ID " << o->build_id.value << ")";
 	LOG_INFO_APPEND << " with base " << (void*)(o->base) << endl;
 
 	// Initialize GLIBC specific stuff
