@@ -1,0 +1,13 @@
+hallo welt!
+hello world!
+hola mundo!
+bonjour monde!
+[end of test]
+
+Thread 1:
+this is a thread local storage variable 
+this is a shared variable 
+
+Thread 2:
+this is a thread local storage variable 
+thread modifed the shared variable 
