@@ -349,7 +349,13 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 	// If dynamic updates are enabled, compare hashes
 	if (flags.updatable == 1 && type != Elf::ET_REL) {
 		LOG_INFO << "Calculate Binary hash of " << *o << endl;
-		o->binary_hash.emplace(*o);
+		uint32_t bean_flags = Bean::FLAG_NONE;
+		// Resolve internal relocations to improve patchable detection
+		bean_flags |= Bean::FLAG_RESOLVE_INTERNAL_RELOCATIONS;
+		if (flags.reconst_relocs == 1)
+			bean_flags |= Bean::FLAG_RECONSTRUCT_RELOCATIONS;
+
+		o->binary_hash.emplace(*o, nullptr, bean_flags);
 		// if previous version exist, check if we can patch it
 		if (current != nullptr) {
 			assert(current->binary_hash && o->binary_hash);
