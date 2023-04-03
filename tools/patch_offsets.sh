@@ -33,7 +33,7 @@ done < <(readelf -n "$LIBC" 2>/dev/null | grep Build)
 
 function filter_symbol() {
 	grep "$1" | while read -r line ; do
-		if [[ $line =~ ^[0]*([0-9a-f]+)\ [lg].+\	[0]*([0-9a-f]+)\ (.+)$ ]] ; then
+		if [[ $line =~ ^[0]*([0-9a-f]+)[\	\ ]+[lg].+[\	\ ]+[0]*([0-9a-f]+)[\	\ ]+(.+)$ ]] ; then
 			if [[ "${BASH_REMATCH[3]}" == "$1" ]] ; then
 				echo "			{ \"${BASH_REMATCH[3]}\", 0x${BASH_REMATCH[1]}, $((16#${BASH_REMATCH[2]})), $2, reinterpret_cast<uintptr_t>($3) },"
 			fi
