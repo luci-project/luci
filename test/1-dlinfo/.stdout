@@ -14,6 +14,8 @@ Search paths:
 $(sed -e 's/^/  x. /' "$LD_LIBRARY_CONF")
   x. /lib
   x. /usr/lib
+  x. /lib64
+  x. /usr/lib64
 
 [./libfoo.so]
 Link map:
@@ -29,5 +31,7 @@ Search paths:
 $(sed -e 's/^/  x. /' "$LD_LIBRARY_CONF")
   x. /lib
   x. /usr/lib
+  x. /lib64
+  x. /usr/lib64
 EOT
 ) -

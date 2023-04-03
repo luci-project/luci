@@ -67,7 +67,12 @@ struct Loader {
 	Vector<const char *> library_path_config;
 
 	/*! \brief default library path default (by convention) */
-	Vector<const char *> library_path_default = { "/lib" , "/usr/lib" };
+	Vector<const char *> library_path_default = {
+		"/lib", "/usr/lib",
+	#ifdef PLATFORM_X64
+		"/lib64", "/usr/lib64",
+	#endif
+	};
 
 	/*! \brief libraries to exclude */
 	Vector<const char *> library_exclude = { "ld-linux-x86-64.so.2" , "libdl.so.2" };
