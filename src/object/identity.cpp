@@ -9,6 +9,8 @@
 #include <dlh/datetime.hpp>
 #include <dlh/stream/output.hpp>
 
+#include <bean/helper/debug_sym.hpp>
+
 #include "object/base.hpp"
 #include "object/dynamic.hpp"
 #include "object/executable.hpp"
@@ -348,6 +350,35 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 
 	// If dynamic updates are enabled, compare hashes
 	if (flags.updatable == 1 && type != Elf::ET_REL) {
+		// Debug symbols
+		if (loader.config.find_debug_symbols) {
+			DebugSymbol dbgsym{path.c_str(), loader.config.debug_symbols_root};
+			const char * debug_link = dbgsym.link(*o);
+			auto debug_symbol_path = dbgsym.find(debug_link, o->build_id);
+			if (debug_symbol_path != nullptr) {
+				void * debug_data = File::contents::get(debug_symbol_path, o->debug_size);
+				if (debug_data != nullptr) {
+					o->debug_symbols = new Elf(debug_data);
+					if (o->debug_symbols != nullptr && o->debug_symbols->valid(o->debug_size)) {
+						LOG_INFO << "Loaded external debug symbols at " << debug_symbol_path << " for " << *o << endl;
+					} else {
+						LOG_WARNING << "Loading external debug symbols at " << debug_symbol_path << " for " << *o << " failed!" << endl;
+						delete(o->debug_symbols);
+						o->debug_symbols = nullptr;
+						if (auto unmap = Syscall::munmap(reinterpret_cast<uintptr_t>(debug_data), o->debug_size); unmap.failed())
+							LOG_WARNING << "Unmapping debug symbols data at " << debug_data << " in " << *o << " failed: " << unmap.error_message() << endl;
+						
+						o->debug_size =0;
+					}
+				} else {
+					LOG_WARNING << "Opening external debug symbols at " << debug_symbol_path << " for " << *o << " failed!" << endl;
+					o->debug_size = 0;
+				}
+			} else {
+				LOG_DEBUG << "No external debug symbols for " << *o << " found!" << endl;
+				o->debug_size = 0;
+			}
+		}
 		LOG_INFO << "Calculate Binary hash of " << *o << endl;
 		uint32_t bean_flags = Bean::FLAG_NONE;
 		// Resolve internal relocations to improve patchable detection
@@ -355,7 +386,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 		if (flags.reconst_relocs == 1)
 			bean_flags |= Bean::FLAG_RECONSTRUCT_RELOCATIONS;
 
-		o->binary_hash.emplace(*o, nullptr, bean_flags);
+		o->binary_hash.emplace(*o, o->debug_symbols, bean_flags);
 		// if previous version exist, check if we can patch it
 		if (current != nullptr) {
 			assert(current->binary_hash && o->binary_hash);
@@ -497,6 +528,7 @@ bool ObjectIdentity::initialize() {
 	}
 	return true;
 }
+
 
 void ObjectIdentity::status(ObjectIdentity::Info info) {
 	if (loader.statusinfofd >= 0 && loader.target != nullptr) {

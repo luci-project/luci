@@ -44,9 +44,10 @@ struct Opts {
 	const char * luciconf{ STR(LDLUCI_CONF) };
 	const char * argv0{ nullptr };
 	const char * entry{ nullptr };
-	const char * debughash{};
-	const char * statusinfo{};
-	const char * detectOutdated{};
+	const char * debughash { nullptr };
+	const char * statusinfo{ nullptr };
+	const char * detectOutdated{ nullptr };
+	const char * debugSymbolsRoot{ nullptr };
 	unsigned delayOutdated{1};
 	bool logtimeAbs{};
 	bool logfileAppend{};
@@ -55,6 +56,7 @@ struct Opts {
 	bool dependencyCheck{};
 	bool modificationTime{};
 	bool forceUpdate{};
+	bool debugSymbols{};
 	bool dynamicWeak{};
 	bool relocateCheck{};
 	bool relocateOutdated{};
@@ -170,6 +172,14 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	// Fix relocations in outdated varsions
 	if (config_loader.dynamic_update)
 		config_loader.update_outdated_relocations = (opts.relocateOutdated || config_file.value_or_default<bool>("LD_RELOCATE_OUTDATED", false));
+
+	// Debug symbols
+	if (config_loader.dynamic_update)
+		config_loader.find_debug_symbols = opts.debugSymbols || config_file.value_or_default<bool>("LD_DEBUG_SYMBOLS", false);
+	if (config_loader.find_debug_symbols) {
+		config_loader.debug_symbols_root = opts.debugSymbolsRoot != nullptr && String::len(opts.debugSymbolsRoot) > 0 ? opts.debugSymbolsRoot : config_file.value_or_default<const char *>("LD_DEBUG_SYMBOLS_ROOT", nullptr);
+		LOG_DEBUG << "Set root for debug symbols to " << config_loader.debug_symbols_root << endl;
+	}
 
 	// Detect access of outdated varsions
 	if (opts.detectOutdated == nullptr || String::len(opts.detectOutdated) == 0)
@@ -340,6 +350,8 @@ int main(int argc, char* argv[]) {
 				{'N',  "bind-not",        nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
 				{'V',  "version",         nullptr,  &Opts::showVersion,      false, "Show version information" },
 				{'s',  "static",          nullptr,  &Opts::linkstatic,       false, "Perform static linking as well" },
+				{'\0', "dbgsym",          nullptr,  &Opts::debugSymbols,     false, "Search for external debug symbols to improve detection of binary updatability. This option can also be enabled by setting the environment variable LD_DEBUG_SYMBOLS to 1" },
+				{'\0', "dbgsym-root",     nullptr,  &Opts::debugSymbolsRoot, false, "Set root directory for external debug symbols. This option can also be configured using the environment variable LD_DEBUG_SYMBOLS_ROOT" },
 				{'\0', "argv0",           nullptr,  &Opts::argv0,            false, "Explicitly specify program name (argv[0])" },
 				{'h',  "help",            nullptr,  &Opts::showHelp,         false, "Show this help" }
 			},

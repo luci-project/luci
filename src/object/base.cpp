@@ -21,6 +21,15 @@ Object::Object(ObjectIdentity & file, const Data & data) : Elf(data.addr), file(
 Object::~Object() {
 	// TODO: Not really supported yet, just a stub...
 
+	if (debug_symbols != nullptr) {
+		uintptr_t data = reinterpret_cast<uintptr_t>(debug_symbols->data());
+		// Elfo object
+		Memory::free(debug_symbols);
+		// Memory mapped file
+		if (auto unmap = Syscall::munmap(data, debug_size); unmap.failed())
+			LOG_WARNING << "Unmapping debug symbols data at " << (void*)data << " in " << *this << " failed: " << unmap.error_message() << endl;
+	}
+
 	if (debug_hash != nullptr)
 		Memory::free(debug_hash);
 

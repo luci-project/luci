@@ -56,6 +56,11 @@ struct Loader {
 		/*! \brief set comparison mode to relax patchability checks */
 		int relax_comparison = 0;
 
+		/*! \brief look for external debug symbols (for bean hashing)? */
+		bool find_debug_symbols = false;
+
+		/*! \brief Root directory for debug symbols (if nullptr system root is used) */
+		const char * debug_symbols_root = nullptr;
 		/* Default constructor */
 		Config() {}
 	} config;

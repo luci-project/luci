@@ -67,6 +67,10 @@ struct Object : public Elf {
 	/*! \brief Build ID, if available (null terminated) */
 	BuildID build_id;
 
+	/*! \brief External debug symbols (if enabled) */
+	Elf * debug_symbols = nullptr;
+	size_t debug_size = 0;
+
 	/*! \brief Mapping protected? */
 	bool mapping_protected = false;
 
