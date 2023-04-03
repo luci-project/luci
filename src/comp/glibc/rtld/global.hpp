@@ -35,8 +35,8 @@ struct Global {
 		GLIBC::DL::link_map::r_scope_elem *_ns_main_searchlist;
 		uint32_t _ns_global_scope_alloc;
 		uint32_t _ns_global_scope_pending_adds;
-#if GLIBC_VERSION >= GLIBC_2_32
-		GLIBC::DL::link_map *libc_map;
+#if GLIBC_VERSION >= GLIBC_2_32 || defined(COMPATIBILITY_RHEL_8)
+		GLIBC::DL::link_map *libc_map = nullptr;
 #endif
 		struct unique_sym_table  {
 			__rtld_lock_t lock;
@@ -54,12 +54,12 @@ struct Global {
 	size_t _dl_nns = 1;
 	__rtld_lock_t _dl_load_lock;
 	__rtld_lock_t _dl_load_write_lock;
-#if  GLIBC_VERSION >= GLIBC_2_35
+#if  GLIBC_VERSION >= GLIBC_2_35 || defined(COMPATIBILITY_RHEL_8) || defined(COMPATIBILITY_RHEL_9)
 	__rtld_lock_t _dl_load_tls_lock;
 #endif
 	uint64_t _dl_load_adds = 0;
 	GLIBC::DL::link_map *_dl_initfirst = nullptr;
-#if GLIBC_VERSION < GLIBC_2_30 || defined(COMPATIBILITY_DEBIAN_BUSTER)
+#if (GLIBC_VERSION < GLIBC_2_30 || defined(COMPATIBILITY_DEBIAN_BUSTER)) && !defined(COMPATIBILITY_RHEL_8)
 	uint64_t _dl_cpuclock_offset;
 #endif
 	GLIBC::DL::link_map *_dl_profile_map = nullptr;
@@ -79,7 +79,7 @@ struct Global {
 	void (*_dl_rtld_lock_recursive)(void *);
 	void (*_dl_rtld_unlock_recursive)(void *);
 #endif
-#if GLIBC_VERSION >= GLIBC_2_32
+#if GLIBC_VERSION >= GLIBC_2_32 || defined(COMPATIBILITY_RHEL_8)
 	uint32_t _dl_x86_feature_1;
 	struct dl_x86_feature_control {
 		enum dl_x86_cet_control {
@@ -110,7 +110,7 @@ struct Global {
 #if GLIBC_VERSION < GLIBC_2_34
 	size_t _dl_tls_static_align;
 #endif
-#if GLIBC_VERSION >= GLIBC_2_32 || defined(COMPATIBILITY_DEBIAN_BULLSEYE)
+#if GLIBC_VERSION >= GLIBC_2_32 || defined(COMPATIBILITY_DEBIAN_BULLSEYE) || defined(COMPATIBILITY_RHEL_8)
 	size_t _dl_tls_static_optional = 0x200;
 #endif
 	void *_dl_initial_dtv;
@@ -222,8 +222,8 @@ struct GlobalRO {
 			unsigned edx;
 		};
 
-#if GLIBC_VERSION >= GLIBC_2_29 && !defined(COMPATIBILITY_DEBIAN_BUSTER)
- #if GLIBC_VERSION < GLIBC_2_32
+#if (GLIBC_VERSION >= GLIBC_2_29 && !defined(COMPATIBILITY_DEBIAN_BUSTER)) || defined(COMPATIBILITY_RHEL_8)
+ #if GLIBC_VERSION >= GLIBC_2_29 && GLIBC_VERSION < GLIBC_2_32
 		struct cpuid_registers cpuid[6];
 		unsigned feature[2];
  #endif
@@ -233,19 +233,19 @@ struct GlobalRO {
 			unsigned family;
 			unsigned model;
 			unsigned stepping;
-		} basic;
- #if GLIBC_VERSION >= GLIBC_2_32
+		} basic = { arch_kind_intel, 22, 6, 142, 9};
+ #if GLIBC_VERSION >= GLIBC_2_32 || defined(COMPATIBILITY_RHEL_8)
 		struct cpuid_features {
 			struct cpuid_registers cpuid;
 			struct cpuid_registers usable;
 		};
- #if GLIBC_VERSION >= GLIBC_2_34
+  #if GLIBC_VERSION >= GLIBC_2_34
 		struct cpuid_features features[9];
- #elif GLIBC_VERSION == GLIBC_2_33
+  #elif GLIBC_VERSION == GLIBC_2_33 || defined(COMPATIBILITY_RHEL_8)
 		struct cpuid_features features[8];
- #else
+  #else
 		struct cpuid_features features[7];
- #endif
+  #endif
 		unsigned int preferred[1] = {4857};
  #endif
  #if GLIBC_VERSION >= GLIBC_2_33
@@ -265,7 +265,7 @@ struct GlobalRO {
 #if GLIBC_VERSION >= GLIBC_2_27
 		unsigned xsave_state_full_size = 1152;
 #endif
-#if GLIBC_VERSION < GLIBC_2_29 || defined(COMPATIBILITY_DEBIAN_BUSTER)
+#if (GLIBC_VERSION < GLIBC_2_29 || defined(COMPATIBILITY_DEBIAN_BUSTER)) && !defined(COMPATIBILITY_RHEL_8)
 		unsigned feature[1];
 #endif
 #if GLIBC_VERSION >= GLIBC_2_26
@@ -273,12 +273,13 @@ struct GlobalRO {
 		unsigned long shared_cache_size = 1572864;
 		unsigned long non_temporal_threshold = 0x120000;
 #endif
-#if GLIBC_VERSION >= GLIBC_2_33
+#if GLIBC_VERSION >= GLIBC_2_33 || defined(COMPATIBILITY_RHEL_8)
 		unsigned long rep_movsb_threshold = 0x2000;
  #if GLIBC_VERSION >= GLIBC_2_33
 		unsigned long rep_movsb_stop_threshold = 0x120000;
  #endif
 		unsigned long rep_stosb_threshold = 0x800;
+ #if !defined(COMPATIBILITY_RHEL_8)
 		unsigned long level1_icache_size = 0x8000;
 		unsigned long level1_icache_linesize = 64;
 		unsigned long level1_dcache_size = 0x8000;
@@ -291,6 +292,7 @@ struct GlobalRO {
 		unsigned long level3_cache_assoc = 12;
 		unsigned long level3_cache_linesize = 64;
 		unsigned long level4_cache_size = 0;
+ #endif
 #endif
 	} _dl_x86_cpu_features;
 #if GLIBC_VERSION >= GLIBC_2_27
@@ -318,7 +320,7 @@ struct GlobalRO {
 	/* Alignment requirement of the static TLS block.  */
 	size_t _dl_tls_static_align = 0;
 #endif
-#if GLIBC_VERSION >= GLIBC_2_34 || defined(COMPATIBILITY_DEBIAN_BULLSEYE)
+#if GLIBC_VERSION >= GLIBC_2_34 || defined(COMPATIBILITY_DEBIAN_BULLSEYE) || defined(COMPATIBILITY_RHEL_8)
 	/* Size of surplus space in the static TLS area for dynamically
 	   loaded modules with IE-model TLS or for TLSDESC optimization.
 	   See comments in elf/dl-tls.c where it is initialized.  */
@@ -413,6 +415,10 @@ struct GlobalRO {
 	/* List of auditing interfaces.  */
 	/* struct audit_ifaces */ void *_dl_audit = nullptr;
 	unsigned int _dl_naudit = 0;
+#if defined(COMPATIBILITY_RHEL_8)
+	int (*_dl_catch_error)(const char **, const char **, bool *, void (*)(void *), void *);
+	void (*_dl_error_free)(void *);
+#endif
 };
 }  // namespace RTLD
 }  // nammespace GLIBC

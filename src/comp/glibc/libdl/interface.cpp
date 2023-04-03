@@ -231,8 +231,9 @@ static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, con
 	}
 
 	if (r && r->valid()) {
+		auto & identity = r->object().file;
 		// Assert the object is from the latest update
-		assert(r->object().file.current == &(r->object()));
+		assert(identity.current == &(r->object()));
 		auto ptr = r->pointer();
 		// Use trampolines
 		if (ptr != nullptr && loader->config.dynamic_dlupdate && (r->type() == Elf::STT_FUNC || r->type() == Elf::STT_GNU_IFUNC)) {

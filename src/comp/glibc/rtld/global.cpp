@@ -271,7 +271,7 @@ void init_globals(const Loader & loader) {
 #endif
 	rtld_global_ro._dl_open = _dl_open;
 	rtld_global_ro._dl_close = _dl_close;
-#if GLIBC_VERSION >= GLIBC_2_34
+#if GLIBC_VERSION >= GLIBC_2_34 || defined(COMPATIBILITY_RHEL_8)
 	rtld_global_ro._dl_catch_error = _dl_catch_error;
 	rtld_global_ro._dl_error_free = _dl_error_free;
 #endif
