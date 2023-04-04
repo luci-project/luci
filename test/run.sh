@@ -98,7 +98,7 @@ if [ $# -gt 0 ] ; then
 	TESTS=$@
 fi
 
-if [ -z ${OS+empty} -o -z ${OSVERSION+empty} ] ; then
+if [ -z ${OS-} -o -z ${OSVERSION-} ] ; then
 	# Determine OS & its version
 	if [ ! -f /etc/os-release ] ; then
 		echo "Missing /etc/os-release" >&2
@@ -106,8 +106,8 @@ if [ -z ${OS+empty} -o -z ${OSVERSION+empty} ] ; then
 	fi
 	source /etc/os-release
 
-	if [ -z ${ID+empty} ] ; then
-		if [ -z ${ID_LIKE+empty} ] ; then
+	if [ -z ${ID-} ] ; then
+		if [ -z ${ID_LIKE-} ] ; then
 			echo "No OS information (in /etc/os-release)" >&2
 			exit 1;
 		else
@@ -116,8 +116,8 @@ if [ -z ${OS+empty} -o -z ${OSVERSION+empty} ] ; then
 	else
 		OS=${ID}
 	fi
-	if [ -z ${VERSION_CODENAME+empty} ] ; then
-		if [ -z ${VERSION_ID+empty} ] ; then
+	if [ -z ${VERSION_CODENAME-} ] ; then
+		if [ -z ${VERSION_ID-} ] ; then
 			echo "No OS version information" >&2
 			exit 1;
 		fi
@@ -126,6 +126,7 @@ if [ -z ${OS+empty} -o -z ${OSVERSION+empty} ] ; then
 		OSVERSION=${VERSION_CODENAME}
 	fi
 fi
+OS="${OS/-/}"
 
 cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null
 
@@ -150,7 +151,7 @@ if $LD_SYSTEM ; then
 else
 	LD_PATH="$(readlink -f "../ld-${LD_NAME,,}-${OS,,}-${OSVERSION,,}-${PLATFORM,,}.so")"
 	if [ ! -x "${LD_PATH}" ] ; then
-		echo "Missing RTLD ${LD_PATH} (${RTLD})" >&2
+		echo "Missing RTLD ${LD_PATH}" >&2
 		exit 1
 	fi
 	if [ -n "${LD_PATH_SHORT}" -a "${LD_PATH}" != "${LD_PATH_SHORT}" ] ; then
@@ -208,7 +209,6 @@ function check() {
 function skip() {
 	SKIP=".skip"
 	for SKIPTEST in $1/${SKIP}{,-${OS,,}}{,-${OSVERSION,,}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}}{,-${USERFAULTFD,,}} ; do
-
 		if [ -f "${SKIPTEST}" ] ; then
 			return 0
 		fi

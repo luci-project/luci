@@ -3,8 +3,8 @@ VERBOSE = @
 NAME = luci
 
 SRCFOLDER = src
-OS ?= $(shell bash -c 'source /etc/os-release ; echo "$${ID,,}"')
-OSVERSION ?= $(shell bash -c 'source /etc/os-release ; if [ -z $${VERSION_CODENAME+empty} ] ; then echo "$${VERSION_ID%%.*}" ; else echo "$${VERSION_CODENAME,,}" ; fi')
+OS ?= $(shell bash -c 'source /etc/os-release ; ID="$${ID/-/}" ; echo "$${ID,,}"')
+OSVERSION ?= $(shell bash -c 'source /etc/os-release ; if [ -z "$${VERSION_CODENAME-}" ] ; then echo "$${VERSION_ID%%.*}" ; else echo "$${VERSION_CODENAME,,}" ; fi')
 PLATFORM ?= x64
 BUILDDIR ?= .build-$(OS)-$(OSVERSION)-$(PLATFORM)
 LIBBEAN = bean/libbean.a
@@ -69,12 +69,16 @@ endef
 
 define each_version
 	$(VERBOSE) echo "$(1)ing luci for each version..."
+	$(call custom_version,$(1),almalinux,9,x64)
 	$(call custom_version,$(1),arch,202211,x64)
 	$(call custom_version,$(1),debian,stretch,x64)
 	$(call custom_version,$(1),debian,buster,x64)
 	$(call custom_version,$(1),debian,bullseye,x64)
 	$(call custom_version,$(1),debian,bookworm,x64)
-	$(call custom_version,$(1),rhel,8,x64)
+	$(call custom_version,$(1),fedora,36,x64)
+	$(call custom_version,$(1),fedora,37,x64)
+	$(call custom_version,$(1),ol,9,x64)
+	$(call custom_version,$(1),opensuseleap,15,x64)
 	$(call custom_version,$(1),rhel,9,x64)
 	$(call custom_version,$(1),ubuntu,focal,x64)
 	$(call custom_version,$(1),ubuntu,jammy,x64)
@@ -96,7 +100,7 @@ version-all:
 	$(call each_version,version)
 
 version:
-	@echo "$(TARGET_FILE)" 
+	@echo "$(TARGET_FILE)"
 
 $(VERSIONS): $(MAKEFILE_LIST)
 	@echo "GEN		$@"

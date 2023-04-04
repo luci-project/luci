@@ -1,0 +1,37 @@
+#!/bin/bash
+
+cat - | sed -e 's/^[ 0-9-]\{3\}\([.:] .*\) \(@ .*\|([0-9]*)\)[\r]*$/  x\1/' -e "s|$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )|[DIR]|" | exec diff -B -w -u <(cat << EOT
+[./run-main]
+Link map:
+  x: ./run-main
+  x: linux-vdso.so.1
+  x: /opt/luci/ld-luci.so
+  x: /lib64/libc.so.6
+
+Search paths:
+  x. [DIR]
+  x. /var/runpath
+$(sed -e 's/^/  x. /' "$LD_LIBRARY_CONF")
+  x. /lib
+  x. /usr/lib
+  x. /lib64
+  x. /usr/lib64
+
+[./libfoo.so]
+Link map:
+  x: [DIR]/run-main
+  x: linux-vdso.so.1
+  x: /opt/luci/ld-luci.so
+  x: [DIR]/libbar.so
+  x: /lib64/libc.so.6
+  x: ./libfoo.so
+
+Search paths:
+  x. [DIR]
+$(sed -e 's/^/  x. /' "$LD_LIBRARY_CONF")
+  x. /lib
+  x. /usr/lib
+  x. /lib64
+  x. /usr/lib64
+EOT
+) -

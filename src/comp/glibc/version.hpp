@@ -137,10 +137,45 @@
   #endif
 
 
- #elif defined(COMPATIBILITY_RHEL)
-  #define OSNAME "RedHat Enterprise Linux"
-  #if defined(COMPATIBILITY_RHEL_8)
+ #elif defined(COMPATIBILITY_FEDORA)
+  #define OSNAME "Fedora Linux"
+  #if defined(COMPATIBILITY_FEDORA_36)
+   #define OSVERSION "36"
+   #define GLIBC_VERSION GLIBC_2_35
+   #define GLIBC_PTHREAD_IN_LIBC 1
+   #define GLIBC_RTLD_GLOBAL_SIZE 4304
+   #define GLIBC_RTLD_GLOBAL_RO_SIZE 928
+   #define GLIBC_LINK_MAP_SIZE 1160
+   #define GLIBC_TUNABLE_COUNT 35
+   #define GLIBC_TUNABLE_SIZE 3920
+
+  #elif defined(COMPATIBILITY_FEDORA_37)
+   #define OSVERSION "37"
+   #define GLIBC_VERSION GLIBC_2_36
+   #define GLIBC_PTHREAD_IN_LIBC 1
+   #define GLIBC_RTLD_GLOBAL_SIZE 4328
+   #define GLIBC_RTLD_GLOBAL_RO_SIZE 896
+   #define GLIBC_LINK_MAP_SIZE 1184
+   #define GLIBC_TUNABLE_COUNT 35
+   #define GLIBC_TUNABLE_SIZE 3920
+
+  #else
+   #error Unsupported or unspecified fedora version
+  #endif
+
+
+
+ #elif defined(COMPATIBILITY_RHEL) || defined(COMPATIBILITY_ALMALINUX) || defined(COMPATIBILITY_OL)
+  #if defined(COMPATIBILITY_ALMALINUX)
+   #define OSNAME "AlmaLinux OS"
+  #elif defined(COMPATIBILITY_OL)
+   #define OSNAME "Oracle Linux"
+  #else
+   #define OSNAME "RedHat Enterprise Linux"
+  #endif
+  #if defined(COMPATIBILITY_RHEL_8) || defined(COMPATIBILITY_ALMALINUX_8) || defined(COMPATIBILITY_OL_8)
    #define OSVERSION "8"
+   #define COMPATIBILITY_RHEL_8_LIKE 1
    #define GLIBC_VERSION GLIBC_2_28
    #define GLIBC_PTHREAD_IN_LIBC 0
    #define GLIBC_RTLD_GLOBAL_SIZE 4152
@@ -179,8 +214,9 @@
 			GLIBC_MALLOC_TCACHE_MAX \
 			GLIBC_MALLOC_CHECK
 
-  #elif defined(COMPATIBILITY_RHEL_9)
+  #elif defined(COMPATIBILITY_RHEL_9) || defined(COMPATIBILITY_ALMALINUX_9) || defined(COMPATIBILITY_OL_9)
    #define OSVERSION "9"
+   #define COMPATIBILITY_RHEL_9_LIKE 1
    #define GLIBC_VERSION GLIBC_2_34
    #define GLIBC_PTHREAD_IN_LIBC 1
    #define GLIBC_RTLD_GLOBAL_SIZE 4176
@@ -225,7 +261,26 @@
 			GLIBC_MALLOC_CHECK \
 
   #else
-   #error Unsupported or unspecified redhat enterprise linux version
+   #error Unsupported or unspecified almalinux / oracle linux / redhat enterprise linux version
+  #endif
+
+
+
+ #elif defined(COMPATIBILITY_OPENSUSELEAP)
+  #define OSNAME "OpenSUSE Leap"
+  #if defined(COMPATIBILITY_OPENSUSELEAP_15)
+   #define OSVERSION "15"
+   #define GLIBC_VERSION GLIBC_2_31
+   // GLIBC_PTHREAD_IN_LIBC aka THREAD_GSCOPE_IN_TCB
+   #define GLIBC_PTHREAD_IN_LIBC 0
+   #define GLIBC_RTLD_GLOBAL_SIZE 4000
+   #define GLIBC_RTLD_GLOBAL_RO_SIZE 544
+   #define GLIBC_LINK_MAP_SIZE 1152
+   #define GLIBC_TUNABLE_COUNT 26
+   #define GLIBC_TUNABLE_SIZE 1456
+
+  #else
+   #error Unsupported or unspecified opensuse leap version
   #endif
 
 

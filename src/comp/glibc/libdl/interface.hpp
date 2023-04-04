@@ -121,7 +121,7 @@ struct link_map {
 	uint32_t l_init_called             : 1;
 	uint32_t l_global                  : 1;
 	uint32_t l_reserved                : 2;
-#if GLIBC_VERSION >= GLIBC_2_35 || defined(COMPATIBILITY_RHEL_9)
+#if GLIBC_VERSION >= GLIBC_2_35 || defined(COMPATIBILITY_RHEL_9_LIKE)
 	uint32_t l_main_map                : 1;
 	uint32_t l_visited                 : 1;
 	uint32_t l_map_used                : 1;
@@ -139,14 +139,14 @@ struct link_map {
 	uint32_t l_symbolic_in_local_scope : 1;
 #endif
 	uint32_t l_free_initfini           : 1;
-#if GLIBC_VERSION >= GLIBC_2_35 || defined(COMPATIBILITY_RHEL_9)
+#if GLIBC_VERSION >= GLIBC_2_35 || defined(COMPATIBILITY_RHEL_9_LIKE)
 	uint32_t l_ld_readonly             : 1;
 #endif
 #if GLIBC_VERSION >= GLIBC_2_35
 	uint32_t l_find_object_processed   : 1;
 #endif
 
-#if (GLIBC_VERSION >= GLIBC_2_31 && !defined(COMPATIBILITY_DEBIAN_BUSTER)) || defined(COMPATIBILITY_RHEL_8) || defined(COMPATIBILITY_RHEL_9)
+#if (GLIBC_VERSION >= GLIBC_2_31 && !defined(COMPATIBILITY_DEBIAN_BUSTER)) || defined(COMPATIBILITY_RHEL_8_LIKE) || defined(COMPATIBILITY_RHEL_9_LIKE)
 	bool l_nodelete_active;
 	bool l_nodelete_pending;
 #endif
@@ -224,6 +224,12 @@ struct link_map {
 	uintptr_t l_relro_addr;
 	size_t l_relro_size;
 	unsigned long long l_serial;
+#if GLIBC_VERSION < GLIBC_2_31
+	struct auditstate {
+		uintptr_t cookie;
+		unsigned int bindflags;
+    } l_audit[0];
+#endif
 };
 }  // namespace DL
 }  // namespace GLIBC

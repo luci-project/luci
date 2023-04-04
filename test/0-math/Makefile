@@ -1,6 +1,6 @@
 OPTLEVEL ?= 2
 CFLAGS += -O$(OPTLEVEL) -g -Wall
-LDGLAGS = -lm
+LDFLAGS = -lm
 
 ifdef LD_PATH
 	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)

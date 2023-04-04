@@ -1,6 +1,7 @@
 stages:
   - build
-  - test
+  - test-gcc
+  - test-llvm
 
 build-luci:
   image: inf4/stubs:gcc-x64
@@ -12,6 +13,7 @@ build-luci:
   artifacts:
     paths:
       - "ld-luci-*.so"
+      - "versions.txt"
   retry: 1
 
 fetch-artifacts:
@@ -30,9 +32,23 @@ fetch-artifacts:
       - "bean/bean-*"
   retry: 1
 
+
+test-almalinux-9-gcc:
+  image: almalinux:9
+  stage: test-gcc
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils gcc gcc-c++
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+
 test-debian-stretch-gcc:
   image: debian:stretch
-  stage: test
+  stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -42,11 +58,10 @@ test-debian-stretch-gcc:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 2
 
 test-debian-buster-gcc:
   image: debian:buster
-  stage: test
+  stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -56,11 +71,10 @@ test-debian-buster-gcc:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 2
 
 test-debian-bullseye-gcc:
   image: debian:bullseye
-  stage: test
+  stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -70,11 +84,10 @@ test-debian-bullseye-gcc:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 2
 
 test-debian-bookworm-gcc:
   image: debian:bookworm
-  stage: test
+  stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -84,11 +97,75 @@ test-debian-bookworm-gcc:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 2
+
+test-fedora-36-gcc:
+  image: fedora:36
+  stage: test-gcc
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils gcc gcc-c++
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+
+test-fedora-37-gcc:
+  image: fedora:37
+  stage: test-gcc
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils gcc gcc-c++
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+
+test-opensuseleap-15-gcc:
+  image: opensuse/leap:15
+  stage: test-gcc
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - zypper install -y make libcap-progs gcc gcc-c++
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+
+test-oraclelinux-9-llvm:
+  image: oraclelinux:9
+  stage: test-llvm
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils clang
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+
+test-rhel-9-gcc:
+  image: redhat/ubi9
+  stage: test-gcc
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils gcc gcc-c++
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
 
 test-ubuntu-focal-gcc:
   image: ubuntu:focal
-  stage: test
+  stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -98,11 +175,10 @@ test-ubuntu-focal-gcc:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 2
 
 test-ubuntu-jammy-gcc:
   image: ubuntu:jammy
-  stage: test
+  stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -112,11 +188,24 @@ test-ubuntu-jammy-gcc:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 2
+
+
+test-almalinux-9-llvm:
+  image: almalinux:9
+  stage: test-llvm
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils clang
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
 
 test-debian-stretch-llvm:
   image: debian:stretch
-  stage: test
+  stage: test-llvm
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -128,11 +217,10 @@ test-debian-stretch-llvm:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 2
 
 test-debian-buster-llvm:
   image: debian:buster
-  stage: test
+  stage: test-llvm
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -142,11 +230,10 @@ test-debian-buster-llvm:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 2
 
 test-debian-bullseye-llvm:
   image: debian:bullseye
-  stage: test
+  stage: test-llvm
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -156,11 +243,10 @@ test-debian-bullseye-llvm:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 2
 
 test-debian-bookworm-llvm:
   image: debian:bookworm
-  stage: test
+  stage: test-llvm
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -170,11 +256,75 @@ test-debian-bookworm-llvm:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 2
+
+test-fedora-36-llvm:
+  image: fedora:36
+  stage: test-llvm
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils clang
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+
+test-fedora-37-llvm:
+  image: fedora:37
+  stage: test-llvm
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils clang
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+
+test-opensuseleap-15-llvm:
+  image: opensuse/leap:15
+  stage: test-llvm
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - zypper install -y make libcap-progs clang
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+
+test-oraclelinux-9-llvm:
+  image: oraclelinux:9
+  stage: test-llvm
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils clang
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+
+test-rhel-9-llvm:
+  image: redhat/ubi9
+  stage: test-llvm
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - yum install -y make diffutils clang
+  script:
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
 
 test-ubuntu-focal-llvm:
   image: ubuntu:focal
-  stage: test
+  stage: test-llvm
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -184,11 +334,10 @@ test-ubuntu-focal-llvm:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 2
 
 test-ubuntu-jammy-llvm:
   image: ubuntu:jammy
-  stage: test
+  stage: test-llvm
   dependencies:
     - build-luci
     - fetch-artifacts
@@ -198,4 +347,4 @@ test-ubuntu-jammy-llvm:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 2
+
