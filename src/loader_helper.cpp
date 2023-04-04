@@ -8,8 +8,14 @@
 const unsigned long SECOND_NS = 1'000'000'000UL;
 
 static void helper_signal(int signum) {
-	LOG_INFO << "helper loop handler ends (Signal " << signum << ")" << endl;
-	Syscall::exit(EXIT_SUCCESS);
+	if (signum == SIGTERM) {
+		LOG_INFO << "helper loop handler ends (Signal " << signum << ")" << endl;
+		Syscall::exit(EXIT_SUCCESS);
+	} else {
+		LOG_ERROR << "helper loop handler got signal " << signum << " -- exit" << endl;
+		Syscall::kill(0, SIGKILL);
+		Syscall::exit(128 + signum);
+	}
 }
 
 void Loader::filemodification_detect(unsigned long now, TreeSet<Pair<unsigned long, ObjectIdentity*>> & worklist_load) {
@@ -205,7 +211,13 @@ void Loader::helper_loop() {
 	action.sa_handler = helper_signal;
 
 	if (auto sigaction = Syscall::sigaction(SIGTERM, &action, NULL); sigaction.failed())
-		LOG_WARNING << "Unable to set helper loop signal handler: " << sigaction.error_message() << endl;
+		LOG_WARNING << "Unable to set helper loop signal handler for SIGTERM: " << sigaction.error_message() << endl;
+	if (auto sigaction = Syscall::sigaction(SIGABRT, &action, NULL); sigaction.failed())
+		LOG_WARNING << "Unable to set helper loop signal handler for SIGABRT: " << sigaction.error_message() << endl;
+	if (auto sigaction = Syscall::sigaction(SIGSEGV, &action, NULL); sigaction.failed())
+		LOG_WARNING << "Unable to set helper loop signal handler for SIGSEGV: " << sigaction.error_message() << endl;
+	if (auto sigaction = Syscall::sigaction(SIGILL, &action, NULL); sigaction.failed())
+		LOG_WARNING << "Unable to set helper loop signal handler for SIGILL: " << sigaction.error_message() << endl;
 
 	if (auto prctl = Syscall::prctl(PR_SET_PDEATHSIG, SIGTERM); prctl.failed())
 		LOG_WARNING << "Unable to set helper loop death signal: " << prctl.error_message() << endl;
