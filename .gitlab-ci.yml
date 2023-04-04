@@ -137,14 +137,14 @@ test-opensuseleap-15-gcc:
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
 
-test-oraclelinux-9-llvm:
+test-oraclelinux-9-gcc:
   image: oraclelinux:9
-  stage: test-llvm
+  stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
   before_script:
-    - yum install -y make diffutils clang
+    - yum install -y make diffutils gcc gcc-c++
   script:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
