@@ -587,7 +587,7 @@ bool Loader::start_handler_threads() {
 			success = false;
 		}
 	} else {
-		LOG_WARNING << "Not starting file modification handler thread since there are no dynamic updates" << endl;
+		LOG_INFO << "Not starting file modification handler thread since there are no dynamic updates" << endl;
 	}
 
 	return success;

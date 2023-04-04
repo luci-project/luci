@@ -429,7 +429,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 
 	// Apply (Luci specific) fixes
 	if (!o->fix()) {
-		LOG_WARNING << "Applying fixes at " << this << " failed!" << endl;
+		LOG_ERROR << "Applying fixes at " << *this << " failed!" << endl;
 	}
 
 	// Prepare
