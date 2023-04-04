@@ -14,7 +14,8 @@ static void logmsg(const char * msg) {
 	size_t len;
 	if (msg == NULL)
 		msg = "NULL";
-	for (len = 0; msg[len] != '\0'; ++len) {}
+	for (len = 0; msg[len] != '\0'; ++len)
+		asm("");  // Prevent replacement by strlen due to optimization
 
 	logbuf(msg, len);
 }
@@ -81,7 +82,7 @@ ssize_t read(int fd, const char * msg, size_t len) {
 }
 
 ssize_t write(int fd, const char * msg, size_t len) {
-	logmsg("\n!read(");
+	logmsg("\n!write(");
 	lognum(fd, 10);
 	logmsg(",");
 	lognum((long)msg, 16);

@@ -3,13 +3,13 @@
 cat - | grep '^!' | sed -e 's/([0-9a-fx,]\+)/(...)/g' -e 's/^!open(.*\(tow[em]\.txt.*) = \).*;/!open(\1...;/' | exec diff -B -w -u <(cat << EOT
 !open(towe.txt,0x0) = ...;
 !read(...) = 3437;
-!read(...) = 3437;
+!write(...) = 3437;
 !read(...) = 0;
 !sleep(...);
 !close(...) = 0;
 !open(towm.txt,0x0) = ...;
 !read(...) = 2339;
-!read(...) = 2339;
+!write(...) = 2339;
 !read(...) = 0;
 !sleep(...);
 !close(...) = 0;
