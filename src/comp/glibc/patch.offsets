@@ -1,6 +1,20 @@
 /* use `tools/patch_offsets.sh` to generate the contents */
 
-#if defined(COMPATIBILITY_DEBIAN_BOOKWORM)
+#if defined(COMPATIBILITY_ALMALINUX_9x)
+	// almalinux 9.1 glibc 2.34 40.el9_1.1 
+	{
+		{ 0x82, 0xf7, 0xae, 0x28, 0xe1, 0x63, 0x76, 0xaa, 0x97, 0xcc, 0x3b, 0xf5, 0x0b, 0x40, 0xab, 0x2d, 0x10, 0x43, 0x92, 0x4a },
+		{
+			{ "_dl_addr", 0x1958e0, 864, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x196370, 134, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x196630, 47, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x196400, 169, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x1964b0, 380, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0x1188b0, 126, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
+#elif defined(COMPATIBILITY_DEBIAN_BOOKWORM)
 	// libc6 Version: 2.36-8
 	{
 		{ 0x4a, 0xff, 0x0f, 0x9d, 0x79, 0x6e, 0x67, 0xd4, 0x13, 0xe4, 0x4f, 0x33, 0x2e, 0xda, 0xce, 0x9a, 0xc0, 0xca, 0x24, 0x01 },
