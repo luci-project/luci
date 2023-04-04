@@ -101,7 +101,7 @@ static bool all_tasks(TreeSet<pid_t> & tids) {
  *  \return `true` if a 32bit relative jump is possible
  */
 static bool check_relative_jump(uintptr_t from, uintptr_t to) {
-	return Math::abs(from + 5 - to) < (2 << 31);
+	return Math::abs(from + 5 - to) < (2UL << 31);
 }
 
 /*! \brief Create a static (permanent) redirection
