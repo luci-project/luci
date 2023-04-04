@@ -14,7 +14,7 @@ SHARED_LIBS = $(addsuffix .so,$(addprefix lib$(LIB)-,off on))
 
 $(EXEC): $(BIN) $(SHARED_LIBS) $(MAKEFILE_LIST)
 	@echo "#!/bin/sh" > $@
-	@echo "for lib in $(SHARED_LIBS) ; do ln -f -s \$$lib lib$(LIB).so && echo "Using \$$lib" >&2 ; sleep 3 ; done & " >> $@
+	@echo "for lib in $(SHARED_LIBS) ; do ln -f -s \$$lib lib$(LIB).so && echo "Using \$$lib" >&2 ; sleep 6 ; done & " >> $@
 	@echo "sleep .5" >> $@
 	@echo "export LD_PRELOAD=$(LIBDIR)lib$(LIB).so" >> $@
 	@echo "./$< $(LIBDIR)towe.txt $(LIBDIR)towm.txt $(LIBDIR)towe.txt $(LIBDIR)towm.txt" >> $@

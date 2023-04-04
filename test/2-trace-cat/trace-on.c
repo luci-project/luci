@@ -97,7 +97,7 @@ ssize_t write(int fd, const char * msg, size_t len) {
 
 int close(int fd) {
 	logmsg("\n!sleep(2);\n");
-	sleep(2);
+	sleep(4);
 
 	logmsg("\n!close(");
 	lognum(fd, 10);

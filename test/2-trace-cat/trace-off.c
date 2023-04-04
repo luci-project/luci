@@ -1,7 +1,7 @@
 #include "sys.h"
 
 int close(int fd) {
-	sleep(2);
+	sleep(4);
 	return sys_close(fd);
 }
 
