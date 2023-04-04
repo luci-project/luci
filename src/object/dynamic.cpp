@@ -163,7 +163,7 @@ bool ObjectDynamic::preload_libraries() {
 				 * However, it seems like glibc ignores it...
 				 */
 				if ((dyn.value() & Elf::DF_STATIC_TLS) != 0 && file_previous == nullptr && this->file.tls_module_id != 0 && file.loader.tls.gen > 0) {
-					LOG_ERROR << *this << " has a static TLS block which cannot be initialized dynamically. Try preloading!" << endl;
+					LOG_WARNING << *this << " has a static TLS block which cannot be initialized dynamically (according to standard) - use preloading instead... However, we will initialize & load it anyway!" << endl;
 					//return false;
 				}
 				break;
