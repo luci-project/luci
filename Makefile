@@ -17,7 +17,7 @@ COMPATIBILITY_MACROS = $(shell echo "-D$(COMPATIBILITY_PREFIX)_$(OS) -D$(COMPATI
 TARGET_FILE = ld-$(NAME)-$(OS)-$(OSVERSION)-$(PLATFORM).so
 TARGET_PATH = /opt/$(NAME)/$(TARGET_FILE)
 
-CRFLAGS ?=
+VERSIONS := versions.txt
 
 
 # Default Luci base address
@@ -89,8 +89,26 @@ install-only: $(LIBPATH_CONF) $(LDLUCI_CONF)
 
 build: $(TARGET_FILE)
 
-all:
+all: $(VERSIONS)
 	$(call each_version,build)
+
+version-all:
+	$(call each_version,version)
+
+version:
+	@echo "$(TARGET_FILE)" 
+
+$(VERSIONS): $(MAKEFILE_LIST)
+	@echo "GEN		$@"
+	@$(MAKE) version-all | egrep '^ld.*\.so$$' > $@
+
+check:
+	@if $(MAKE) version-all | grep '^$(TARGET_FILE)$$' >/dev/null ; then \
+		echo "$(TARGET_FILE) is supported" ; \
+	else \
+		echo "$(TARGET_FILE) is not supported (yet)" ; \
+		exit 1 ; \
+	fi
 
 test-all:
 	$(call each_version,test)
