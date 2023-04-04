@@ -191,16 +191,21 @@ static PatchSymbol symbol_fixes[] = {
 };
 
 static bool patch_using_symbol_fixes(Object & object) {
+	Optional<Elf::SymbolTable> symtab, dynsym;
 	for (const auto & section: object.sections)
-		if (section.type() == Elf::SHT_DYNSYM) {
-			auto symtab = section.get_symbol_table();
-			bool r = true;
-			for (const auto & fix : symbol_fixes)
-				r &= fix.apply(object, symtab);
-			return r;
-		}
+		if (section.type() == Elf::SHT_DYNSYM)
+			dynsym.emplace(section.get_symbol_table());
+		else if (section.type() == Elf::SHT_SYMTAB)
+			symtab.emplace(section.get_symbol_table());
 
-	return false;
+	if (symtab.has_value() || dynsym.has_value()) {
+		bool r = true;
+		for (const auto & fix : symbol_fixes)
+			r &= (symtab.has_value() && fix.apply(object, symtab.value())) || (dynsym.has_value() && fix.apply(object, dynsym.value()));
+		return r;
+	} else {
+		return false;
+	}
 }
 
 
