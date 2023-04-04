@@ -5,7 +5,7 @@ LIBDIR = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 LDFLAGS ?= -Wl,-rpath=$(LIBDIR) -L$(LIBDIR) -ldl -pthread
 
 ifdef LD_PATH
-	CFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
+	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
 endif
 
 EXEC ?= run
