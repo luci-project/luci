@@ -290,7 +290,7 @@ test-opensuseleap-15-llvm:
     - build-luci
     - fetch-artifacts
   before_script:
-    - zypper install -y make libcap-progs clang
+    - zypper install -y make libcap-progs gcc gcc-c++ clang
   script:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
