@@ -16,23 +16,23 @@ if [ -f "/.dockerenv" ] ; then
 			ln -fs /usr/share/zoneinfo/Europe/Berlin /etc/localtime
 			export DEBIAN_FRONTEND=noninteractive
 			apt-get update
-			apt-get install -y make libcap2-bin
+			apt-get install -y make libcap2-bin gcc g++
 			if [ $# -eq 0 ] ; then
-				apt-get install -y gcc g++ gdb less
+				apt-get install -y gdb less
 			fi
 			;;
 
 		almalinux|fedora|ol|rhel)
-			yum install -y make diffutils
+			yum install -y make diffutils gcc gcc-c++
 			if [ $# -eq 0 ] ; then
-				yum install -y gcc gcc-c++ gdb less
+				yum install -y gdb less
 			fi
 			;;
 
 		opensuse-*)
-			zypper install -y make libcap-progs
+			zypper install -y make libcap-progs gcc gcc-c++
 			if [ $# -eq 0 ] ; then
-				zypper install -y gcc gcc-c++ gdb less
+				zypper install -y gdb less
 			fi
 			;;
 
@@ -54,6 +54,26 @@ if [ -f "/.dockerenv" ] ; then
 elif [ $# -ge 1 ] ; then
 	IMAGE=$1
 	shift
+	if [ "$(docker images -q "${IMAGE}" 2> /dev/null)" == "" ] ; then
+		case "${IMAGE}" in
+			ol:*)
+				IMAGE="oraclelinux:${IMAGE//*:}"
+				;;
+
+			opensuseleap:*)
+				IMAGE="opensuse/leap:${IMAGE//*:}"
+				;;
+
+			rhel:*)
+				IMAGE="redhat/ubi${IMAGE//*:}"
+				;;
+
+			*)
+				echo "Unknown docker image ${IMAGE}!" >&2
+				exit 1
+		esac
+	fi
+
 	docker run --rm -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --security-opt apparmor=unconfined -v $( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd ):${DOCKERBASE}-ro:ro "$IMAGE" "${DOCKERBASE}-ro/tools/$( basename -- "${BASH_SOURCE[0]}" )" "$@"
 else
 	echo "Usage: $0 [DOCKER-IMAGE] [COMMAND [ARGS]]"

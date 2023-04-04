@@ -119,7 +119,7 @@ test-all:
 
 test: $(TARGET_FILE)
 	$(VERBOSE) uname -m | sed -e "s/^x86_64$$/x64/" | xargs test "$(PLATFORM)" =
-	$(VERBOSE) ./tools/docker.sh $(OS):$(OSVERSION) /bin/sh -c "apt install -y gcc g++ && ./test/run.sh && ./test/run.sh -u"
+	$(VERBOSE) ./tools/docker.sh $(OS):$(OSVERSION) /bin/sh -c "./test/run.sh && ./test/run.sh -u"
 
 $(LIBBEAN):
 	@echo "GEN		$@"
