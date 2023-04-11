@@ -8,7 +8,7 @@
 
 MemorySegment::MemorySegment(const Object & object, const Elf::Segment & segment, uintptr_t base, uintptr_t offset_delta)
   : source{object, segment.offset() + offset_delta, segment.size() - offset_delta},
-    target{base, segment.virt_addr() + offset_delta, segment.virt_size() - offset_delta, (segment.readable() ? PROT_READ : PROT_NONE) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, 0, segment.type() == Elf::PT_GNU_RELRO, object.file.flags.premapped ? MEMSEG_MAPPED : MEMSEG_NOT_MAPPED} {
+    target{base, segment.virt_addr() + offset_delta, segment.virt_size() - offset_delta, (segment.readable() || segment.type() == Elf::PT_GNU_RELRO ? PROT_READ : PROT_NONE) | (segment.writeable() ? PROT_WRITE : 0) | (segment.executable() ? PROT_EXEC : 0), PROT_NONE, -1, 0, segment.type() == Elf::PT_GNU_RELRO, object.file.flags.premapped ? MEMSEG_MAPPED : MEMSEG_NOT_MAPPED} {
 	assert(!(target.relro && segment.writeable()));
 	assert(target.size >= source.size);
 }
