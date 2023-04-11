@@ -12,7 +12,6 @@ bool ObjectExecutable::preload_segments() {
 	Optional<Elf::Segment> relro;
 	for (const auto & segment : this->segments)
 		if (Elf::PT_GNU_RELRO == segment.type()) {
-			assert((segment.virt_addr() + segment.size()) % Page::SIZE == 0);
 			assert(segment.virt_size() == segment.size());
 			relro.emplace(segment);
 		}
@@ -25,8 +24,10 @@ bool ObjectExecutable::preload_segments() {
 				// Relro section
 				memory_map.emplace_back(*this, *relro, base);
 				// Rest of data section (if any)
-				if (segment.virt_size() - relro->size() > 0)
+				if (segment.virt_size() - relro->size() > 0) {
+					assert((relro->virt_addr() + relro->size()) % Page::SIZE == 0);
 					memory_map.emplace_back(*this, segment, base, relro->size());
+				}
 			} else {
 				memory_map.emplace_back(*this, segment, base);
 			}
