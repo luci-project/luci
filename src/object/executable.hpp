@@ -8,10 +8,10 @@ struct ObjectExecutable : public Object {
 
  protected:
 	virtual bool preload() override {
-		return preload_segments();
+		return preload_segments(false);
 	}
 
 	/*! \brief initialize segments */
-	bool preload_segments();
+	bool preload_segments(bool setup_relro);
 
 };

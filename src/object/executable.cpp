@@ -5,16 +5,17 @@
 #include "loader.hpp"
 #include "page.hpp"
 
-bool ObjectExecutable::preload_segments() {
+bool ObjectExecutable::preload_segments(bool setup_relro) {
 	size_t load = 0;
 
 	// Check relocation read-only
 	Optional<Elf::Segment> relro;
-	for (const auto & segment : this->segments)
-		if (Elf::PT_GNU_RELRO == segment.type()) {
-			assert(segment.virt_size() == segment.size());
-			relro.emplace(segment);
-		}
+	if (setup_relro)
+		for (const auto & segment : this->segments)
+			if (Elf::PT_GNU_RELRO == segment.type()) {
+				assert(segment.virt_size() == segment.size());
+				relro.emplace(segment);
+			}
 
 	// LOAD segments
 	for (const auto & segment : this->segments)

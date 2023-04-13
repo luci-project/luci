@@ -56,7 +56,7 @@ void * ObjectDynamic::dynamic_resolve(size_t index) const {
 
 bool ObjectDynamic::preload() {
 	//base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
-	return preload_segments()
+	return preload_segments(true)
 	    && preload_libraries()
 	    && compatibility_setup();
 }
@@ -384,7 +384,7 @@ bool ObjectDynamic::patchable() const {
 			for (const auto & r : obj->relocations)
 				if (&r.value.object() == file_previous) {
 					// TODO: Check if relocations are in some protected memory part
-					LOG_DEBUG << " - referenced symbol " << r.value.name() << endl;
+					LOG_TRACE << " - referenced symbol " << r.value.name() << endl;
 					if (!this->resolve_symbol(r.value.name())) {
 						LOG_WARNING << "Required symbol " << r.value.name() << " not found in new version of " << this->file << ") -- not patching the library!" << endl;
 						return false;
