@@ -22,7 +22,7 @@ $(EXEC): $(BIN) $(SHARED_LIBS) $(MAKEFILE_LIST)
 
 $(BIN): /bin/cat lib$(LIB).so
 	cp $< $@
-	if [ -n "$(LD_PATH)" ] ; then $(LIBDIR)/../../bean/elfo/elfo-setinterp $@ $(LD_PATH) ; fi
+	if [ -n "$(LD_PATH)" ] ; then $(LIBDIR)/../../../bean/elfo/elfo-setinterp $@ $(LD_PATH) ; fi
 
 lib$(LIB).so: $(SHARED_LIBS)
 	ln -f -s $< $@

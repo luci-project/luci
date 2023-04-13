@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Default values
 COMPILER="GCC"
+GROUP="default"
 LD_NAME="Luci"
 LD_PATH_SHORT="/opt/luci/ld-luci.so"
 DEBUG_OUTPUT=false
@@ -16,12 +17,19 @@ LD_DEBUG_HASH=""
 EXEC="run"
 TIMEOUT=120
 TIMEOUT_KILLDELAY=1
+FORCE=false
 
 # Options
-while getopts "c:d:hi:or:st:uv:R" OPT; do
+while getopts "c:d:fg:hi:or:st:uv:R" OPT; do
 	case "${OPT}" in
 		c)
 			COMPILER=${OPTARG}
+			;;
+		g)
+			GROUP=${OPTARG}
+			;;
+		f)
+			FORCE=true
 			;;
 		o)
 			DEBUG_OUTPUT=true
@@ -51,15 +59,17 @@ while getopts "c:d:hi:or:st:uv:R" OPT; do
 			LD_SYSTEM=true
 			;;
 		*)
-			echo "$0 [-c COMPILER] [-v LOGLEVEL] [-u] [TESTS]" >&2
+			echo "$0 [-c COMPILER] [-v LOGLEVEL] [-u] [-g GROUP] [TESTS]" >&2
 			echo >&2
 			echo "Parameters:" >&2
 			echo "	-c COMPILER  Use 'GCC' (default) or 'LLVM'" >&2
+			echo "	-g GROUP     Group directory containing tests (default: $GROUP)" >&2
 			echo "	-v LOGLEVEL  Specify log level (default: $LD_LOGLEVEL)" >&2
 			echo "	-r PATH      (Short) Path for RTLD (default: $LD_PATH_SHORT)" >&2
 			echo "	-t SECONDS   set maximum run time per test case (default: $TIMEOUT)" >&2
 			echo "	-d SOCKET    Socket for debug hash (elfvarsd)" >&2
 			echo "	-i MODE      Relax patchabilitiy check requirements" >&2
+			echo "	-f           Force tests (do not skip)" >&2
 			echo "	-s           Stop on (first) Error" >&2
 			echo "	-o           Debug: Print output" >&2
 			echo "	-h           Show this help" >&2
@@ -89,13 +99,22 @@ case $COMPILER in
 esac
 
 if [[ $TIMEOUT =~ [^0-9] ]] ; then
-   echo "Invalid timeout seconds:'$TIMEOUT'" >&2
+   echo "Invalid timeout seconds: '$TIMEOUT'" >&2
    exit 1
 fi
 
-TESTS="*"
+cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null
+BASEDIR="$(pwd)"
+
+if [ ! -d "${BASEDIR}/${GROUP}" ] ; then
+	echo "Invalid group directory: '${GROUP}'" "${BASEDIR}/${GROUP}" >&2
+   exit 1
+fi
+
 if [ $# -gt 0 ] ; then
 	TESTS=$@
+else
+	TESTS=$(ls "${BASEDIR}/${GROUP}")
 fi
 
 if [ -z ${OS-} -o -z ${OSVERSION-} ] ; then
@@ -127,8 +146,6 @@ if [ -z ${OS-} -o -z ${OSVERSION-} ] ; then
 	fi
 fi
 OS="${OS/-/}"
-
-cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null
 
 case $(uname -m) in
 	x86_64)
@@ -197,7 +214,7 @@ function check() {
 		if [ -f "$file" ] ; then
 			echo "Checking $file" ;
 			if [ -x "$file" ] ; then
-				"./$file"
+				"$file"
 			else
 				diff -B -w -u "$file" -
 			fi
@@ -217,11 +234,11 @@ function skip() {
 }
 
 FAILED=()
-TESTDIR="$(pwd)"
 for TEST in ${TESTS} ; do
-	if [ -d "${TEST}" ] ; then
+	TESTDIR=$(readlink -f "${BASEDIR}/${GROUP}/${TEST}")
+	if [ -d "${TESTDIR}" ] ; then
 		# Check if we should skip depending on variables
-		if  [ "$TESTS" = "*" ] && skip "${TEST}" ; then
+		if ! $FORCE && skip "${TESTDIR}" ; then
 			echo -e "\n(skipping test ${TEST})" >&2
 			continue
 		fi
@@ -229,10 +246,10 @@ for TEST in ${TESTS} ; do
 		echo -e "\n\e[1mTest ${TEST}\e[0m"
 
 		# Build
-		test -f "${TEST}/Makefile" && make LD_PATH="${LD_PATH}" EXEC="${EXEC}" -B -s -C "${TEST}"
+		test -f "${TESTDIR}/Makefile" && make LD_PATH="${LD_PATH}" EXEC="${EXEC}" -B -s -C "${TESTDIR}"
 		# Check executable
-		if [ ! -x "${TEST}/${EXEC}" ] ; then
-			echo "No executable file (${TEST}/${EXEC}) found" >&2
+		if [ ! -x "${TESTDIR}/${EXEC}" ] ; then
+			echo "No executable file (${TESTDIR}/${EXEC}) found" >&2
 			if ${STOP_ON_ERROR} ; then
 				exit 1
 			else
@@ -278,9 +295,9 @@ for TEST in ${TESTS} ; do
 		export LD_RELAX_CHECK
 		export LD_RELOCATE_OUTDATED=1
 		export LD_STATUS_INFO=$STATUS
-		export LD_LIBRARY_PATH=$(readlink -f "${TEST}")
+		export LD_LIBRARY_PATH="$TESTDIR"
 
-		cd "${TEST}"
+		cd "${TESTDIR}"
 		EXITCODE=0
 		SECONDS=0
 		CHECK_OUTPUT=true
@@ -289,7 +306,7 @@ for TEST in ${TESTS} ; do
 				echo "(finished after ${SECONDS}s)"
 			else
 				EXITCODE=$?
-				echo -e "\e[31mExecution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
+				echo -e "\e[31mExecution of ${EXEC} (${GROUP}/${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
 				rm "$STDOUT" "$STDERR"
 				if ${STOP_ON_ERROR} ; then
 					exit ${EXITCODE}
@@ -307,7 +324,7 @@ for TEST in ${TESTS} ; do
 			cat "$STDERR" >&2
 			echo -e "\n\e[4mstatus\e[0m" >&2
 			cat "$STATUS" >&2
-			echo -e "\e[31mExecution of ${EXEC} (${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
+			echo -e "\e[31mExecution of ${EXEC} (${GROUP}/${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
 			rm -f "$STDOUT" "$STDERR" "$STATUS"
 			if ${STOP_ON_ERROR} ; then
 				exit ${EXITCODE}
@@ -316,7 +333,7 @@ for TEST in ${TESTS} ; do
 				CHECK_OUTPUT=false
 			fi
 		fi
-		cd "${TESTDIR}"
+		cd "${BASEDIR}"
 
 		# Stop Timeout process
 		if [[ $TIMEOUT -gt 0 ]] ; then
@@ -325,8 +342,8 @@ for TEST in ${TESTS} ; do
 
 		if ${CHECK_OUTPUT} ; then
 			# Compare stdout + stderr with example
-			if ! ( check "${TEST}/.stdout" < "$STDOUT" && check "${TEST}/.stderr" < "$STDERR" && check "${TEST}/.status" < <(test -f "$STATUS" && sed -e "s/) for .*$/)/" "$STATUS" 2>/dev/null || true)  ) ; then
-				echo -e "\e[31mUnexpected output content of ${EXEC} (${TEST}) -- runtime ${SECONDS}s\e[0m" >&2
+			if ! ( check "${TESTDIR}/.stdout" < "$STDOUT" && check "${TESTDIR}/.stderr" < "$STDERR" && check "${TESTDIR}/.status" < <(test -f "$STATUS" && sed -e "s/) for .*$/)/" "$STATUS" 2>/dev/null || true)  ) ; then
+				echo -e "\e[31mUnexpected output content of ${EXEC} (${GROUP}/${TEST}) -- runtime ${SECONDS}s\e[0m" >&2
 				if ${STOP_ON_ERROR} ; then
 					exit ${EXITCODE}
 				else
@@ -337,8 +354,8 @@ for TEST in ${TESTS} ; do
 			# Remove files
 			rm -f "$STDOUT" "$STDERR" "$STATUS"
 		fi
-	elif [ "$TESTS" != "*" ] ; then
-		echo "Test '$TEST' does not exist!" >&2
+	else
+		echo "Test '${TEST}' (${TESTDIR}) does not exist!" >&2
 		if ${STOP_ON_ERROR} ; then
 			exit 1
 		fi

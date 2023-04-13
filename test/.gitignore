@@ -1,5 +1,5 @@
-*/run
-*/run-*
+**/run
+**/run-*
 a.out
 *.o
 lib*.a
