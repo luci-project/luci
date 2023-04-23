@@ -1,5 +1,6 @@
 stages:
   - build
+  - test-lang
   - test-gcc
   - test-llvm
 
@@ -348,3 +349,82 @@ test-ubuntu-jammy-llvm:
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
 
+
+test-debian-stretch-lang:
+  image: debian:stretch
+  stage: test-lang
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
+  script:
+    - ./test/run.sh -g lang -R
+    - ./test/run.sh -g lang
+    - ./test/run.sh -g lang -u
+
+test-debian-buster-lang:
+  image: debian:buster
+  stage: test-lang
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
+  script:
+    - ./test/run.sh -g lang -R
+    - ./test/run.sh -g lang
+    - ./test/run.sh -g lang -u
+
+test-debian-bullseye-lang:
+  image: debian:bullseye
+  stage: test-lang
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
+  script:
+    - ./test/run.sh -g lang -R
+    - ./test/run.sh -g lang
+    - ./test/run.sh -g lang -u
+
+test-debian-bookworm-lang:
+  image: debian:bookworm
+  stage: test-lang
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
+  script:
+    - ./test/run.sh -g lang -R
+    - ./test/run.sh -g lang
+    - ./test/run.sh -g lang -u
+
+
+test-ubuntu-focal-lang:
+  image: ubuntu:focal
+  stage: test-lang
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
+  script:
+    - ./test/run.sh -g lang -R
+    - ./test/run.sh -g lang
+    - ./test/run.sh -g lang -u
+
+test-ubuntu-jammy-lang:
+  image: ubuntu:jammy
+  stage: test-lang
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  before_script:
+    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
+  script:
+    - ./test/run.sh -g lang -R
+    - ./test/run.sh -g lang
+    - ./test/run.sh -g lang -u
