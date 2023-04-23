@@ -1,0 +1,7 @@
+[C++ main]
+fib(0) = 0
+[C++ Fibonacci Library v0] fib(21) = 10946
+fib(1) = 1
+[C++ Fibonacci Library v1] fib(22) = 17711
+fib(2) = 1
+[C++ Fibonacci Library v2] fib(23) = 28657

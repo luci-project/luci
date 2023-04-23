@@ -1,0 +1,14 @@
+**/run
+**/run-*
+**/.ada
+**/.pas
+a.out
+b\~*
+hw
+*.o
+*.ali
+lib*.a
+lib*.so
+lib*.h
+libpath.conf
+fibonacci_module.mod

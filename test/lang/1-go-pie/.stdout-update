@@ -1,0 +1,7 @@
+[Go (PIE) main]
+fib(0) = 0
+[Go Fibonacci Library v0] fib(21) = 10946
+fib(1) = 1
+[Go Fibonacci Library v1] fib(22) = 17711
+fib(2) = 1
+[Go Fibonacci Library v2] fib(23) = 28657

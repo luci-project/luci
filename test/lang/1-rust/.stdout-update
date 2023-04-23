@@ -1,0 +1,7 @@
+[Rust main]
+fib(0) = 0
+[Rust Fibonacci Library v0] fib(21) = 10946
+fib(1) = 1
+[Rust Fibonacci Library v1] fib(22) = 17711
+fib(2) = 1
+[Rust Fibonacci Library v2] fib(23) = 28657
