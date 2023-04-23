@@ -404,13 +404,24 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 	this->argv = reinterpret_cast<const char **>(stack_pointer) + 1;
 	this->envp = this->argv + this->argc + 1;
 
-	// Reorder environment variables (skip empty [consumed] entries)
+	/* Reorder environment variables
+	 * by move empty [consumed] entries (nulled name) to the end
+	 * since glibc getenv will stop iterating on such occurences
+	 * (and we don't want to change the auxiliary vectors)
+	 */
 	{
-		size_t curr = 0;
-		for (size_t e = 0; this->envp[e] != nullptr; e++)
-			if (*(this->envp[curr] = this->envp[e]) != '\0')
-				curr++;
-		this->envp[curr] = nullptr;
+		// Count entries
+		size_t envc = 0;
+		while (this->envp[envc] != nullptr)
+			envc++;
+		// swap each empty entry with one from the end
+		for (size_t curr = 0; curr < envc; curr++)
+			if (*(this->envp[curr]) == '\0') {
+				while (*(this->envp[--envc]) == '\0' && envc > curr) {}
+				auto tmp = this->envp[envc];
+				this->envp[envc] = this->envp[curr];
+				this->envp[curr] = tmp;
+			}
 	}
 
 	// Binary has to be first in list
