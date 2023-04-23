@@ -112,10 +112,12 @@ if [ ! -d "${BASEDIR}/${GROUP}" ] ; then
 fi
 
 if [ $# -gt 0 ] ; then
-	TESTS=$@
+	REGEX="$( printf "\)\|\(%s" "$@" )"
+	REGEX="${REGEX:4}\)"
 else
-	TESTS=$(ls "${BASEDIR}/${GROUP}")
+	REGEX=".\{1,\}"
 fi
+TESTS=$(find "${BASEDIR}/${GROUP}" -maxdepth 1 -type d ! -path "${BASEDIR}/${GROUP}" -exec expr match {} "^.\{1,\}/\(${REGEX}\)$" ";" | sort)
 
 if [ -z ${OS-} -o -z ${OSVERSION-} ] ; then
 	# Determine OS & its version
