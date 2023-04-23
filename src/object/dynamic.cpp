@@ -36,7 +36,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
 	if (position_independent) {
 		// Base is not defined, hence
 		if (file.flags.premapped == 1) {
-			this->base = data.addr;
+			this->base = data.addr - this->virt_offset();
 		} else {
 			size_t max_size = 0;
 			for (auto & segment : this->segments)
@@ -68,7 +68,7 @@ void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
 		// Apply rpath token expansion if required
 		if (String::find(str, '$') != nullptr) {
 			// TODO: Here we allocate space which is never freed yet
-			char * path = String::duplicate(str, PATH_MAX + 1);
+			char * path = String::duplicate(str, PATH_MAX);
 			assert(path != nullptr);
 
 			// Origin
