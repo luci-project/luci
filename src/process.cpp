@@ -117,6 +117,7 @@ static void exit_func() {
 }
 
 void Process::start(uintptr_t entry, uintptr_t stack_pointer, const char ** envp) {
+	LOG_INFO << "Handing over to process at " << reinterpret_cast<void*>(entry) << endl;
 	const unsigned long flags = 1 << 0   // CF: No carry
 	                          | 1 << 2   // PF: Even parity
 	                          | 1 << 4   // AF: No auxiliary carry
