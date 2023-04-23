@@ -65,7 +65,9 @@ class Process {
 	/*! \brief Start Process
 	 * \param entry Start address
 	 */
-	void start(uintptr_t entry);
+	void start(uintptr_t entry) {
+		start(entry, stack_pointer, envp);
+	}
 
 	/*! \brief Start Process
 	 * \param entry Start address
@@ -73,18 +75,4 @@ class Process {
 	 * \param envp Pointer to start of environment variables on stack
 	 */
 	static void start(uintptr_t entry, uintptr_t stack_pointer, const char ** envp);
-
-	/*! \brief Dump environment
-	 * \param argc argument count
-	 * \param argc argument values
-	 * \param envp pointer to enironment variable
-	 */
-	static void dump(int argc, const char **argv, const char ** envp);
-
-	/*! \brief Dump environment
-	 * \param p process
-	 */
-	static void dump(const Process &p) {
-		dump(p.argc, p.argv, p.envp);
-	}
 };

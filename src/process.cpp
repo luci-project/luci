@@ -112,16 +112,11 @@ void Process::init(const Vector<const char *> &arg) {
 	*reinterpret_cast<void**>(stack_pointer) = reinterpret_cast<void*>(argc);
 }
 
-void Process::start(uintptr_t entry) {
-	start(entry, stack_pointer, envp);
-}
-
 static void exit_func() {
 	LOG_INFO << "Exit Function called" << endl;
 }
 
 void Process::start(uintptr_t entry, uintptr_t stack_pointer, const char ** envp) {
-	LOG_INFO << "Starting process at " << (void*)entry << " (with sp = " << (void*)stack_pointer << ")" << endl;
 	const unsigned long flags = 1 << 0   // CF: No carry
 	                          | 1 << 2   // PF: Even parity
 	                          | 1 << 4   // AF: No auxiliary carry
@@ -160,22 +155,4 @@ void Process::start(uintptr_t entry, uintptr_t stack_pointer, const char ** envp
 }
 
 
-void Process::dump(int argc, const char **argv, const char ** envp) {
-	long * argcp  = reinterpret_cast<long*>(argv) - 1;
-	cout << argcp << ": argc = " << *argcp << endl;
 
-	for (int i = 0 ; i < argc; i++)
-		cout << argv + i << ": argv[" << i << "] = " << (void*)argv[i] << " (" << argv[i] << ")" << endl;
-	cout << argv + argc << ": argv[" << argc << "] = " << (void*)argv[argc] << endl;
-
-	int envc;
-	for (envc = 0 ; envp[envc] != NULL; envc++)
-		cout << envp + envc << ": envp[" << envc << "] = " << (void*)envp[envc] << " (" << envp[envc] << ")" << endl;
-	cout << envp + envc << ": envp[" << envc << "] = " << (void*)envp[envc] << endl;
-
-	Auxiliary * auxv = reinterpret_cast<Auxiliary *>(envp + envc + 1);
-	int auxc;
-	for (auxc = 0 ; auxv[auxc].a_type != Auxiliary::AT_NULL; auxc++)
-		cout <<  auxv + auxc << ": auxv[" << auxc << "] = " <<  auxv[auxc].a_type << ": " << auxv[auxc].a_un.a_val << endl;
-	cout <<  auxv + auxc << ": auxv[" << auxc << "] = " <<  auxv[auxc].a_type << ": " << auxv[auxc].a_un.a_val << endl;
-}

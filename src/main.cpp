@@ -65,6 +65,9 @@ struct Opts {
 	bool tracing{};
 	bool linkstatic{};
 	bool showVersion{};
+	bool showArgs{};
+	bool showAuxv{};
+	bool showEnv{};
 	bool showHelp{};
 };
 
@@ -172,6 +175,10 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	// Fix relocations in outdated varsions
 	if (config_loader.dynamic_update)
 		config_loader.update_outdated_relocations = (opts.relocateOutdated || config_file.value_or_default<bool>("LD_RELOCATE_OUTDATED", false));
+	// Process init debug output
+	config_loader.show_args = opts.showArgs || config_file.value_or_default<bool>("LD_SHOW_ARGS", false);
+	config_loader.show_auxv = opts.showAuxv || config_file.value_or_default<bool>("LD_SHOW_AUXV", false);
+	config_loader.show_env = opts.showEnv ||  config_file.value_or_default<bool>("LD_SHOW_ENV", false);
 
 	// Debug symbols
 	if (config_loader.dynamic_update)
@@ -353,6 +360,9 @@ int main(int argc, char* argv[]) {
 				{'\0', "dbgsym",          nullptr,  &Opts::debugSymbols,     false, "Search for external debug symbols to improve detection of binary updatability. This option can also be enabled by setting the environment variable LD_DEBUG_SYMBOLS to 1" },
 				{'\0', "dbgsym-root",     nullptr,  &Opts::debugSymbolsRoot, false, "Set root directory for external debug symbols. This option can also be configured using the environment variable LD_DEBUG_SYMBOLS_ROOT" },
 				{'\0', "argv0",           nullptr,  &Opts::argv0,            false, "Explicitly specify program name (argv[0])" },
+				{'\0', "show-args",       nullptr,  &Opts::showArgs,         false, "Show the arguments passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ARGS to 1" },
+				{'\0', "show-auxv",       nullptr,  &Opts::showAuxv,         false, "Show the auxiliary array passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_AUXV to 1" },
+				{'\0', "show-env",        nullptr,  &Opts::showEnv,          false, "Show the environment variables passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ENV to 1" },
 				{'h',  "help",            nullptr,  &Opts::showHelp,         false, "Show this help" }
 			},
 			File::exists,

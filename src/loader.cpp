@@ -341,6 +341,114 @@ uintptr_t Loader::get_entry_point(Object * start, const char * custom_entry_poin
 	return entry;
 }
 
+template<typename T>
+static void show_args(T &stream, uintptr_t stack_pointer) {
+	size_t argc = *reinterpret_cast<size_t*>(stack_pointer);
+	const char **argv = reinterpret_cast<const char**>(stack_pointer + sizeof(void*));
+
+	for (size_t i = 0 ; i < argc; i++)
+		stream << '\t' << (i + 1) << ". \"" << argv[i] << '"' << endl;
+	stream << endl;
+}
+
+template<typename T>
+static void show_env(T &stream, const char ** envp) {
+	size_t envc = 0;
+	for (; envp[envc] != nullptr; envc++)
+		stream << '\t' << (envc + 1) << ". \"" << envp[envc] << "\" (0x" << reinterpret_cast<const void*>(envp[envc]) << ")" << endl;
+	if (envc == 0)
+		stream << "\t(none)" << endl;
+	stream << endl;
+}
+
+template<typename T>
+static void show_auxv(T &stream, const char ** envp) {
+	size_t envc = 0;
+	while (envp[envc] != nullptr)
+		envc++;
+
+	Auxiliary * auxv = reinterpret_cast<Auxiliary *>(envp + envc + 1);
+	size_t auxc = 0;
+	do {
+		stream << '\t' << (auxc + 1) << ". ";
+		auto v = auxv[auxc].a_un;
+		switch (auxv[auxc].a_type) {
+			case Auxiliary::AT_NULL:              stream << "NULL (End of vector)" << endl; break;
+			case Auxiliary::AT_IGNORE:            stream << "IGNORE (Entry should be ignored)" << endl; break;
+			case Auxiliary::AT_EXECFD:            stream << "EXECFD (File descriptor of program): " << v.a_val << endl; break;
+			case Auxiliary::AT_PHDR:              stream << "PHDR (Program headers for program): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_PHENT:             stream << "PHENT (Size of program header entry): " << v.a_val << endl; break;
+			case Auxiliary::AT_PHNUM:             stream << "PHNUM (Number of program headers): " << v.a_val << endl; break;
+			case Auxiliary::AT_PAGESZ:            stream << "PAGESZ (System page size): " << v.a_val << endl; break;
+			case Auxiliary::AT_BASE:              stream << "BASE (Base address of interpreter): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_FLAGS:             stream << "FLAGS: 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_ENTRY:             stream << "ENTRY (Entry point of program): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_NOTELF:            stream << "NOTELF (Program is not ELF): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_UID:               stream << "UID (Real UID): " << v.a_val << endl; break;
+			case Auxiliary::AT_EUID:              stream << "EUID (Effective UID): " << v.a_val << endl; break;
+			case Auxiliary::AT_GID:               stream << "GID (Real GID): " << v.a_val << endl; break;
+			case Auxiliary::AT_EGID:              stream << "EGID (Effective GID): " << v.a_val << endl; break;
+			case Auxiliary::AT_PLATFORM:          stream << "PLATFORM (String identifying platform): " << reinterpret_cast<const char *>(v.a_ptr) << endl; break;
+			case Auxiliary::AT_HWCAP:             stream << "HWCAP (Machine-dependent hints about processor capabilities): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_CLKTCK:            stream << "CLKTCK (Frequency of times): " << v.a_val << endl; break;
+			case Auxiliary::AT_FPUCW:             stream << "FPUCW (Used FPU control word): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_DCACHEBSIZE:       stream << "DCACHEBSIZE (Data cache block size): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_ICACHEBSIZE:       stream << "ICACHEBSIZE (Instruction cache block size): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_UCACHEBSIZE:       stream << "UCACHEBSIZE (Unified cache block size): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_IGNOREPPC:         stream << "IGNOREPPC (Entry should be ignored)" << endl; break;
+			case Auxiliary::AT_SECURE:            stream << "SECURE (Boolean, was exec setuid-like?): " << v.a_val << endl; break;
+			case Auxiliary::AT_BASE_PLATFORM:     stream << "BASE_PLATFORM (String identifying real platforms): " << reinterpret_cast<const char *>(v.a_ptr) << endl; break;
+			case Auxiliary::AT_RANDOM:            stream << "RANDOM (Address of 16 random bytes): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_HWCAP2:            stream << "HWCAP2 (More machine-dependent hints about processor capabilities): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_EXECFN:            stream << "EXECFN (Filename of executable): " << reinterpret_cast<const char *>(v.a_ptr) << endl; break;
+			case Auxiliary::AT_SYSINFO:           stream << "SYSINFO (Entry point to the system call function in the vDSO): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_SYSINFO_EHDR:      stream << "SYSINFO_EHDR (Pointer to the vDSO in memory): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_L1I_CACHESHAPE:    stream << "L1I_CACHESHAPE: 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_L1D_CACHESHAPE:    stream << "L1D_CACHESHAPE: 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_L2_CACHESHAPE:     stream << "L2_CACHESHAPE: 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_L3_CACHESHAPE:     stream << "L3_CACHESHAPE: 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_L1I_CACHESIZE:     stream << "L1I_CACHESIZE (L1 instruction cache size): " << v.a_val << endl; break;
+			case Auxiliary::AT_L1I_CACHEGEOMETRY: stream << "L1I_CACHEGEOMETRY (Geometry of the L1 instruction cache): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_L1D_CACHESIZE:     stream << "L1D_CACHESIZE (L1 data cache size): " << v.a_val << endl; break;
+			case Auxiliary::AT_L1D_CACHEGEOMETRY: stream << "L1D_CACHEGEOMETRY (Geometry of the L1 data cache): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_L2_CACHESIZE:      stream << "L2_CACHESIZE (L2 cache size): " << v.a_val << endl; break;
+			case Auxiliary::AT_L2_CACHEGEOMETRY:  stream << "L2_CACHEGEOMETRY (Geometry of the L2 cache): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_L3_CACHESIZE:      stream << "L3_CACHESIZE (L3 cache size): " << v.a_val << endl; break;
+			case Auxiliary::AT_L3_CACHEGEOMETRY:  stream << "L3_CACHEGEOMETRY (Geometry of the L3 cache): 0x" << v.a_ptr << endl; break;
+			case Auxiliary::AT_MINSIGSTKSZ:       stream << "MINSIGSTKSZ (Stack needed for signal delivery): " << v.a_val << endl; break;
+			default:                              stream << "[Type " << auxv[auxc].a_type << "]: 0x" << v.a_ptr << endl; break;
+		}
+	} while (auxv[auxc++].a_type != Auxiliary::AT_NULL);
+	stream << endl;
+}
+
+void Loader::show_init_stack(uintptr_t entry, uintptr_t stack_pointer, const char ** envp) {
+	if (config.show_args) {
+		cerr << "Arguments for 0x" << reinterpret_cast<void*>(entry) << " (with stackpointer at 0x" << reinterpret_cast<void*>(stack_pointer) << "):" << endl;
+		show_args(cerr, stack_pointer);
+	}
+	if (config.show_env) {
+		cerr << "Environment variables (at " << reinterpret_cast<void*>(envp) << "):" << endl;
+		show_env(cerr, envp);
+	}
+	if (config.show_auxv) {
+		cerr << "Auxiliary vectors:" << endl;
+		show_auxv(cerr, envp);
+	}
+
+	// Log
+	if (LOG.visible(Log::INFO)) {
+		LOG_INFO << "Arguments for " << reinterpret_cast<void*>(entry) << " (with stackpointer " << reinterpret_cast<void*>(stack_pointer) << "):" << endl;
+		show_args(LOG.append(), stack_pointer);
+	}
+	if (LOG.visible(Log::TRACE)) {
+		LOG_TRACE << "Environment variables (at " << reinterpret_cast<void*>(envp) << "):" << endl;
+		show_env(LOG.append(), envp);
+
+		LOG_TRACE << "Auxiliary vectors:" << endl;
+		show_auxv(LOG.append(), envp);
+	}
+}
 
 bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintptr_t stack_pointer, size_t stack_size, const char * entry_point) {
 	assert(file != nullptr);
@@ -379,9 +487,12 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 		return false;
 	}
 
+	// Dump contents of initial stack
+	auto entry = get_entry_point(start, entry_point);
+	show_init_stack(entry, p.stack_pointer, p.envp);
 	// Start
 	process_started = true;
-	p.start(get_entry_point(start, entry_point));
+	p.start(entry);
 
 	return true;
 }
@@ -435,9 +546,12 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 		return false;
 	}
 
+	// Dump contents of initial stack
+	auto entry = get_entry_point(start, entry_point);
+	show_init_stack(entry, stack_pointer, this->envp);
 	// Start
 	process_started = true;
-	Process::start(get_entry_point(start, entry_point), stack_pointer, this->envp);
+	Process::start(entry, stack_pointer, this->envp);
 
 	return true;
 }

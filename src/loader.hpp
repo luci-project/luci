@@ -59,6 +59,15 @@ struct Loader {
 		/*! \brief look for external debug symbols (for bean hashing)? */
 		bool find_debug_symbols = false;
 
+		/*! \brief Show arguments before starting process? */
+		bool show_args = false;
+
+		/*! \brief Show environment variables before starting process? */
+		bool show_env = false;
+
+		/*! \brief Show auxiliary vectors before starting process? */
+		bool show_auxv = false;
+
 		/*! \brief Root directory for debug symbols (if nullptr system root is used) */
 		const char * debug_symbols_root = nullptr;
 		/* Default constructor */
@@ -227,4 +236,7 @@ struct Loader {
 
 	/*! \brief prepare all loaded files for execution */
 	bool prepare(Object * start);
+
+	/*! \brief dump process contents of initial stack */
+	void show_init_stack(uintptr_t entry, uintptr_t stack_pointer, const char ** envp);
 };
