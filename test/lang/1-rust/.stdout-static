@@ -1,3 +1,4 @@
+[Rust main]
 fib(0) = 0
 [Rust Fibonacci Library v0] fib(21) = 10946
 fib(1) = 1

@@ -4,10 +4,10 @@ SETINTERP := $(DIR)/../../../bean/elfo/elfo-setinterp
 OPTLEVEL ?= 2
 
 FPC ?= fpc
-FPCFLAGS += -O$(OPTLEVEL)
+FPCFLAGS += -O$(OPTLEVEL) -Tlinux -XD -Cg
 
 ifdef LD_PATH
-	LDFLAGS += -Wl,--dynamic-linker=$(LD_PATH)
+	FPCFLAGS += -FL$(LD_PATH)
 endif
 
 EXEC ?= run
@@ -15,4 +15,3 @@ SOURCE = $(wildcard *.pas)
 
 $(EXEC): $(SOURCE)
 	$(FPC) $(FPCFLAGS) -o$@ $<
-	test -n "$(LD_PATH)" && $(SETINTERP) $@ $(LD_PATH) || true
