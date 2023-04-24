@@ -360,6 +360,7 @@ test-debian-stretch-lang:
     DEBIAN_FRONTEND: noninteractive
     LC_ALL: C.UTF-8
   before_script:
+    - sed -i -e '/stretch-updates/d' -e 's/\(security\|deb\).debian.org/archive.debian.org/' /etc/apt/sources.list
     - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
     - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
   script:
