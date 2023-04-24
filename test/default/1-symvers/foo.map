@@ -1,0 +1,14 @@
+VERS_0 {
+	global: foo;
+	local: *;
+};
+
+VERS_1 {
+	global: foo;
+	local: *;
+};
+
+VERS_2 {
+	global: foo;
+	local: *;
+};
