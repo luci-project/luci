@@ -79,7 +79,7 @@ struct ObjectDynamic : public ObjectExecutable {
 			if (version.file != nullptr)
 				for (auto & v : version_definition)
 					if (v.base()) {
-						skip_version_definition = version.hash != v.hash() || strcmp(v.auxiliary().at(0).name(), version.file) != 0;
+						skip_version_definition = version.filehash != v.hash() || strcmp(v.auxiliary().at(0).name(), version.file) != 0;
 						break;
 					}
 			if (!skip_version_definition)
