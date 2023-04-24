@@ -356,7 +356,11 @@ test-debian-stretch-lang:
   dependencies:
     - build-luci
     - fetch-artifacts
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+    LC_ALL: C.UTF-8
   before_script:
+    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
     - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
   script:
     - ./test/run.sh -g lang -R
@@ -369,7 +373,11 @@ test-debian-buster-lang:
   dependencies:
     - build-luci
     - fetch-artifacts
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+    LC_ALL: C.UTF-8
   before_script:
+    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
     - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
   script:
     - ./test/run.sh -g lang -R
@@ -382,7 +390,11 @@ test-debian-bullseye-lang:
   dependencies:
     - build-luci
     - fetch-artifacts
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+    LC_ALL: C.UTF-8
   before_script:
+    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
     - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
   script:
     - ./test/run.sh -g lang -R
@@ -395,7 +407,11 @@ test-debian-bookworm-lang:
   dependencies:
     - build-luci
     - fetch-artifacts
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+    LC_ALL: C.UTF-8
   before_script:
+    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
     - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
   script:
     - ./test/run.sh -g lang -R
@@ -409,7 +425,11 @@ test-ubuntu-focal-lang:
   dependencies:
     - build-luci
     - fetch-artifacts
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+    LC_ALL: C.UTF-8
   before_script:
+    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
     - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
   script:
     - ./test/run.sh -g lang -R
@@ -422,7 +442,11 @@ test-ubuntu-jammy-lang:
   dependencies:
     - build-luci
     - fetch-artifacts
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+    LC_ALL: C.UTF-8
   before_script:
+    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
     - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
   script:
     - ./test/run.sh -g lang -R
