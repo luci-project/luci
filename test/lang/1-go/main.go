@@ -15,7 +15,6 @@ import (
 func main() {
 	fmt.Println("[Go main]")
 	for i := C.long(0); i < 3; i++ {
-		fmt.Println("")
 		if i != 0 {
 			time.Sleep(10 * time.Second)
 		}
