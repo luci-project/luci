@@ -30,7 +30,7 @@ package body fib_1 is
 
    procedure PrintFib(Value : Long_Integer) is
    begin
-    Put_Line("[Ada Fibonacci Library v" & LeftTrim(Version'Image) & "] fib(" & LeftTrim(Value'Image) & ") = " & LeftTrim(fibalgo(value)'Image));
+    Put_Line("[Ada Fibonacci Library v" & LeftTrim(Integer'Image(Version)) & "] fib(" & LeftTrim(Long_Integer'Image(Value)) & ") = " & LeftTrim(Long_Integer'Image(fibalgo(value))));
    end PrintFib;
 
 end fib_1;
