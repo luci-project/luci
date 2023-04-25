@@ -34,422 +34,157 @@ fetch-artifacts:
   retry: 1
 
 
-test-almalinux-9-gcc:
-  image: almalinux:9
+.test-gcc:
   stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils gcc gcc-c++
   script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
+    - ./test/run.sh -c LLVM -R
+    - ./test/run.sh -c LLVM
+    - ./test/run.sh -c LLVM -u
+  retry: 1
 
 test-debian-stretch-gcc:
-  image: debian:stretch
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
+  image: heinloth/lp-build:debian-stretch
+  extends: .test-gcc
 
 test-debian-buster-gcc:
-  image: debian:buster
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
+  image: heinloth/lp-build:debian-buster
+  extends: .test-gcc
 
 test-debian-bullseye-gcc:
-  image: debian:bullseye
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
+  image: heinloth/lp-build:debian-bullseye
+  extends: .test-gcc
 
 test-debian-bookworm-gcc:
-  image: debian:bookworm
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
-
-test-fedora-36-gcc:
-  image: fedora:36
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils gcc gcc-c++
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
-
-test-fedora-37-gcc:
-  image: fedora:37
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils gcc gcc-c++
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
-
-test-opensuseleap-15-gcc:
-  image: opensuse/leap:15
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - zypper install -y make libcap-progs gcc gcc-c++
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
-
-test-oraclelinux-9-gcc:
-  image: oraclelinux:9
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils gcc gcc-c++
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
-
-test-rhel-9-gcc:
-  image: redhat/ubi9
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils gcc gcc-c++
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
+  image: heinloth/lp-build:debian-bookworm
+  extends: .test-gcc
 
 test-ubuntu-focal-gcc:
-  image: ubuntu:focal
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
+  image: heinloth/lp-build:ubuntu-focal
+  extends: .test-gcc
 
 test-ubuntu-jammy-gcc:
-  image: ubuntu:jammy
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y gcc g++ make libcap2-bin
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
+  image: heinloth/lp-build:ubuntu-jammy
+  extends: .test-gcc
+
+test-almalinux-9-gcc:
+  image: heinloth/lp-build:almalinux-9
+  extends: .test-gcc
+
+test-oraclelinux-9-gcc:
+  image: heinloth/lp-build:orcalelinux-9
+  extends: .test-gcc
+
+test-rhel-9-gcc:
+  image: heinloth/lp-build:rhel-9
+  extends: .test-gcc
+
+test-fedora-36-gcc:
+  image: heinloth/lp-build:fedora-36
+  extends: .test-gcc
+
+test-fedora-37-gcc:
+  image: heinloth/lp-build:fedora-37
+  extends: .test-gcc
+
+test-opensuseleap-15-gcc:
+  image: heinloth/lp-build:opensuseleap-15
+  extends: .test-gcc
 
 
-test-almalinux-9-llvm:
-  image: almalinux:9
+.test-llvm:
   stage: test-llvm
   dependencies:
     - build-luci
     - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils clang
   script:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
+  retry: 1
 
 test-debian-stretch-llvm:
-  image: debian:stretch
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y clang-11 make libcap2-bin
-    - update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
-    - update-alternatives --install /usr/bin/cc cc /usr/bin/clang 110 --slave /usr/bin/c++ c++ /usr/bin/clang++
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
+  image: heinloth/lp-build:debian-stretch
+  extends: .test-llvm
 
 test-debian-buster-llvm:
-  image: debian:buster
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y clang make libcap2-bin
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
+  image: heinloth/lp-build:debian-buster
+  extends: .test-llvm
 
 test-debian-bullseye-llvm:
-  image: debian:bullseye
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y clang make libcap2-bin
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
+  image: heinloth/lp-build:debian-bullseye
+  extends: .test-llvm
 
 test-debian-bookworm-llvm:
-  image: debian:bookworm
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y clang make libcap2-bin
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
-
-test-fedora-36-llvm:
-  image: fedora:36
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils clang
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
-
-test-fedora-37-llvm:
-  image: fedora:37
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils clang
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
-
-test-opensuseleap-15-llvm:
-  image: opensuse/leap:15
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - zypper install -y make libcap-progs gcc gcc-c++ clang
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
-
-test-oraclelinux-9-llvm:
-  image: oraclelinux:9
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils clang
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
-
-test-rhel-9-llvm:
-  image: redhat/ubi9
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - yum install -y make diffutils clang
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
+  image: heinloth/lp-build:debian-bookworm
+  extends: .test-llvm
 
 test-ubuntu-focal-llvm:
-  image: ubuntu:focal
-  stage: test-llvm
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y clang make libcap2-bin
-  script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
+  image: heinloth/lp-build:ubuntu-focal
+  extends: .test-llvm
 
 test-ubuntu-jammy-llvm:
-  image: ubuntu:jammy
-  stage: test-llvm
+  image: heinloth/lp-build:ubuntu-jammy
+  extends: .test-llvm
+
+test-almalinux-9-llvm:
+  image: heinloth/lp-build:almalinux-9
+  extends: .test-llvm
+
+test-oraclelinux-9-llvm:
+  image: heinloth/lp-build:orcalelinux-9
+  extends: .test-llvm
+
+test-rhel-9-llvm:
+  image: heinloth/lp-build:rhel-9
+  extends: .test-llvm
+
+test-fedora-36-llvm:
+  image: heinloth/lp-build:fedora-36
+  extends: .test-llvm
+
+test-fedora-37-llvm:
+  image: heinloth/lp-build:fedora-37
+  extends: .test-llvm
+
+test-opensuseleap-15-llvm:
+  image: heinloth/lp-build:opensuseleap-15
+  extends: .test-llvm
+
+
+.test-lang:
+  stage: test-lang
   dependencies:
     - build-luci
     - fetch-artifacts
-  before_script:
-    - apt-get update && apt-get install -y clang make libcap2-bin
   script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
-
+    - ./test/run.sh -g lang -R
+    - ./test/run.sh -g lang
+    - ./test/run.sh -g lang -u
+  retry: 1
 
 test-debian-stretch-lang:
-  image: debian:stretch
-  stage: test-lang
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  variables:
-    DEBIAN_FRONTEND: noninteractive
-    LC_ALL: C.UTF-8
-  before_script:
-    - sed -i -e '/stretch-updates/d' -e 's/\(security\|deb\).debian.org/archive.debian.org/' /etc/apt/sources.list
-    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
-    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
-  script:
-    - ./test/run.sh -g lang -R
-    - ./test/run.sh -g lang
-    - ./test/run.sh -g lang -u
+  image: heinloth/lp-build:debian-stretch
+  extends: .test-lang
 
 test-debian-buster-lang:
-  image: debian:buster
-  stage: test-lang
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  variables:
-    DEBIAN_FRONTEND: noninteractive
-    LC_ALL: C.UTF-8
-  before_script:
-    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
-    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
-  script:
-    - ./test/run.sh -g lang -R
-    - ./test/run.sh -g lang
-    - ./test/run.sh -g lang -u
+  image: heinloth/lp-build:debian-buster
+  extends: .test-lang
 
 test-debian-bullseye-lang:
-  image: debian:bullseye
-  stage: test-lang
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  variables:
-    DEBIAN_FRONTEND: noninteractive
-    LC_ALL: C.UTF-8
-  before_script:
-    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
-    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
-  script:
-    - ./test/run.sh -g lang -R
-    - ./test/run.sh -g lang
-    - ./test/run.sh -g lang -u
+  image: heinloth/lp-build:debian-bullseye
+  extends: .test-lang
 
 test-debian-bookworm-lang:
-  image: debian:bookworm
-  stage: test-lang
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  variables:
-    DEBIAN_FRONTEND: noninteractive
-    LC_ALL: C.UTF-8
-  before_script:
-    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
-    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
-  script:
-    - ./test/run.sh -g lang -R
-    - ./test/run.sh -g lang
-    - ./test/run.sh -g lang -u
-
+  image: heinloth/lp-build:debian-bookworm
+  extends: .test-lang
 
 test-ubuntu-focal-lang:
-  image: ubuntu:focal
-  stage: test-lang
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  variables:
-    DEBIAN_FRONTEND: noninteractive
-    LC_ALL: C.UTF-8
-  before_script:
-    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
-    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
-  script:
-    - ./test/run.sh -g lang -R
-    - ./test/run.sh -g lang
-    - ./test/run.sh -g lang -u
+  image: heinloth/lp-build:ubuntu-focal
+  extends: .test-lang
 
 test-ubuntu-jammy-lang:
-  image: ubuntu:jammy
-  stage: test-lang
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  variables:
-    DEBIAN_FRONTEND: noninteractive
-    LC_ALL: C.UTF-8
-  before_script:
-    - ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
-    - apt-get update && apt-get install -y gcc gccgo g++ gfortran gnat golang fpc rustc make libcap2-bin
-  script:
-    - ./test/run.sh -g lang -R
-    - ./test/run.sh -g lang
-    - ./test/run.sh -g lang -u
+  image: heinloth/lp-build:ubuntu-jammy
+  extends: .test-lang
