@@ -225,9 +225,8 @@ function check() {
 	done
 }
 
-function skip() {
-	SKIP=".skip"
-	for SKIPTEST in $1/${SKIP}{,-${OS,,}}{,-${OSVERSION,,}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}}{,-${USERFAULTFD,,}} ; do
+function flag() {
+	for SKIPTEST in $1{,-${OS,,}}{,-${OSVERSION,,}}{,-${PLATFORM}}{,-${COMPILER,,}}{,-${UPDATEFLAG}}{,-ld_${LD_NAME,,}}{,-${USERFAULTFD,,}} ; do
 		if [ -f "${SKIPTEST}" ] ; then
 			return 0
 		fi
@@ -235,12 +234,29 @@ function skip() {
 	return 1
 }
 
+function fail() {
+	if flag "$1/.mayfail" ; then
+		echo -e "\e[33m$2; however this test is allowed to fail!\e[0m" >&2
+		FAILED+=( "\e[33m - $3\e[0m" )
+	else
+		echo -e "\e[31m$2\e[0m" >&2
+		if ${STOP_ON_ERROR} ; then
+			echo "SHOULDNOTBEHERE"
+			exit $4
+		else
+			FAILED+=( "\e[31m - $3\e[0m" )
+			FATAL=$((FATAL + 1))
+		fi
+	fi
+}
+
+FATAL=0
 FAILED=()
 for TEST in ${TESTS} ; do
 	TESTDIR=$(readlink -f "${BASEDIR}/${GROUP}/${TEST}")
 	if [ -d "${TESTDIR}" ] ; then
 		# Check if we should skip depending on variables
-		if ! $FORCE && skip "${TESTDIR}" ; then
+		if ! $FORCE && flag "${TESTDIR}/.skip" ; then
 			echo -e "\n(skipping test ${TEST})" >&2
 			continue
 		fi
@@ -255,6 +271,7 @@ for TEST in ${TESTS} ; do
 			if ${STOP_ON_ERROR} ; then
 				exit 1
 			else
+				FAILED+=( "\e[33m - ${TEST} has no executable file (${TESTDIR}/${EXEC})!\e[0m" )
 				continue
 			fi
 		fi
@@ -308,13 +325,8 @@ for TEST in ${TESTS} ; do
 				echo "(finished after ${SECONDS}s)"
 			else
 				EXITCODE=$?
-				echo -e "\e[31mExecution of ${EXEC} (${GROUP}/${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
-				rm "$STDOUT" "$STDERR"
-				if ${STOP_ON_ERROR} ; then
-					exit ${EXITCODE}
-				else
-					FAILED+=( "$TEST (exit code ${EXITCODE})" )
-				fi
+				rm "$STDOUT" "$STDERR" || true
+				fail "${TESTDIR}" "Execution of ${EXEC} (${GROUP}/${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s" "$TEST (exit code ${EXITCODE})" ${EXITCODE}
 			fi
 		elif "./${EXEC}" 2>"$STDERR" >"$STDOUT" ; then
 			echo "(finished after ${SECONDS}s)"
@@ -326,14 +338,9 @@ for TEST in ${TESTS} ; do
 			cat "$STDERR" >&2
 			echo -e "\n\e[4mstatus\e[0m" >&2
 			cat "$STATUS" >&2
-			echo -e "\e[31mExecution of ${EXEC} (${GROUP}/${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s\e[0m" >&2
 			rm -f "$STDOUT" "$STDERR" "$STATUS"
-			if ${STOP_ON_ERROR} ; then
-				exit ${EXITCODE}
-			else
-				FAILED+=( "$TEST (exit code ${EXITCODE})" )
-				CHECK_OUTPUT=false
-			fi
+			fail "${TESTDIR}" "Execution of ${EXEC} (${GROUP}/${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s" "$TEST (exit code ${EXITCODE})" ${EXITCODE}
+			CHECK_OUTPUT=false
 		fi
 		cd "${BASEDIR}"
 
@@ -344,22 +351,19 @@ for TEST in ${TESTS} ; do
 
 		if ${CHECK_OUTPUT} ; then
 			# Compare stdout + stderr with example
-			if ! ( check "${TESTDIR}/.stdout" < "$STDOUT" && check "${TESTDIR}/.stderr" < "$STDERR" && check "${TESTDIR}/.status" < <(test -f "$STATUS" && sed -e "s/) for .*$/)/" "$STATUS" 2>/dev/null || true)  ) ; then
-				echo -e "\e[31mUnexpected output content of ${EXEC} (${GROUP}/${TEST}) -- runtime ${SECONDS}s\e[0m" >&2
-				if ${STOP_ON_ERROR} ; then
-					exit ${EXITCODE}
-				else
-					FAILED+=( "$TEST (output mismatch)" )
-				fi
+			if check "${TESTDIR}/.stdout" < "$STDOUT" && check "${TESTDIR}/.stderr" < "$STDERR" && check "${TESTDIR}/.status" < <(test -f "$STATUS" && sed -e "s/) for .*$/)/" "$STATUS" 2>/dev/null || true); then
+				rm -f "$STDOUT" "$STDERR" "$STATUS"
+			else
+				rm -f "$STDOUT" "$STDERR" "$STATUS"
+				fail "${TESTDIR}" "Unexpected output content of ${EXEC} (${GROUP}/${TEST}) - runtime ${SECONDS}s" "$TEST (output mismatch)" ${EXITCODE}
 			fi
-
-			# Remove files
-			rm -f "$STDOUT" "$STDERR" "$STATUS"
 		fi
 	else
 		echo "Test '${TEST}' (${TESTDIR}) does not exist!" >&2
 		if ${STOP_ON_ERROR} ; then
 			exit 1
+		else
+			FAILED+=( "\e[33m - ${TEST} does not exist!\e[0m" )
 		fi
 	fi
 done
@@ -368,9 +372,15 @@ if [[ ${#FAILED[@]} -eq 0 ]] ; then
 	echo -e "\n\e[32mTests finished successfully\e[0m"
 	exit 0
 else
-	echo -e "\n\e[31m${#FAILED[@]} test(s) failed:\e[0m"
+	if [[ ${FATAL} -eq 0 ]] ; then
+		echo -e "\n\e[33m${#FAILED[@]} test(s) failed (but none fatal):\e[0m"
+		EXITCODE=0
+	else
+		echo -e "\n\e[31m${#FAILED[@]} test(s) failed (with ${FATAL} fatal):\e[0m"
+		EXITCODE=1
+	fi
 	for TEST in "${FAILED[@]}" ; do
-		echo -e "\e[31m - $TEST\e[0m"
+		echo -e "$TEST"
 	done
-	exit 1
+	exit ${EXITCODE}
 fi
