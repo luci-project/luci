@@ -17,8 +17,9 @@ DWARFVERSION := 4
 COMPATIBILITY_PREFIX = COMPATIBILITY
 COMPATIBILITY_MACROS = $(shell echo "-D$(COMPATIBILITY_PREFIX)_$(OS) -D$(COMPATIBILITY_PREFIX)_$(OS)_$(OSVERSION) -D$(COMPATIBILITY_PREFIX)_$(OS)_$(OSVERSION)_$(PLATFORM) -DPLATFORM_$(PLATFORM)" | tr a-z A-Z)
 
+SOPATH = /opt/$(NAME)/
+SONAME = ld-$(NAME).so
 TARGET_FILE = ld-$(NAME)-$(OS)-$(OSVERSION)-$(PLATFORM).so
-TARGET_PATH = /opt/$(NAME)/$(TARGET_FILE)
 
 VERSIONS := versions.txt
 
@@ -49,7 +50,7 @@ CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-jump-tables -fno-
 CXXFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
 CXXFLAGS += -ffreestanding -ffunction-sections -fdata-sections -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
-CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBADDRESS=$(LIBADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DLDLUCI_CONF=$(LDLUCI_CONF) -DSONAME=$(notdir $(TARGET_PATH)) -DSOPATH=$(TARGET_PATH)
+CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBADDRESS=$(LIBADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DLDLUCI_CONF=$(LDLUCI_CONF) -DSONAME=$(SONAME) -DSOPATH=$(SOPATH)
 CXXFLAGS += -fvisibility=hidden
 
 BUILDINFO = $(BUILDDIR)/.build_$(NAME).o
@@ -58,7 +59,7 @@ OBJECTS = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o)) $(BUILDINF
 DEPFILES = $(patsubst $(SRCFOLDER)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.d))
 VERSION_SCRIPT = luci.version
 EXPORT_SYMBOLS = $(shell cat $(VERSION_SCRIPT) | grep 'global:' | sed -e 's/global:\(.*\);/\1;/' | tr -d '\n;')
-LDFLAGS = -pie -soname $(notdir $(TARGET_PATH)) --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic -Bstatic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
+LDFLAGS = -pie -soname $(SONAME) --gc-sections -Ttext-segment=$(BASEADDRESS) --exclude-libs ALL --version-script=$(VERSION_SCRIPT) --no-dynamic-linker --export-dynamic -Bstatic $(addprefix --undefined=,$(EXPORT_SYMBOLS))
 
 
 # Helper
@@ -88,11 +89,11 @@ define each_version
 endef
 
 
-install: $(TARGET_PATH) $(LIBPATH_CONF) $(LDLUCI_CONF)
+install: $(SOPATH)$(SONAME) $(LIBPATH_CONF) $(LDLUCI_CONF)
 
 install-only: $(LIBPATH_CONF) $(LDLUCI_CONF)
 	$(VERBOSE) test -f "$(TARGET_FILE)"
-	$(VERBOSE) ln -f -s $(shell readlink -f "$(TARGET_FILE)") "/opt/luci/ld-luci.so"
+	$(VERBOSE) ln -f -s $(shell readlink -f "$(TARGET_FILE)") "$(SOPATH)$(SONAME)"
 
 build: $(TARGET_FILE)
 
@@ -128,9 +129,13 @@ $(LIBBEAN):
 	@echo "GEN		$@"
 	$(VERBOSE) $(MAKE) VERBOSE_MODE=0 DWARFVERSION=$(DWARFVERSION) OPTIMIZE=$(OPTIMIZE) -C $(@D)
 
-$(TARGET_PATH): $(TARGET_FILE)
-	@echo "CP		$@"
+$(SOPATH)$(TARGET_FILE): $(TARGET_FILE)
+	@echo "CPY		$@"
 	$(VERBOSE) cp $< $@
+
+$(SOPATH)$(SONAME): $(SOPATH)$(TARGET_FILE)
+	@echo "LINK		$@"
+	$(VERBOSE) ln -f -r -s $< $@
 
 $(TARGET_FILE): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
 	@echo "LD		$@"
@@ -167,7 +172,7 @@ clean::
 	$(VERBOSE) test -d $(BUILDDIR) && rm -rf $(BUILDDIR) || true
 
 mrproper:: clean
-	$(VERBOSE) rm -f $(notdir $(TARGET_PATH))
+	$(VERBOSE) rm -f $(SOPATH)$(SONAME) $(SOPATH)$(TARGET_FILE)
 
 $(BUILDDIR): ; @mkdir -p $@
 
