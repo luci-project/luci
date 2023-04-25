@@ -10,6 +10,9 @@ BUILDDIR ?= .build-$(OS)-$(OSVERSION)-$(PLATFORM)
 LIBBEAN = bean/libbean.a
 CXX = g++
 
+# Debian stretch only supports DWARF 4
+DWARFVERSION := 4
+
 # Compatibility macro name
 COMPATIBILITY_PREFIX = COMPATIBILITY
 COMPATIBILITY_MACROS = $(shell echo "-D$(COMPATIBILITY_PREFIX)_$(OS) -D$(COMPATIBILITY_PREFIX)_$(OS)_$(OSVERSION) -D$(COMPATIBILITY_PREFIX)_$(OS)_$(OSVERSION)_$(PLATFORM) -DPLATFORM_$(PLATFORM)" | tr a-z A-Z)
@@ -31,7 +34,7 @@ LDLUCI_CONF = /opt/$(NAME)/ld-$(NAME).conf
 ifeq ($(OPTIMIZE), 1)
 	CXXFLAGS := -O3 -DNDEBUG
 else
-	CXXFLAGS := -Og -g
+	CXXFLAGS := -Og -g -gdwarf-$(DWARFVERSION)
 endif
 CXXFLAGS += -std=c++2a
 CXXFLAGS += -I $(SRCFOLDER) -I $(dir $(LIBBEAN))/include/
@@ -123,7 +126,7 @@ test: $(TARGET_FILE)
 
 $(LIBBEAN):
 	@echo "GEN		$@"
-	$(VERBOSE) $(MAKE) VERBOSE_MODE=0 -C $(@D)
+	$(VERBOSE) $(MAKE) VERBOSE_MODE=0 DWARFVERSION=$(DWARFVERSION) OPTIMIZE=$(OPTIMIZE) -C $(@D)
 
 $(TARGET_PATH): $(TARGET_FILE)
 	@echo "CP		$@"
