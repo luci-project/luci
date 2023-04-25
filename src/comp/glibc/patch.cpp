@@ -180,8 +180,9 @@ static PatchSymbol symbol_fixes[] = {
 	{ "__libc_dlopen_mode", nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
 	{ "__libc_dlclose",     nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
 	{ "__libc_dlsym",       nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+#ifndef COMPATIBILITY_DEBIAN_STRETCH
 	{ "__libc_dlvsym",      nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
-
+#endif
 #if GLIBC_VERSION >= GLIBC_2_34
 #define FOKR_SYMNAME "_Fork"
 #else
