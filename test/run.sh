@@ -276,27 +276,6 @@ for TEST in ${TESTS} ; do
 			fi
 		fi
 
-		# Set timeout thread
-		if [[ $TIMEOUT -gt 0 ]] ; then
-			(
-				sleep 1
-				if TARGET=$(ps -o pid=,cmd= --ppid $$ 2>/dev/null | sed -ne "s|^[ ]*\([0-9]*\) .*\./${EXEC}\$|\1|p") ; then
-					for ((t=1;t<$TIMEOUT;t++)) ; do
-						sleep 1
-						kill -0 $TARGET 2>/dev/null || exit 0
-					done
-					echo -e "\e[31mRuntime of $TIMEOUT seconds exceeded -- stopping PID $TARGET (${EXEC}) via SIGTERM...\e[0m" >&2
-					if kill -s SIGTERM $TARGET 2>/dev/null ; then
-						sleep $TIMEOUT_KILLDELAY
-						if kill -s SIGKILL $TARGET 2>/dev/null ; then
-							echo -e "\e[31m(stopped via SIGKILL)\e[0m" >&2
-						fi
-					fi
-				fi
-			) &
-			TIMEOUT_PID=$!
-		fi
-
 		# Execute and capture stdout, stderr and status
 		STDOUT=$(mktemp)
 		STDERR=$(mktemp)
@@ -316,38 +295,56 @@ for TEST in ${TESTS} ; do
 		export LD_STATUS_INFO=$STATUS
 		export LD_LIBRARY_PATH="$TESTDIR"
 
+		# Start test thread
 		cd "${TESTDIR}"
 		EXITCODE=0
 		SECONDS=0
 		CHECK_OUTPUT=true
-		if ${DEBUG_OUTPUT} ; then
-			if ../../tools/stdlog -t -e "$STDERR" -e- -o "$STDOUT" -o- "./${EXEC}" ; then
-				echo "(finished after ${SECONDS}s)"
+
+		(
+			if ${DEBUG_OUTPUT} ; then
+				exec ../../tools/stdlog -t -e "$STDERR" -e- -o "$STDOUT" -o- "./${EXEC}"
 			else
-				EXITCODE=$?
-				rm "$STDOUT" "$STDERR" || true
-				fail "${TESTDIR}" "Execution of ${EXEC} (${GROUP}/${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s" "$TEST (exit code ${EXITCODE})" ${EXITCODE}
+				exec "./${EXEC}" 2>"$STDERR" >"$STDOUT"
 			fi
-		elif "./${EXEC}" 2>"$STDERR" >"$STDOUT" ; then
+		) &
+		TARGET=$!
+
+		# Wait until finished
+		while [[ $TIMEOUT -gt 0 ]] ; do
+			sleep 1
+			if ! kill -0 $TARGET 2>/dev/null ; then
+				break;
+			elif [[ $SECONDS -gt TIMEOUT ]] ; then
+				echo -e "\n\e[31mRuntime of $TIMEOUT seconds exceeded -- stopping PID $TARGET (${EXEC}) via SIGTERM...\e[0m" >&2
+				if kill -s SIGTERM $TARGET 2>/dev/null ; then
+					sleep $TIMEOUT_KILLDELAY
+					if kill -s SIGKILL $TARGET 2>/dev/null ; then
+						echo -e "\e[31m(stopped via SIGKILL)\e[0m" >&2
+					fi
+				fi
+				break
+			elif ! ${DEBUG_OUTPUT} ; then
+				echo -n "."
+			fi
+		done
+		if wait $TARGET ; then
 			echo "(finished after ${SECONDS}s)"
 		else
 			EXITCODE=$?
-			echo -e "\e[4mstdout\e[0m" >&2
-			cat "$STDOUT" >&2
-			echo -e "\n\e[4mstderr\e[0m" >&2
-			cat "$STDERR" >&2
-			echo -e "\n\e[4mstatus\e[0m" >&2
-			cat "$STATUS" >&2
+			if ! ${DEBUG_OUTPUT} ; then
+				echo -e "\e[4mstdout\e[0m" >&2
+				cat "$STDOUT" >&2
+				echo -e "\n\e[4mstderr\e[0m" >&2
+				cat "$STDERR" >&2
+				echo -e "\n\e[4mstatus\e[0m" >&2
+				cat "$STATUS" >&2
+			fi
 			rm -f "$STDOUT" "$STDERR" "$STATUS"
 			fail "${TESTDIR}" "Execution of ${EXEC} (${GROUP}/${TEST}) failed with exit code ${EXITCODE} after ${SECONDS}s" "$TEST (exit code ${EXITCODE})" ${EXITCODE}
 			CHECK_OUTPUT=false
 		fi
 		cd "${BASEDIR}"
-
-		# Stop Timeout process
-		if [[ $TIMEOUT -gt 0 ]] ; then
-			wait $TIMEOUT_PID 2>/dev/null || true
-		fi
 
 		if ${CHECK_OUTPUT} ; then
 			# Compare stdout + stderr with example
