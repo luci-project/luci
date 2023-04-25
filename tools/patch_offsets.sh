@@ -59,7 +59,7 @@ function dump_offsets() {
 }
 
 if [[ $# -ge 1 ]] ; then
-	for FILE in $@ ; do 
+	for FILE in $@ ; do
 		echo "	// File $FILE"
 		dump_offsets "$FILE"
 	done
@@ -70,7 +70,7 @@ else
 	if [ -z ${ID+isset} ] ; then
 		ID="unknown"
 	fi
-	
+
 	case $ID in
 		ubuntu|debian)
 			LIBCPKG="libc6"

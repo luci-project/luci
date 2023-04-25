@@ -8,7 +8,7 @@ ifdef LD_PATH
 endif
 
 EXEC ?= run
-BIN ?= main
+BIN ?= run-main
 SHARED_LIBS := libpreload.so libsnafu.so libbohica.so libfubar.so
 
 all: $(EXEC)

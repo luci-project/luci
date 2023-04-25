@@ -16,7 +16,7 @@ GOFLAGS += -a
 
 GNATMAKE ?= gnatmake
 GNATDIR = .ada
-GNATFLAGS += -D $(GNATDIR) -O$(OPTLEVEL) -g -f 
+GNATFLAGS += -D $(GNATDIR) -O$(OPTLEVEL) -g -f
 
 FORTC ?= gfortran
 FORTFLAGS += -O$(OPTLEVEL) -g -Wall
