@@ -40,9 +40,9 @@ fetch-artifacts:
     - build-luci
     - fetch-artifacts
   script:
-    - ./test/run.sh -c LLVM -R
-    - ./test/run.sh -c LLVM
-    - ./test/run.sh -c LLVM -u
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
   retry: 1
 
 test-debian-stretch-gcc:
@@ -74,7 +74,7 @@ test-almalinux-9-gcc:
   extends: .test-gcc
 
 test-oraclelinux-9-gcc:
-  image: heinloth/lp-build:orcalelinux-9
+  image: heinloth/lp-build:oraclelinux-9
   extends: .test-gcc
 
 test-rhel-9-gcc:
@@ -134,7 +134,7 @@ test-almalinux-9-llvm:
   extends: .test-llvm
 
 test-oraclelinux-9-llvm:
-  image: heinloth/lp-build:orcalelinux-9
+  image: heinloth/lp-build:oraclelinux-9
   extends: .test-llvm
 
 test-rhel-9-llvm:
