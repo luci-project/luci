@@ -1,13 +1,18 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "trampoline.hpp"
 
 #include <dlh/syscall.hpp>
 #include <dlh/assert.hpp>
-#include <dlh/log.hpp>
 #include <dlh/math.hpp>
+#include <dlh/page.hpp>
+#include <dlh/log.hpp>
 
 #include "object/identity.hpp"
 #include "object/base.hpp"
-#include "page.hpp"
+
 
 const size_t trampoline_bytes = 16;  // Trampoline entry is 32 bytes
 const size_t entries_per_block = Page::SIZE / sizeof(uintptr_t);
@@ -85,9 +90,9 @@ bool Trampoline::allocate(const VersionedSymbol & sym, size_t & index) {
 			}
 			if (auto mprotect = Syscall::mprotect(mmap.value(), trampolines_block, PROT_EXEC)) {
 				blocks.push_back(mmap.value());
-				LOG_TRACE << "Got new pages for trampoline at " << (void*)mmap.value() << endl;
+				LOG_TRACE << "Got new pages for trampoline at " << reinterpret_cast<void*>(mmap.value()) << endl;
 			} else {
-				LOG_ERROR << "Protecting page at " << (void*)mmap.value() << " failed: " << mprotect.error_message() << endl;
+				LOG_ERROR << "Protecting page at " << reinterpret_cast<void*>(mmap.value()) << " failed: " << mprotect.error_message() << endl;
 				Syscall::munmap(mmap.value(), trampolines_block + Page::SIZE);
 				return false;
 			}

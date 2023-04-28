@@ -1,5 +1,6 @@
-// Copyright 2020, Bernhard Heinloth
-// SPDX-License-Identifier: AGPL-3.0-only
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include <dlh/container/initializer_list.hpp>
 #include <dlh/container/vector.hpp>
@@ -302,7 +303,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		}
 
 		// Preload Library
-		for (auto & lib: opts.preload)
+		for (auto & lib : opts.preload)
 			preload.push_back(lib);
 
 		char * preload_libs = const_cast<char*>(config_file.value("LD_PRELOAD"));
@@ -329,7 +330,7 @@ int main(int argc, char* argv[]) {
 		// Available commandline options
 		auto args = Parser::Arguments<Opts>({
 				/* short & long name,     argument, element               required, help text,  optional validation function */
-				{'v',  "verbosity",       "LEVEL",  &Opts::loglevel,         false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},
+				{'v',  "verbosity",       "LEVEL",  &Opts::loglevel,         false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},  // NOLINT
 				{'A',  "logtimeabs",      nullptr,  &Opts::logtimeAbs,       false, "Use absolute time (instead of delta) in log. This option can also be enabled by setting the environment variable LD_LOGTIME_ABS to 1"},
 				{'f',  "logfile",         "FILE",   &Opts::logfile,          false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
 				{'a',  "logfile-append",  nullptr,  &Opts::logfileAppend,    false, "Append output to log file (instead of truncate). Requires logfile, can also be enabled by setting the environment variable LD_LOGFILE_APPEND to 1" },
@@ -366,8 +367,7 @@ int main(int argc, char* argv[]) {
 				{'h',  "help",            nullptr,  &Opts::showHelp,         false, "Show this help" }
 			},
 			File::exists,
-			[](const char *) -> bool { return true; }
-		);
+			[](const char *) -> bool { return true; });
 
 		// Check arguments / show help
 		if (!args.parse(argc, argv)) {
@@ -403,7 +403,7 @@ int main(int argc, char* argv[]) {
 
 			assert(start != nullptr);
 
-			for (auto & lib: preload) {
+			for (auto & lib : preload) {
 				if (auto loaded = loader->library(lib, loader->default_flags, true)) {
 					LOG_INFO << "Preloaded " << lib << ": " << *loaded << endl;
 				} else {
@@ -412,7 +412,7 @@ int main(int argc, char* argv[]) {
 			}
 
 			if (args.linkstatic)
-				for (auto & lib: args.libload) {
+				for (auto & lib : args.libload) {
 					if (lib[0] == ':') {
 						// Try as filename
 						lib++;
@@ -440,7 +440,7 @@ int main(int argc, char* argv[]) {
 				}
 
 			LOG_DEBUG << "Library search order:" << endl;
-			for (auto & obj: loader->lookup) {
+			for (auto & obj : loader->lookup) {
 				LOG_DEBUG_APPEND << " - " << obj << endl;
 			}
 
@@ -476,7 +476,7 @@ int main(int argc, char* argv[]) {
 			return EXIT_FAILURE;
 		}
 
-		for (auto & lib: preload) {
+		for (auto & lib : preload) {
 			if (auto loaded = loader->library(lib, loader->default_flags, true)) {
 				LOG_INFO << "Preloaded " << lib << ": " << *loaded << endl;
 			} else {
@@ -485,7 +485,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		LOG_DEBUG << "Library search order:" << endl;
-		for (auto & obj: loader->lookup) {
+		for (auto & obj : loader->lookup) {
 			LOG_DEBUG_APPEND << " - " << obj << endl;
 		}
 

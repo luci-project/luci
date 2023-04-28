@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 #include <dlh/container/optional.hpp>
@@ -12,7 +16,7 @@ struct Object;
 // For Hash Set/Map
 struct SymbolHelper {
 	SymbolHelper(const char * name, uint32_t gnu_hash) : _name(name), _gnu_hash_value(gnu_hash) {}
-	SymbolHelper(const char * name) : SymbolHelper(name, ELF_Def::gnuhash(name)) {}
+	SymbolHelper(const char * name) : SymbolHelper(name, ELF_Def::gnuhash(name)) {}  // NOLINT
 	SymbolHelper(const SymbolHelper & other) = default;
 	SymbolHelper(SymbolHelper && other) = default;
 
@@ -48,7 +52,7 @@ struct ElfSymbolHelper : Elf::Symbol {
 	using Elf::Symbol::visibility;
 	using Elf::Symbol::section_index;
 
-	ElfSymbolHelper(const Elf::Symbol & sym) : Elf::Symbol(sym), _gnu_hash_value(ELF_Def::gnuhash(sym.name())) {}
+	ElfSymbolHelper(const Elf::Symbol & sym) : Elf::Symbol(sym), _gnu_hash_value(ELF_Def::gnuhash(sym.name())) {}  // NOLINT
 	ElfSymbolHelper(const ElfSymbolHelper & other) = default;
 	ElfSymbolHelper(ElfSymbolHelper && other) = default;
 
@@ -100,7 +104,7 @@ struct VersionedSymbol : Elf::Symbol {
 		Version(bool valid = true) : name(nullptr), file(nullptr), hash(0), filehash(0), valid(valid), weak(false) {}
 	} version;
 
-	VersionedSymbol(const Elf::Symbol & sym, const char * version_name = nullptr, bool version_weak = false, const char * version_file = nullptr);
+	VersionedSymbol(const Elf::Symbol & sym, const char * version_name = nullptr, bool version_weak = false, const char * version_file = nullptr);  // NOLINT
 	VersionedSymbol(const Elf::Symbol & sym, const Version & version, uint32_t hash, uint32_t gnu_hash);
 	VersionedSymbol(const Elf::Symbol & sym, const Version & version);
 	VersionedSymbol(const VersionedSymbol & other) = default;

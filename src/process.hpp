@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 #include <dlh/container/hash.hpp>
@@ -5,7 +9,6 @@
 #include <dlh/auxiliary.hpp>
 
 class Process {
-
 	/*! \brief allocate Stack
 	 */
 	uintptr_t allocate_stack(size_t stack_size);
@@ -45,7 +48,7 @@ class Process {
 	 * \brief stack_size    size of stack
 	 *                      (use system default if `0`)
 	 */
-	Process(uintptr_t stack_pointer = 0, size_t stack_size = 0);
+	explicit Process(uintptr_t stack_pointer = 0, size_t stack_size = 0);
 
 	/*! \brief Initialize process frame
 	 * \brief stack_pointer top adress of allocated stack

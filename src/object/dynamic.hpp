@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 #include <dlh/container/vector.hpp>
@@ -71,9 +75,8 @@ struct ObjectDynamic : public ObjectExecutable {
 
 	uint16_t version_index(const VersionedSymbol::Version & version) const {
 		if (!version.valid) {
-			//return Elf::VER_NDX_LOCAL;
+			// return Elf::VER_NDX_LOCAL;
 		} else if (version.name != nullptr) {
-
 			// Version Definition Section
 			bool skip_version_definition = false;
 			if (version.file != nullptr)
@@ -96,7 +99,6 @@ struct ObjectDynamic : public ObjectExecutable {
 					for (auto & aux : v.auxiliary())
 						if (aux.hash() == version.hash && (aux.name() == version.name || strcmp(aux.name(), version.name) == 0))
 							return aux.version_index();
-
 		}
 
 		return Elf::VER_NDX_GLOBAL;

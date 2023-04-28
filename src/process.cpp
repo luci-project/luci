@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "process.hpp"
 
 #include <dlh/syscall.hpp>
@@ -36,7 +40,7 @@ Process::Process(uintptr_t stack_pointer, size_t stack_size) : stack_pointer(sta
 	}
 
 	// Adjust
-//	aux[AT_RANDOM] = address + (aux[AT_RANDOM] & 0xfff);
+	// aux[AT_RANDOM] = address + (aux[AT_RANDOM] & 0xfff);
 }
 
 uintptr_t Process::allocate_stack(size_t stack_size) {
@@ -95,13 +99,13 @@ void Process::init(const Vector<const char *> &arg) {
 	const char ** ptr_addr = reinterpret_cast<const char**>(aux_addr);
 	// environment pointer
 	*(--ptr_addr) = NULL;
-	for (auto & e: env_str)
+	for (auto & e : env_str)
 		*(--ptr_addr) = e;
 	envp = ptr_addr;
 
 	// argument array
 	*(--ptr_addr) = NULL;
-	for (auto & e: arg_str) {
+	for (auto & e : arg_str) {
 		*(--ptr_addr) = e;
 	}
 	argv = ptr_addr;
@@ -118,14 +122,13 @@ static void exit_func() {
 
 void Process::start(uintptr_t entry, uintptr_t stack_pointer, const char ** envp) {
 	LOG_INFO << "Handing over to process at " << reinterpret_cast<void*>(entry) << endl;
-	const unsigned long flags = 1 << 0   // CF: No carry
-	                          | 1 << 2   // PF: Even parity
-	                          | 1 << 4   // AF: No auxiliary carry
-	                          | 1 << 6   // ZF: No zero result
-	                          | 1 << 7   // SF: Unsigned result
-	                          | 1 << 10  // DF: Direction forward
-	                          | 1 << 11  // OF: No overflow occurred
-	                          ;
+	const unsigned long flags = 1 << 0    // CF: No carry
+	                          | 1 << 2    // PF: Even parity
+	                          | 1 << 4    // AF: No auxiliary carry
+	                          | 1 << 6    // ZF: No zero result
+	                          | 1 << 7    // SF: Unsigned result
+	                          | 1 << 10   // DF: Direction forward
+	                          | 1 << 11;  // OF: No overflow occurred
 	asm (
 		/* Required by Sys V ABI */
 		"pushf;"                // Clear several flag set

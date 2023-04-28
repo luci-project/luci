@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "object/identity.hpp"
 
 #include <dlh/log.hpp>
@@ -31,7 +35,7 @@ static bool supported(const Elf::Header * header) {
 			break;
 
 		default:
-			LOG_ERROR << "Unsupported OS ABI " << (int)header->ident_abi() << endl;
+			LOG_ERROR << "Unsupported OS ABI " << static_cast<int>(header->ident_abi()) << endl;
 			return false;
 	}
 
@@ -112,13 +116,15 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 		}
 
 		// Check if already loaded (using modification time)
-		if (loader.config.use_mtime && !flags.ignore_mtime && !flags.ignore_identical)
-			for (Object * obj = current; obj != nullptr; obj = obj->file_previous)
+		if (loader.config.use_mtime && !flags.ignore_mtime && !flags.ignore_identical) {
+			for (Object * obj = current; obj != nullptr; obj = obj->file_previous) {
 				if (obj->data.modification_time.tv_sec == data.modification_time.tv_sec && obj->data.modification_time.tv_nsec == data.modification_time.tv_nsec && obj->data.size == data.size) {
 					LOG_INFO << "Already loaded " << *this << " with same modification time -- abort loading..." << endl;
 					Syscall::close(data.fd);
 					return INFO_IDENTICAL_TIME;
 				}
+			}
+		}
 
 		// Map file
 		if (auto mmap = Syscall::mmap(NULL, data.size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, data.fd, 0)) {
@@ -218,7 +224,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 	} else {
 		// We need the absolute path to the directory (GLIBC requirement...)
 		auto pathlen = String::len(path) + 1;
-		char tmp[pathlen];
+		char tmp[pathlen];  // NOLINT
 		String::copy(tmp, path, pathlen);
 		auto tmpfilename = const_cast<char*>(String::find_last(tmp, '/'));
 		size_t bufferlen;
@@ -367,8 +373,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 						o->debug_symbols = nullptr;
 						if (auto unmap = Syscall::munmap(reinterpret_cast<uintptr_t>(debug_data), o->debug_size); unmap.failed())
 							LOG_WARNING << "Unmapping debug symbols data at " << debug_data << " in " << *o << " failed: " << unmap.error_message() << endl;
-						
-						o->debug_size =0;
+						o->debug_size = 0;
 					}
 				} else {
 					LOG_WARNING << "Opening external debug symbols at " << debug_symbol_path << " for " << *o << " failed!" << endl;
@@ -448,10 +453,10 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 		o->status = Object::STATUS_PREPARED;
 	}
 
-	LOG_INFO << "Successfully loaded " << path << " v" << o->version() ;
+	LOG_INFO << "Successfully loaded " << path << " v" << o->version();
 	if (o->build_id.available())
 		LOG_INFO_APPEND << " (Build ID " << o->build_id.value << ")";
-	LOG_INFO_APPEND << " with base " << (void*)(o->base) << endl;
+	LOG_INFO_APPEND << " with base " << reinterpret_cast<void*>(o->base) << endl;
 
 	// Initialize GLIBC specific stuff
 	base = o->base;
@@ -532,7 +537,7 @@ bool ObjectIdentity::initialize() {
 
 void ObjectIdentity::status(ObjectIdentity::Info info) {
 	if (loader.statusinfofd >= 0 && loader.target != nullptr) {
-		OutputStream<512> out (loader.statusinfofd);
+		OutputStream<512> out(loader.statusinfofd);
 		switch (info) {
 			case INFO_ERROR_OPEN:          out << "ERROR (opening file failed)"; break;
 			case INFO_ERROR_STAT:          out << "ERROR (retrieving file status failed)"; break;

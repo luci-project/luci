@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "object/dynamic.hpp"
 
 #include <elfo/elf_rel.hpp>
@@ -44,7 +48,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
 					max_size = segment.virt_addr() + segment.virt_size();
 			this->base = file.loader.next_address(max_size);
 		}
-		LOG_DEBUG << "Set Base of " << file.filename << " to " << (void*)(this->base) << endl;
+		LOG_DEBUG << "Set Base of " << file.filename << " to " << reinterpret_cast<void*>(this->base) << endl;
 	}
 }
 
@@ -55,7 +59,7 @@ void * ObjectDynamic::dynamic_resolve(size_t index) const {
 }
 
 bool ObjectDynamic::preload() {
-	//base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
+	// base = file.flags.premapped == 1 ? data.addr : file.loader.next_address();
 	return preload_segments(true)
 	    && preload_libraries()
 	    && compatibility_setup();
@@ -79,16 +83,15 @@ void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
 			String::replace_inplace(path, PATH_MAX, "${ORIGIN}", origin);
 
 			// Lib
-			const char * lib =
 #if defined(__x86_64__)
-				"lib64"
+			const char * lib = "lib64";
 #elif defined(__i386__)
-				"lib"
+			const char * lib = "lib";
 #else
-				""
+			const char * lib = "";
 #error "Rpath token expension with unknown lib"
 #endif
-			;
+
 			String::replace_inplace(path, PATH_MAX, "$LIB", lib);
 			String::replace_inplace(path, PATH_MAX, "${LIB}", lib);
 
@@ -98,15 +101,13 @@ void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
 				if (auto at_platform = Auxiliary::vector(Auxiliary::AT_PLATFORM)) {
 					platform = reinterpret_cast<char *>(at_platform.pointer());
 				} else {
-					platform =
 #if defined(__x86_64__)
-					"x86_64"
+					platform = "x86_64";
 #elif defined(__i386__)
-					"i386"
+					platform = "i386";
 #else
-				""
+					platform = "";
 #endif
-					;
 				}
 			}
 			String::replace_inplace(path, PATH_MAX, "$PLATFORM", platform);
@@ -120,10 +121,12 @@ void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
 }
 
 bool ObjectDynamic::compatibility_setup() {
-	if (this->file_previous == nullptr)
-		for (auto &dyn: dynamic_table)
+	if (this->file_previous == nullptr) {
+		for (auto &dyn : dynamic_table) {
 			if (dyn.tag() < 80)
 				this->file.libinfo[dyn.tag()] = dyn.ptr();
+		}
+	}
 
 	return GLIBC::init(*this);
 }
@@ -133,7 +136,7 @@ bool ObjectDynamic::preload_libraries() {
 
 	// load needed libaries
 	Vector<const char *> libs;
-	for (auto &dyn: dynamic_table) {
+	for (auto &dyn : dynamic_table) {
 		switch (dyn.tag()) {
 			case Elf::DT_NEEDED:
 				libs.emplace_back(dyn.string());
@@ -164,7 +167,7 @@ bool ObjectDynamic::preload_libraries() {
 				 */
 				if ((dyn.value() & Elf::DF_STATIC_TLS) != 0 && file_previous == nullptr && this->file.tls_module_id != 0 && file.loader.tls.gen > 0) {
 					LOG_WARNING << *this << " has a static TLS block which cannot be initialized dynamically (according to standard) - use preloading instead... However, we will initialize & load it anyway!" << endl;
-					//return false;
+					// return false;
 				}
 				break;
 
@@ -225,7 +228,7 @@ bool ObjectDynamic::fix() {
 }
 
 bool ObjectDynamic::prepare() {
-	LOG_INFO << "Prepare " << *this << " with " << (void*)global_offset_table << endl;
+	LOG_INFO << "Prepare " << *this << " with " << reinterpret_cast<void*>(global_offset_table) << endl;
 	bool error = false;
 
 	// Perform initial relocations
@@ -293,7 +296,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 		}
 
 	// Detect changes in data relocation
-	Pair<int,uintptr_t> datarel_key{-1,0};
+	Pair<int, uintptr_t> datarel_key{-1, 0};
 	if (seg != nullptr && file.loader.config.check_relocation_content && is_latest_version()) {
 		datarel_key.first = seg->target.fd;
 
@@ -302,7 +305,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 		datarel_key.second = relocator.address(this->base) - seg->target.address();
 
 		auto cached = file.datarel_content.find(datarel_key);
-		if (cached != file.datarel_content.end()){
+		if (cached != file.datarel_content.end()) {
 			uintptr_t current_value = *reinterpret_cast<uintptr_t *>(relocator.address(this->base));
 			if (current_value != cached->value) {
 				LOG_WARNING << "Value at relocation target " << reinterpret_cast<void*>(relocator.address(this->base)) << " has changed: " << reinterpret_cast<void*>(current_value) << " instead of " << reinterpret_cast<void*>(cached->value) << " (skipping!)" << endl;
@@ -325,7 +328,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 		return reinterpret_cast<void*>(value);
 	} else /* TODO: if (!dynamic_symbols.ignored(need_symbol_index)) */ {
 		auto need_symbol_version_index = dynamic_symbols.version(need_symbol_index);
-		//assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
+		// assert(need_symbol_version_index != Elf::VER_NDX_LOCAL);
 		VersionedSymbol need_symbol(dynamic_symbols[need_symbol_index], get_version(need_symbol_version_index));
 		// COPY Relocations have a defined symbol with the same name
 		Loader::ResolveSymbolMode mode = relocator.is_copy() ? Loader::RESOLVE_EXCEPT_OBJECT : (file.flags.bind_deep == 1 ? Loader::RESOLVE_OBJECT_FIRST : Loader::RESOLVE_DEFAULT);
@@ -335,7 +338,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 			auto & symobj = symbol->object();
 
 			auto value = relocator.value_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset);
-			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << " to " << (void*)value <<  endl;
+			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << " to " << reinterpret_cast<void*>(value) <<  endl;
 			if (relocator.is_copy() || (fix && relocator.read_value(this->base) != value)) {
 				auto r = relocator.fix_value_external(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), symbol.value(), value);
 				assert(r == value);
@@ -416,10 +419,10 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const char * name, uint3
 		if (naked_sym.section_index() != SHN_UNDEF && naked_sym.bind() != Elf::STB_LOCAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
 			auto symbol_version_index = dynamic_symbols.version(found);
 			VersionedSymbol vs{naked_sym, get_version(symbol_version_index), hash, gnu_hash};
-			return { vs };
+			return Optional<VersionedSymbol>{ vs };
 		}
 	}
-	return {};
+	return Optional<VersionedSymbol>{};
 }
 
 Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(uintptr_t addr) const {
@@ -428,10 +431,10 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(uintptr_t addr) const {
 		for (const auto & sym : dynamic_symbols)
 			if (sym.section_index() != Elf::STN_UNDEF && offset >= sym.value() && offset <= sym.value() + sym.size()) {
 				VersionedSymbol vs{sym, get_version(dynamic_symbols.version(dynamic_symbols.index(sym)))};
-				return { vs };
+				return Optional<VersionedSymbol>{ vs };
 			}
 	}
-	return {};
+	return Optional<VersionedSymbol>{};
 }
 
 bool ObjectDynamic::initialize(bool preinit) {

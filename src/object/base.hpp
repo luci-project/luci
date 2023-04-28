@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 #include <dlh/assert.hpp>
@@ -111,7 +115,7 @@ struct Object : public Elf {
 	virtual void* dynamic_resolve(size_t index) const;
 
 	/*! \brief Luci specific fixes performed right after mapping */
-	virtual bool fix() { return true; };
+	virtual bool fix() { return true; }
 
 	/*! \brief Initialisation of object (after creation) */
 	virtual bool preload() = 0;
@@ -120,13 +124,13 @@ struct Object : public Elf {
 	bool map();
 
 	/*! \brief Prepare relocations */
-	virtual bool prepare() { return true; };
+	virtual bool prepare() { return true; }
 
 	/*! \brief Update relocations */
-	virtual bool update() { return true; };
+	virtual bool update() { return true; }
 
 	/*! \brief Does this object use memory aliasing for data? */
-	virtual bool use_data_alias() const { return false; };
+	virtual bool use_data_alias() const { return false; }
 
 	/*! \brief Helper to get pointer in compose buffer corresponding to an active address */
 	template<typename T>
@@ -142,10 +146,13 @@ struct Object : public Elf {
 	virtual bool finalize() const;
 
 	/*! \brief Initialisation method */
-	virtual bool initialize(bool preinit = false) { (void)preinit; return true; };
+	virtual bool initialize(bool preinit = false) {
+		(void)preinit;
+		return true;
+	}
 
 	/*! \brief Check if current object can patch a previous version */
-	virtual bool patchable() const { return false; };
+	virtual bool patchable() const { return false; }
 
 	/*! \brief Make this (old) object inactive */
 	virtual bool disable() const;
@@ -175,13 +182,13 @@ struct Object : public Elf {
 		(void) gnu_hash;
 		(void) version;
 		return {};
-	};
+	}
 
 	/*! \brief Find (external visible) symbol in this object overlapping the given address */
 	virtual Optional<VersionedSymbol> resolve_symbol(uintptr_t addr) const {
 		(void) addr;
 		return {};
-	};
+	}
 
 	/*! \brief Check & get the symbol */
 	bool has_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version, Optional<VersionedSymbol> & result) const;

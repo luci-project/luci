@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 #include <dlh/types.hpp>
@@ -87,7 +91,7 @@ struct ObjectIdentity {
 	Object * current = nullptr;
 
 	/*! \brief Storage for comparing relocated values in data section to detect changes by the user [program] */
-	HashMap<Pair<int,uintptr_t>,uintptr_t> datarel_content;
+	HashMap<Pair<int, uintptr_t>, uintptr_t> datarel_content;
 
 private:
 	friend struct Loader;

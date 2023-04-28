@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/glibc/rtld/exception.hpp"
 
 #include <dlh/log.hpp>
@@ -33,7 +37,7 @@ EXPORT void _dl_signal_exception(int errcode, dl_exception *exception, const cha
 }
 
 
-EXPORT int _dl_catch_exception (dl_exception *exception, void (*operate) (void *), void *args) {
+EXPORT int _dl_catch_exception(dl_exception *exception, void (*operate)(void *), void *args) {
 	(void) exception;
 	(void) operate;
 	(void) args;
@@ -50,7 +54,7 @@ EXPORT void _dl_signal_error(int errcode, const char *objname, const char *occas
 	          << endl;
 }
 
-EXPORT int _dl_catch_error(const char **objname, const char **errstring, bool *mallocedp, void (*operate) (void *), void *args) {
+EXPORT int _dl_catch_error(const char **objname, const char **errstring, bool *mallocedp, void (*operate)(void *), void *args) {
 	(void) objname;
 	(void) errstring;
 	(void) mallocedp;
@@ -74,8 +78,8 @@ void _dl_error_free(void *ptr) {
 
 EXPORT void _dl_fatal_printf(const char *fmt, ...) {
 	va_list arg;
-	va_start (arg, fmt);
+	va_start(arg, fmt);
 	LOG_ERROR.output(fmt, arg);
-	va_end (arg);
+	va_end(arg);
 	Syscall::exit(127);
 }

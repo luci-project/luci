@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "redirect.hpp"
 
 #include <dlh/dir.hpp>
@@ -41,7 +45,7 @@ struct RedirectionEntry {
 };
 
 /*! \brief Collection of active redirection entries */
-static HashMap<uintptr_t,RedirectionEntry> redirection_entries;
+static HashMap<uintptr_t, RedirectionEntry> redirection_entries;
 /*! \brief Helper to synchronize concurrent collection access */
 static RWLock redirection_sync;
 
@@ -160,12 +164,12 @@ static void trap_handler(int signal, siginfo *si, ucontext *context) {
 	(void) si;
 	auto & rip = context->uc_mcontext.gregs[REG_RIP];
 	if (signal == SIGTRAP) {
-		LOG_TRACE << "Got trap signal " << si->si_signo << ':' << si->si_code << " (" << context->uc_mcontext.gregs[REG_TRAPNO] << ") at " << (void*)rip << endl;
+		LOG_TRACE << "Got trap signal " << si->si_signo << ':' << si->si_code << " (" << context->uc_mcontext.gregs[REG_TRAPNO] << ") at " << reinterpret_cast<void*>(rip) << endl;
 		redirection_sync.read_lock();
 		auto i = redirection_entries.find(rip);
 		if (i) {
 			auto & entry = i->value;
-			LOG_DEBUG << "Redirecting " << (void*)rip << " (" << entry.from_object << ") to " << (void*)(entry.to_address) << endl;
+			LOG_DEBUG << "Redirecting " << reinterpret_cast<void*>(rip) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
 			// Set new RIP to the target address
 			rip = entry.to_address;
 			// In case this should be replaced by an jmp at some point...
@@ -179,7 +183,7 @@ static void trap_handler(int signal, siginfo *si, ucontext *context) {
 					entry.tids.insert(tid);
 					// Check if all tasks of the thread have hit the trap and try to install the static redirect
 					if (all_tasks(entry.tids) && static_redirect(entry.from_object, rip, entry.to_address)) {
-						LOG_DEBUG << "Installed a static redirection from " << (void*)rip << " (" << entry.from_object << ") to " << (void*)(entry.to_address) << endl;
+						LOG_DEBUG << "Installed a static redirection from " << reinterpret_cast<void*>(rip) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
 						entry.type = RedirectionEntry::MADE_STATIC;
 					}
 					redirection_sync.write_unlock();
@@ -187,11 +191,11 @@ static void trap_handler(int signal, siginfo *si, ucontext *context) {
 				}
 			}
 		} else {
-			LOG_ERROR << "Trap at " << (void*)rip << ", but not registered to any code" << endl;
+			LOG_ERROR << "Trap at " << reinterpret_cast<void*>(rip) << ", but not registered to any code" << endl;
 		}
 		redirection_sync.read_unlock();
 	} else {
-		LOG_WARNING << "Got unexpected signal " << si->si_signo << ':' << si->si_code << " at " << (void*)rip << endl;
+		LOG_WARNING << "Got unexpected signal " << si->si_signo << ':' << si->si_code << " at " << reinterpret_cast<void*>(rip) << endl;
 	}
 }
 
@@ -233,7 +237,7 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 	size_t bytes_to_be_replaced = 1;
 	if (make_static) {
 		if (from_size < bytes_to_be_replaced) {
-			LOG_INFO << "Not enough space at " << (void*)from_address << " for static redirection -- will only use dynamic" << endl;
+			LOG_INFO << "Not enough space at " << reinterpret_cast<void*>(from_address) << " for static redirection -- will only use dynamic" << endl;
 		} else {
 			type = RedirectionEntry::MAKE_STATIC;
 			bytes_to_be_replaced = check_relative_jump(from_address, to_address) ? 5 : 16;

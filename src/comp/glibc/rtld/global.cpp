@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/glibc/rtld/global.hpp"
 
 #include <dlh/log.hpp>
@@ -16,7 +20,7 @@
 
 /* Setup _rtld_global */
 GLIBC::RTLD::Global rtld_global;
-extern __attribute__ ((alias("rtld_global"), visibility("default"))) GLIBC::RTLD::Global _rtld_global;
+extern __attribute__((alias("rtld_global"), visibility("default"))) GLIBC::RTLD::Global _rtld_global;
 
 /* Setup _rtld_global_ro */
 GLIBC::RTLD::GlobalRO rtld_global_ro;
@@ -30,17 +34,17 @@ EXPORT const GLIBC::RTLD::GlobalRO::cpu_features * __get_cpu_features() {
 	return &(rtld_global_ro._dl_x86_cpu_features);
 }
 
-__attribute__ ((visibility("default"))) int __libc_enable_secure = 0;
+__attribute__((visibility("default"))) int __libc_enable_secure = 0;
 
 void *libc_stack_end = nullptr;
-extern __attribute__ ((alias("libc_stack_end"), visibility("default"))) void * __libc_stack_end;
+extern __attribute__((alias("libc_stack_end"), visibility("default"))) void * __libc_stack_end;
 
 void *dlfcn_hook = nullptr;
-extern __attribute__ ((alias("dlfcn_hook"), visibility("default"))) void * _dlfcn_hook;
+extern __attribute__((alias("dlfcn_hook"), visibility("default"))) void * _dlfcn_hook;
 
-__attribute__ ((visibility("default"))) unsigned int __rseq_flags = 0;
-__attribute__ ((visibility("default"))) unsigned int __rseq_size = 0;
-__attribute__ ((visibility("default"))) ptrdiff_t __rseq_offset = 0;
+__attribute__((visibility("default"))) unsigned int __rseq_flags = 0;
+__attribute__((visibility("default"))) unsigned int __rseq_size = 0;
+__attribute__((visibility("default"))) ptrdiff_t __rseq_offset = 0;
 
 
 namespace GLIBC {
@@ -49,9 +53,9 @@ namespace RTLD {
 #if GLIBC_VERSION < GLIBC_2_25
 static __attribute__((unused)) void * _dl_error_catch_tsd() {
 	LOG_INFO << "Using error_catch_tsd!" << endl;
-	//return &(Thread::self()->__glibc_unused2);
+	// return &(Thread::self()->__glibc_unused2);
 	static void * data;
-	return &data; // TODO: should be __thread
+	return &data;  // TODO: should be __thread
 }
 #endif
 
@@ -85,12 +89,12 @@ static __attribute__((unused)) void _dl_wait_lookup_done() {
 
 EXPORT void _dl_debug_printf(const char *fmt, ...) {
 	va_list arg;
-	va_start (arg, fmt);
+	va_start(arg, fmt);
 	LOG_DEBUG.output(fmt, arg);
-	va_end (arg);
+	va_end(arg);
 }
 
-static __attribute__((unused)) void * _dl_lookup_symbol_x(const char * undef_name, GLIBC::DL::link_map *undef_map, const void **ref, void *symbol_scope[], const void * version, int type_class, int flags, GLIBC::DL::link_map * skip_map){
+static __attribute__((unused)) void * _dl_lookup_symbol_x(const char * undef_name, GLIBC::DL::link_map *undef_map, const void **ref, void *symbol_scope[], const void * version, int type_class, int flags, GLIBC::DL::link_map * skip_map) {
 	(void) undef_map;
 	(void) ref;
 	(void) symbol_scope;
@@ -123,7 +127,7 @@ static __attribute__((unused)) void _dl_libc_freeres() {
 }
 
 static int _dl_find_object(uintptr_t address, GLIBC::RTLD::GlobalRO::dl_find_object * result) {
-	LOG_TRACE << "GLIBC _dl_find_object(" << (void*)address << ", " << result << ")" << endl;
+	LOG_TRACE << "GLIBC _dl_find_object(" << reinterpret_cast<void*>(address) << ", " << result << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -317,7 +321,6 @@ void init_globals_tls(const TLS & tls, void * dtv) {
 #if GLIBC_VERSION >= GLIBC_2_34 || defined(COMPATIBILITY_DEBIAN_BULLSEYE)
 	rtld_global_ro._dl_tls_static_surplus = tls.surplus;
 #endif
-
 }
 
 void stack_end(void * ptr) {

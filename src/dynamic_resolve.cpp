@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "dynamic_resolve.hpp"
 
 #include "loader.hpp"
@@ -8,7 +12,7 @@ extern "C" __attribute__((__used__)) void * __dlresolve(const Object & o, size_t
 	const uint32_t mask_low = 0xff;  // assume XSAVE & AVX, TODO: Use CPUID
 	const uint32_t mask_high = 0;
 	alignas(64) uint8_t buf[4096] = {};
-	asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );
+	asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
 #endif
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
@@ -18,7 +22,7 @@ extern "C" __attribute__((__used__)) void * __dlresolve(const Object & o, size_t
 	auto r = o.dynamic_resolve(index);
 	loader->lookup_sync.write_unlock();
 #ifndef NO_FPU
-	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );
+	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
 #endif
 	return r;
 }

@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "object/relocatable.hpp"
 
 #include <elfo/elf_rel.hpp>
@@ -17,11 +21,10 @@
  * TODO Linker symbols: etext edata end
  */
 
-//uintptr_t ObjectRelocatable::offset = 0;
+// uintptr_t ObjectRelocatable::offset = 0;
 
 ObjectRelocatable::ObjectRelocatable(ObjectIdentity & file, const Object::Data & data)
   : Object{file, data} {
-
 	// Updates require rewriting of old files
 	if (file.flags.updatable)
 		file.flags.update_outdated = 1;
@@ -161,7 +164,6 @@ bool ObjectRelocatable::preload() {
 bool ObjectRelocatable::fix() {
 	// TODO: add _start routine etc
 	return true;
-
 }
 
 
@@ -238,7 +240,7 @@ bool ObjectRelocatable::adjust_offsets(uintptr_t offset, const Elf::Section & se
 
 
 bool ObjectRelocatable::prepare() {
-	LOG_INFO << "Prepare " << *this << " with " << (void*)global_offset_table << endl;
+	LOG_INFO << "Prepare " << *this << " with " << reinterpret_cast<void*>(global_offset_table) << endl;
 	bool success = true;
 
 	// Allocate bss space for tentative definitions
@@ -288,7 +290,7 @@ bool ObjectRelocatable::prepare() {
 	// Perform initial relocations
 	for (auto & relocations : relocation_tables)
 		for (auto & reloc : relocations) {
-			//LOG_INFO << "Relocate " << (void*)reloc.offset() << " = " << (void*)reloc.symbol().address() << endl;
+			// LOG_INFO << "Relocate " << (void*)reloc.offset() << " = " << (void*)reloc.symbol().address() << endl;
 			if (relocate(reloc) == nullptr)
 				success = false;
 		}
@@ -297,7 +299,7 @@ bool ObjectRelocatable::prepare() {
 	for (auto & section : this->init_sections) {
 		assert(section.size() > 0 && section.type() == SHT_PROGBITS);
 		char * end = reinterpret_cast<char *>(base + section.virt_addr() + section.size());
-		LOG_INFO << "Add retq instruction to " << (void*)end << " at " << section.name() << endl;
+		LOG_INFO << "Add retq instruction to " << reinterpret_cast<void*>(end) << " at " << section.name() << endl;
 		*end = 0xc3;  // retq
 	}
 
@@ -339,13 +341,13 @@ bool ObjectRelocatable::patchable() const {
 Optional<ElfSymbolHelper> ObjectRelocatable::resolve_internal_symbol(const SymbolHelper & needle) const {
 	const auto sym = symbols.find(needle);
 	if (sym != symbols.end() && sym->section_index() != Elf::SHN_UNDEF) {
-		return { *sym };
+		return Optional<ElfSymbolHelper>{ *sym };
 	}
 
 	// hand over to previous version to resurrect old data fields -- TODO is this intuitive or counter intuitive?
-	//if (file_previous != nullptr)
-	//	return reinterpret_cast<ObjectRelocatable*>(this->file_previous)->resolve_internal_symbol(needle);
-	return {};
+	// if (file_previous != nullptr)
+	// 	return reinterpret_cast<ObjectRelocatable*>(this->file_previous)->resolve_internal_symbol(needle);
+	return Optional<ElfSymbolHelper>{};
 }
 
 
@@ -355,9 +357,9 @@ Optional<VersionedSymbol> ObjectRelocatable::resolve_symbol(const char * name, u
 	const auto sym = symbols.find(SymbolHelper{name, gnu_hash});
 	if (sym != symbols.end() && sym->section_index() != Elf::SHN_UNDEF && sym->bind() != Elf::STB_LOCAL && sym->visibility() == Elf::STV_DEFAULT) {
 		VersionedSymbol vs{ *sym };
-		return { vs };
+		return Optional<VersionedSymbol>{ vs };
 	}
-	return {};
+	return Optional<VersionedSymbol>{};
 }
 
 
@@ -367,10 +369,10 @@ Optional<VersionedSymbol> ObjectRelocatable::resolve_symbol(uintptr_t addr) cons
 		for (const auto & sym : symbols)
 			if (sym.section_index() != Elf::SHN_UNDEF && offset >= sym.value() && offset <= sym.value() + sym.size()) {
 				VersionedSymbol vs{sym};
-				return { vs };
+				return Optional<VersionedSymbol>{ vs };
 			}
 	}
-	return {};
+	return Optional<VersionedSymbol>{};
 }
 
 void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
@@ -397,7 +399,7 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 			}
 			// Local symbol
 			relocations.insert(reloc, needed_symbol);
-			LOG_INFO << "Relocating local symbol " << needed_symbol.name() << " @ " << (void*)(base + needed_symbol.value()) << " in " << *this << endl;
+			LOG_INFO << "Relocating local symbol " << needed_symbol.name() << " @ " << reinterpret_cast<void*>(base + needed_symbol.value()) << " in " << *this << endl;
 			return reinterpret_cast<void*>(relocator.fix_internal(this->base, plt_entry, this->file.tls_module_id, this->file.tls_offset));
 		} else {
 			// external symbol

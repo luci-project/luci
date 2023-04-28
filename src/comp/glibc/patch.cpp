@@ -1,11 +1,15 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/glibc/patch.hpp"
 
 #include <dlh/log.hpp>
+#include <dlh/page.hpp>
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
 #include <dlh/syscall.hpp>
 
-#include "page.hpp"
 #include "object/identity.hpp"
 #include "comp/glibc/version.hpp"
 #include "comp/glibc/libdl/interface.hpp"
@@ -33,7 +37,7 @@ class Patch {
 		uint8_t * addr = object.compose_pointer(reinterpret_cast<uint8_t *>(object.base + address));
 
 		if (addr == nullptr) {
-			LOG_ERROR << "Unable to get compose buffer for " << (void*)address << " for patching " << name << " in " << object << endl;
+			LOG_ERROR << "Unable to get compose buffer for " << reinterpret_cast<void*>(address) << " for patching " << name << " in " << object << endl;
 			return false;
 		}
 
@@ -47,10 +51,10 @@ class Patch {
 		bool success = func(addr, size, arg);
 
 		if (!success) {
-			LOG_ERROR << "Patching '" << name << "' (" << size << " bytes) @ " << (void*)address << " with " << (void*)arg << " in " << object << " failed!"<< endl;
+			LOG_ERROR << "Patching '" << name << "' (" << size << " bytes) @ " << reinterpret_cast<void*>(address) << " with " << reinterpret_cast<void*>(arg) << " in " << object << " failed!"<< endl;
 			return false;
 		} else {
-			LOG_DEBUG << "Patched '" << name << "' (" << size << " bytes) @ " << (void*)address << " with " << (void*)arg << " in " << object << endl;
+			LOG_DEBUG << "Patched '" << name << "' (" << size << " bytes) @ " << reinterpret_cast<void*>(address) << " with " << reinterpret_cast<void*>(arg) << " in " << object << endl;
 			return true;
 		}
 	}
@@ -61,7 +65,7 @@ class PatchSymbol : public Patch {
 	uint32_t gnuhash;
 
  public:
-	PatchSymbol(const char * name = nullptr, bool (*func)(uint8_t*, size_t, uintptr_t) = nullptr, uintptr_t arg = 0)
+	PatchSymbol(const char * name = nullptr, bool (*func)(uint8_t*, size_t, uintptr_t) = nullptr, uintptr_t arg = 0)  // NOLINT
 	  : Patch(name, func, arg), hash(ELF_Def::hash(name)), gnuhash(ELF_Def::gnuhash(name)) {}
 
 
@@ -83,7 +87,7 @@ class PatchOffset : public Patch {
 	size_t size;
 
  public:
-	PatchOffset(const char * name = nullptr, uintptr_t address = 0, size_t size = 0, bool (*func)(uint8_t*, size_t, uintptr_t) = nullptr, uintptr_t arg = 0)
+	PatchOffset(const char * name = nullptr, uintptr_t address = 0, size_t size = 0, bool (*func)(uint8_t*, size_t, uintptr_t) = nullptr, uintptr_t arg = 0)  // NOLINT
 	  : Patch(name, func, arg), address(address), size(size) {}
 
 	bool apply(Object & object) const {
@@ -106,8 +110,7 @@ static bool redirect_fork_syscall(uint8_t * address, size_t size, uintptr_t arg)
 		    a[5] == 0xb8 && a[6] == 0x38 && a[7] == 0x00 && a[8] == 0x00 && a[9] == 0x00 &&                                    // mov    $0x38,%eax
 		    a[10] == 0x0f && a[11] == 0x05                                                                                     // syscall
 #endif
-		 ){
-
+		 ) {
 			// Replace with call to replacement function
 			// movabs $arg, %rax
 			*(a++) = 0x48;
@@ -193,7 +196,7 @@ static PatchSymbol symbol_fixes[] = {
 
 static bool patch_using_symbol_fixes(Object & object) {
 	Optional<Elf::SymbolTable> symtab, dynsym;
-	for (const auto & section: object.sections)
+	for (const auto & section : object.sections)
 		if (section.type() == Elf::SHT_DYNSYM)
 			dynsym.emplace(section.get_symbol_table());
 		else if (section.type() == Elf::SHT_SYMTAB)
@@ -227,7 +230,7 @@ static struct {
 static bool patch_using_offset_fixes(Object & object) {
 	if (sizeof(offset_fixes) > 0) {
 		// This looks quite messy, but it is not as expensive as it looks on a first glimpse. And after all it is only a temporary hack
-		for (auto & section: object.sections)
+		for (auto & section : object.sections)
 			if (section.type() == Elf::SHT_NOTE)
 				for (auto & note : section.get_notes())
 					if (note.name() != nullptr && String::compare(note.name(), "GNU") == 0 && note.type() == Elf::NT_GNU_BUILD_ID) {

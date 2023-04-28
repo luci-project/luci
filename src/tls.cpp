@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "tls.hpp"
 
 #include <dlh/log.hpp>
@@ -60,7 +64,7 @@ void TLS::dtv_setup(Thread * thread) {
 
 		// Calculate address of module
 		auto addr = start - module.offset;
-		//TODO: assert(addr % module.align == 0); ?
+		// TODO: assert(addr % module.align == 0); ?
 		assert(addr < start);  // only x86_64
 
 		// Copy data & assign pointer
@@ -135,7 +139,7 @@ Thread * TLS::allocate(Thread * thread, bool set_fs) {
 		assert(mem != 0);
 
 		uintptr_t addr = Math::align_up(mem + initial_size + surplus, initial_align);
-		LOG_INFO << "Allocate Thread " << (void*)addr << " with " << initial_size << "B (+ " << surplus << "B) TLS starting at " << (void*)mem << endl;
+		LOG_INFO << "Allocate Thread " << reinterpret_cast<void*>(addr) << " with " << initial_size << "B (+ " << surplus << "B) TLS starting at " << reinterpret_cast<void*>(mem) << endl;
 		thread = new (reinterpret_cast<Thread*>(addr)) Thread(nullptr, mem, initial_size + sizeof(Thread) + surplus);
 	}
 
@@ -144,9 +148,9 @@ Thread * TLS::allocate(Thread * thread, bool set_fs) {
 	if (set_fs) {
 		auto set_fs = Syscall::arch_prctl(ARCH_SET_FS, reinterpret_cast<uintptr_t>(thread));
 		if (set_fs.success()) {
-			LOG_INFO << "Changed %fs of ThreadID " << Syscall::gettid() << " to " << (void*)thread << endl;
+			LOG_INFO << "Changed %fs of ThreadID " << Syscall::gettid() << " to " << reinterpret_cast<void*>(thread) << endl;
 		} else {
-			LOG_WARNING << "Changing %fs of ThreadID " << Syscall::gettid() << " to " << (void*)thread << " failed: " << set_fs.error_message() << endl;
+			LOG_WARNING << "Changing %fs of ThreadID " << Syscall::gettid() << " to " << reinterpret_cast<void*>(thread) << " failed: " << set_fs.error_message() << endl;
 		}
 	}
 

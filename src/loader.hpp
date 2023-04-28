@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 #include <dlh/container/optional.hpp>
@@ -139,7 +143,7 @@ struct Loader {
 	ObjectIdentity::Flags default_flags;
 
 	/*! \brief Constructor */
-	Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", Config config = Config{});
+	explicit Loader(uintptr_t self, const char * sopath = "/lib/ld-luci.so", Config config = Config{});
 
 	/*! \brief Destructor: Unload all files */
 	~Loader();
@@ -156,7 +160,7 @@ struct Loader {
 	inline ObjectIdentity * open(const char * path) {
 		return open(path, default_flags);
 	}
-	//ObjectIdentity * open(uintptr_t addr, ObjectIdentity::Flags flags, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
+	// ObjectIdentity * open(uintptr_t addr, ObjectIdentity::Flags flags, const char * filepath = nullptr, namespace_t ns = NAMESPACE_BASE, Elf::ehdr_type type = Elf::ET_NONE);
 
 	/*! \brief Search, load & initizalize libary (during runtime) */
 	ObjectIdentity * dlopen(const char * file, ObjectIdentity::Flags flags, namespace_t ns = NAMESPACE_BASE, bool load = true);

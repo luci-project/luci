@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/glibc/init.hpp"
 
 #include <elfo/elf.hpp>
@@ -6,8 +10,6 @@
 #include "comp/glibc/version.hpp"
 #include "comp/glibc/rtld/global.hpp"
 #include "comp/glibc/libdl/interface.hpp"
-
-
 
 namespace GLIBC {
 bool patch(const Elf::SymbolTable & symtab, uintptr_t base = 0);
@@ -55,6 +57,5 @@ void init_tls(ObjectIdentity & object, const size_t size, const size_t align, co
 	object.glibc_link_map.l_tls_offset = offset;
 	object.glibc_link_map.l_tls_modid = modid;
 }
-
 
 }  // namespace GLIBC

@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "loader.hpp"
 
 #include <dlh/stream/output.hpp>
@@ -10,6 +14,7 @@
 #include <dlh/error.hpp>
 #include <dlh/file.hpp>
 #include <dlh/math.hpp>
+#include <dlh/page.hpp>
 #include <dlh/log.hpp>
 
 #include "comp/glibc/rtld/global.hpp"
@@ -19,7 +24,6 @@
 #include "comp/gdb.hpp"
 #include "object/base.hpp"
 #include "process.hpp"
-#include "page.hpp"
 
 
 static Loader * _instance = nullptr;
@@ -60,7 +64,7 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
 		LOG_ERROR << "Unable to load Luci (" << sopath << ")..." << endl;
 		assert(false);
 	}
-	LOG_INFO << "Base of " << sopath << " is " << (void*)(self->current->base) << endl;
+	LOG_INFO << "Base of " << sopath << " is " << reinterpret_cast<void*>(self->current->base) << endl;
 	self->current->base = 0;
 
 	// Assign current instance
@@ -134,7 +138,7 @@ ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags fl
 ObjectIdentity * Loader::open(const char * filename, const char * directory, ObjectIdentity::Flags flags, bool priority, namespace_t ns) {
 	auto filename_len = String::len(filename);
 	auto directory_len = String::len(directory);
-	char path[directory_len + filename_len + 2];
+	char path[directory_len + filename_len + 2];  // NOLINT
 	String::copy(path, directory, directory_len);
 	path[directory_len] = '/';
 	String::copy(path + directory_len + 1, filename, filename_len + 1);
@@ -151,7 +155,7 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 
 		LOG_DEBUG << "Loading " << filepath;
 		if (addr != 0)
-			LOG_DEBUG_APPEND << " from memory at " << (void*)addr;
+			LOG_DEBUG_APPEND << " from memory at " << reinterpret_cast<void*>(addr);
 		LOG_DEBUG_APPEND << "..." << endl;
 
 		// Check format
@@ -280,8 +284,8 @@ bool Loader::prepare(Object * start) {
 	if (random.valid()) {
 		main_thread->setup_guards(random.a_un.a_ptr);
 		// TODO: __stack_chk_guard = main_thread->stack_guard;
-		LOG_DEBUG << "Stack Guard: " << (void*)main_thread->stack_guard << endl;
-		LOG_DEBUG << "Pointer Guard: " << (void*)main_thread->pointer_guard << endl;
+		LOG_DEBUG << "Stack Guard: " << reinterpret_cast<void*>(main_thread->stack_guard) << endl;
+		LOG_DEBUG << "Pointer Guard: " << reinterpret_cast<void*>(main_thread->pointer_guard) << endl;
 	} else {
 		LOG_WARNING << "No AT_RANDOM!" << endl;
 	}
@@ -317,7 +321,7 @@ uintptr_t Loader::get_entry_point(Object * start, const char * custom_entry_poin
 			entry = reinterpret_cast<uintptr_t>(sym->pointer());
 			LOG_VERBOSE << "Overwritten entry point with symbol " << custom_entry_point << sym->object() << endl;
 		} else if (Parser::string(entry, custom_entry_point)) {
-			LOG_VERBOSE << "Overwritten entry point with address " << (void*)entry << endl;
+			LOG_VERBOSE << "Overwritten entry point with address " << reinterpret_cast<void*>(entry) << endl;
 			// Check if relative (starting with '+' after trimming)
 			for (const char * e = custom_entry_point; *e != '\0'; e++) {
 				if (*e == '+')
@@ -511,7 +515,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 	// Executed binary will be initialized in _start automatically
 	file->flags.initialized = 1;
 
-	this->argc = *reinterpret_cast<int *>(stack_pointer);;
+	this->argc = *reinterpret_cast<int *>(stack_pointer);
 	this->argv = reinterpret_cast<const char **>(stack_pointer) + 1;
 	this->envp = this->argv + this->argc + 1;
 
@@ -520,7 +524,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 	 * since glibc getenv will stop iterating on such occurences
 	 * (and we don't want to change the auxiliary vectors)
 	 */
-	{
+	 {
 		// Count entries
 		size_t envc = 0;
 		while (this->envp[envc] != nullptr)
@@ -533,7 +537,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 				this->envp[envc] = this->envp[curr];
 				this->envp[curr] = tmp;
 			}
-	}
+	 }
 
 	// Binary has to be first in list
 	lookup.extract(file);
@@ -622,12 +626,16 @@ Optional<VersionedSymbol> Loader::resolve_symbol(uintptr_t addr, namespace_t ns)
 
 
 Object * Loader::resolve_object(uintptr_t addr, namespace_t ns) const {
-	for (const auto & object_file : lookup)
-		if (object_file.ns == ns)
-			for (auto o = object_file.current; o != nullptr; o = o->file_previous)
-				for (const auto & mem : o->memory_map)
-					if (addr >= mem.target.address() && addr <= mem.target.address() + mem.target.size)
-						return o;
+	for (const auto & object_file : lookup) {
+		if (object_file.ns != ns)
+			continue;
+		for (auto o = object_file.current; o != nullptr; o = o->file_previous) {
+			for (const auto & mem : o->memory_map) {
+				if (addr >= mem.target.address() && addr <= mem.target.address() + mem.target.size)
+					return o;
+			}
+		}
+	}
 	return nullptr;
 }
 

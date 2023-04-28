@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "loader.hpp"
 
 #include <dlh/syscall.hpp>
@@ -142,7 +146,7 @@ void Loader::userfault_handle() {
 			*/
 			for (auto & object_file : lookup) {
 				for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous) {
-					for (MemorySegment &mem: obj->memory_map) {
+					for (MemorySegment &mem : obj->memory_map) {
 						if (msg.arg.pagefault.address >= mem.target.page_start() && msg.arg.pagefault.address < mem.target.page_end()) {
 							memseg = &mem;
 							LOG_DEBUG << "Usefault found memory segment " << reinterpret_cast<void*>(mem.target.address()) << " with " << mem.target.size << " bytes"
@@ -154,7 +158,7 @@ void Loader::userfault_handle() {
 
 							// Copy data
 							if (mem.buffer == 0) {
-								LOG_WARNING << "No memory backbuffer for " << (void*)mem.target.page_start() << " (" <<  mem.target.page_size() << " Bytes) -- copying from source" << endl;
+								LOG_WARNING << "No memory backbuffer for " << reinterpret_cast<void*>(mem.target.page_start()) << " (" <<  mem.target.page_size() << " Bytes) -- copying from source" << endl;
 								cpy.src = mem.source.object.data.addr + mem.source.offset - (mem.target.address() - mem.target.page_start());
 							} else {
 								cpy.src = mem.buffer;

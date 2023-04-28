@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 #include <dlh/types.hpp>
@@ -237,9 +241,9 @@ struct link_map {
 extern "C" int dlclose(void *);
 extern "C" const char *dlerror();
 extern "C" void *dlopen(const char *, int);
-extern "C" void *dlmopen (GLIBC::DL::Lmid_t, const char *, int);
+extern "C" void *dlmopen(GLIBC::DL::Lmid_t, const char *, int);
 extern "C" int dlinfo(void * __restrict, int, void * __restrict);
 extern "C" void *dlsym(void *__restrict, const char *__restrict);
-extern "C" void *dlvsym(void *__restrict, const char *__restrict, const char *__restrict );
+extern "C" void *dlvsym(void *__restrict, const char *__restrict, const char *__restrict);
 extern "C" int dladdr(void *addr, GLIBC::DL::Info *info);
 extern "C" int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int flags);

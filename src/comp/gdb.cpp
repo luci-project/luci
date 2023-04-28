@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/gdb.hpp"
 
 #include <dlh/assert.hpp>
@@ -5,7 +9,7 @@
 
 GDB::RDebugExtended r_debug;
 
-extern __attribute__ ((alias("r_debug"), visibility("default"))) GDB::RDebug _r_debug;
+extern __attribute__((alias("r_debug"), visibility("default"))) GDB::RDebug _r_debug;
 
 EXPORT void _dl_debug_state(void) {
 	asm volatile("nop" ::: "memory");
@@ -21,8 +25,8 @@ void notify(State state) {
 
 static bool set_dynamic_debug(const ObjectIdentity * object) {
 	assert(object != nullptr);
-	if (object->dynamic != 0)
-		for (auto dyn = reinterpret_cast<Elf::Dyn *>(object->dynamic); dyn->d_tag != Elf::DT_NULL; dyn++)
+	if (object->dynamic != 0) {
+		for (auto dyn = reinterpret_cast<Elf::Dyn *>(object->dynamic); dyn->d_tag != Elf::DT_NULL; dyn++) {
 			if (dyn->d_tag == Elf::DT_DEBUG) {
 				auto current = object->current;
 				assert(current != nullptr);
@@ -31,6 +35,8 @@ static bool set_dynamic_debug(const ObjectIdentity * object) {
 				LOG_INFO << "GDB debug structure in " << *object << " at *" << &(dyn->d_un.d_ptr) << " = " << &r_debug << endl;
 				return true;
 			}
+		}
+	}
 	return false;
 }
 

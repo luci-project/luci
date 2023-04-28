@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include <dlh/assert.hpp>
 #include <dlh/types.hpp>
 #include <dlh/macro.hpp>
@@ -397,18 +401,18 @@
 #if GLIBC_TUNABLE_SIZE > 0
 
 #ifndef TUNABLE_LIST
-#define TUNABLE_GET_LIST(MAJOR,MINOR) TUNABLE_GET_LIST_HELPER(MAJOR,MINOR)
-#define TUNABLE_GET_LIST_HELPER(MAJOR,MINOR) TUNABLE_LIST_ ## MAJOR ## _ ## MINOR
-#define TUNABLE_LIST TUNABLE_GET_LIST(GLIBC,GLIBC_VERSION)
+#define TUNABLE_GET_LIST(MAJOR, MINOR) TUNABLE_GET_LIST_HELPER(MAJOR, MINOR)
+#define TUNABLE_GET_LIST_HELPER(MAJOR, MINOR) TUNABLE_LIST_ ## MAJOR ## _ ## MINOR
+#define TUNABLE_LIST TUNABLE_GET_LIST(GLIBC, GLIBC_VERSION)
 #endif
 
 /* Do some preprocessor *magic*, part 1: enum with tunable ids */
 
-#define TUNABLE_VALUE(TOP,NS,ID,TYPE,MIN,MAX,VAL,INIT,SECURITY,ALIAS) TUNABLE_ENUM_NAME(TOP,NS,ID)
-#define TUNABLE_ENUM_NAME(TOP,NS,ID) TOP ## _ ## NS ## _ ## ID,
+#define TUNABLE_VALUE(TOP, NS, ID, TYPE, MIN, MAX, VAL, INIT, SECURITY, ALIAS) TUNABLE_ENUM_NAME(TOP, NS, ID)
+#define TUNABLE_ENUM_NAME(TOP, NS, ID) TOP ## _ ## NS ## _ ## ID,
 
-//#define TUNABLE_LIST(VERSION) TUNABLE_LIST_HELPER(VERSION)
-//#define TUNABLE_LIST_HELPER(VERSION) TUNABLE_LIST_GLIBC_ ## VERSION
+// #define TUNABLE_LIST(VERSION) TUNABLE_LIST_HELPER(VERSION)
+// #define TUNABLE_LIST_HELPER(VERSION) TUNABLE_LIST_GLIBC_ ## VERSION
 
 
 enum TunableID {
@@ -423,9 +427,9 @@ static_assert(_count == GLIBC_TUNABLE_COUNT, "Wrong number of tunables for " OSN
 
 /* Do some preprocessor *magic*, part 2: tunable list */
 
-#define TUNABLE_VALUE(TOP,NS,ID,TYPE,MIN,MAX,VAL,INIT,SECURITY,ALIAS) { #TOP "." #NS "." #ID, {Tunable::TYPE, static_cast<int64_t>(MIN), static_cast<int64_t>(MAX) }, VAL, INIT, Tunable::SECURITY, ALIAS },
+#define TUNABLE_VALUE(TOP, NS, ID, TYPE, MIN, MAX, VAL, INIT, SECURITY, ALIAS) { #TOP "." #NS "." #ID, {Tunable::TYPE, static_cast<int64_t>(MIN), static_cast<int64_t>(MAX) }, VAL, INIT, Tunable::SECURITY, ALIAS },
 
-struct Tunable	{
+struct Tunable {
 	/* Internal name of the tunable.  */
 #if GLIBC_VERSION >= GLIBC_2_33
 	const char name[42];
@@ -483,27 +487,27 @@ static_assert(sizeof(tunables) == GLIBC_TUNABLE_SIZE, "Wrong size of tunables fo
 
 extern __attribute__((alias("tunables"), visibility("default"))) struct Tunable tunable_list;
 
-EXPORT void __tunable_get_val (TunableID id, void * valp, void (*callback) (Tunable::Val *)) {
+EXPORT void __tunable_get_val(TunableID id, void * valp, void (*callback)(Tunable::Val *)) {
 	assert(id < TunableID::_count);
 	auto &cur = tunables[id];
-	LOG_TRACE << "GLIBC __tunable_get_val " << (int)id << " (" << cur.name << ") = ";
+	LOG_TRACE << "GLIBC __tunable_get_val " << static_cast<int>(id) << " (" << cur.name << ") = ";
 
 	switch (cur.type.type_code) {
 		case Tunable::TUNABLE_TYPE_UINT_64:
-			LOG_TRACE_APPEND << (uint64_t) cur.val.numval;
-			*((uint64_t *) valp) = (uint64_t) cur.val.numval;
+			LOG_TRACE_APPEND << static_cast<uint64_t>(cur.val.numval);
+			*reinterpret_cast<uint64_t *>(valp) = static_cast<uint64_t>(cur.val.numval);
 			break;
 		case Tunable::TUNABLE_TYPE_INT_32:
-			LOG_TRACE_APPEND << (int32_t) cur.val.numval;
-			*((int32_t *) valp) = (int32_t) cur.val.numval;
+			LOG_TRACE_APPEND << static_cast<int32_t>(cur.val.numval);
+			*reinterpret_cast<int32_t *>(valp) = static_cast<int32_t>(cur.val.numval);
 			break;
 		case Tunable::TUNABLE_TYPE_SIZE_T:
-			LOG_TRACE_APPEND << (size_t) cur.val.numval;
-			*((size_t *) valp) = (size_t) cur.val.numval;
+			LOG_TRACE_APPEND << static_cast<size_t>(cur.val.numval);
+			*reinterpret_cast<size_t *>(valp) = static_cast<size_t>(cur.val.numval);
 			break;
 		case Tunable::TUNABLE_TYPE_STRING:
 			LOG_TRACE_APPEND << cur.val.strval;
-			*((const char **)valp) = cur.val.strval;
+			*reinterpret_cast<const char **>(valp) = cur.val.strval;
 			break;
 		default:
 			assert(false);

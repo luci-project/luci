@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/glibc/rtld/dl_tls.hpp"
 
 #include <dlh/log.hpp>
@@ -36,7 +40,7 @@ EXPORT Thread * _dl_allocate_tls_init(Thread *thread, bool init_tls) {
 #if GLIBC_VERSION < GLIBC_2_35
 	init_tls = true;
 #endif
-	LOG_TRACE << "GLIBC _dl_allocate_tls_init(" << (void*)thread << ", " << init_tls << ")" << endl;
+	LOG_TRACE << "GLIBC _dl_allocate_tls_init(" << reinterpret_cast<void*>(thread) << ", " << init_tls << ")" << endl;
 	if (thread == nullptr)
 		return nullptr;
 
@@ -49,7 +53,7 @@ EXPORT Thread * _dl_allocate_tls_init(Thread *thread, bool init_tls) {
 }
 
 EXPORT Thread * _dl_allocate_tls(Thread * thread) {
-	LOG_TRACE << "GLIBC _dl_allocate_tls(" << (void*)thread << ")" << endl;
+	LOG_TRACE << "GLIBC _dl_allocate_tls(" << reinterpret_cast<void*>(thread) << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -59,7 +63,7 @@ EXPORT Thread * _dl_allocate_tls(Thread * thread) {
 }
 
 EXPORT void _dl_deallocate_tls(Thread * thread, bool free_thread_struct) {
-	LOG_TRACE << "GLIBC _dl_deallocate_tls(" << (void*)thread << ")" << endl;
+	LOG_TRACE << "GLIBC _dl_deallocate_tls(" << reinterpret_cast<void*>(thread) << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 

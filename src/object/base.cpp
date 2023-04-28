@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "object/base.hpp"
 
 #include <dlh/syscall.hpp>
@@ -27,21 +31,23 @@ Object::~Object() {
 		Memory::free(debug_symbols);
 		// Memory mapped file
 		if (auto unmap = Syscall::munmap(data, debug_size); unmap.failed())
-			LOG_WARNING << "Unmapping debug symbols data at " << (void*)data << " in " << *this << " failed: " << unmap.error_message() << endl;
+			LOG_WARNING << "Unmapping debug symbols data at " << reinterpret_cast<void*>(data) << " in " << *this << " failed: " << unmap.error_message() << endl;
 	}
 
 	if (debug_hash != nullptr)
 		Memory::free(debug_hash);
 
 	// Remove this version from list
-	if (file.current == this)
+	if (file.current == this) {
 		file.current = file_previous;
-	else
-		for (auto tmp = file.current; tmp != nullptr; tmp = tmp->file_previous)
+	} else {
+		for (auto tmp = file.current; tmp != nullptr; tmp = tmp->file_previous) {
 			if (tmp->file_previous == this) {
 				tmp->file_previous = file_previous;
 				break;
 			}
+		}
+	}
 
 	// Unmap virt mem
 	for (auto & seg : memory_map)
@@ -142,17 +148,17 @@ bool Object::disable() const {
 			return false;
 
 		case Loader::Config::DETECT_OUTDATED_VIA_USERFAULTFD:
-		{
+		 {
 			bool success = true;
 			for (auto & seg : memory_map)
 				if ((seg.target.protection & PROT_EXEC) != 0)
 					success &= seg.disable();
 			return success;
-		}
+		 }
 
 		case Loader::Config::DETECT_OUTDATED_VIA_UPROBES:
 		case Loader::Config::DETECT_OUTDATED_WITH_DEPS_VIA_UPROBES:
-		{
+		 {
 			if (!file.current->binary_hash) {
 				LOG_WARNING << *(file.current) << " has no binary hash, hence no uprobe detection possible!" << endl;
 				return false;
@@ -173,7 +179,7 @@ bool Object::disable() const {
 				return false;
 			}
 
-			//File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "0");
+			// File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "0");
 			if (auto fd = Syscall::open("/sys/kernel/debug/tracing/uprobe_events", O_WRONLY | O_APPEND)) {
 				OutputStream<1024> uprobe_events(fd.value());
 				char name[65];
@@ -216,7 +222,7 @@ bool Object::disable() const {
 				LOG_ERROR << "Opening /sys/kernel/debug/tracing/uprobe_events for " << file.name << " failed: " << fd.error_message() << endl;
 				return false;
 			}
-		}
+		 }
 
 		case Loader::Config::DETECT_OUTDATED_VIA_PTRACE:
 			LOG_ERROR << "Ptrace outdated detection not implemented yet" << endl;
@@ -254,7 +260,7 @@ bool Object::has_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, con
 	auto tmp = resolve_symbol(name, hash, gnu_hash, version);
 	if (tmp) {
 		assert(tmp->valid());
-		assert(tmp->bind() != Elf::STB_LOCAL); // should not be returned
+		assert(tmp->bind() != Elf::STB_LOCAL);  // should not be returned
 		// Weak dynamic linkage is only taken into account, if file.loader.config.dynamic_weak is set. Otherwise it is always strong.
 		bool strong = tmp->bind() != Elf::STB_WEAK || !file.loader.config.dynamic_weak;
 		if (strong || !result) {

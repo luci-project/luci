@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 #include "loader.hpp"
@@ -186,7 +190,7 @@ struct GlobalRO {
 	int _dl_bind_not = 0;
 
 	/* Nonzero if references should be treated as weak during runtime linking.  */
-	int _dl_dynamic_weak = 0 ;
+	int _dl_dynamic_weak = 0;
 
 	/* Default floating-point control word.  */
 	unsigned short _dl_fpu_control = 0x037f;
@@ -377,23 +381,23 @@ struct GlobalRO {
 	   call the function instead of going through the PLT.  The result
 	   is that we can avoid exporting the functions and we do not jump
 	   PLT relocations in libc.so.  */
-	void (*_dl_debug_printf) (const char *, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
+	void (*_dl_debug_printf)(const char *, ...) __attribute__((__format__(__printf__, 1, 2)));
 #if GLIBC_VERSION < GLIBC_2_25
-	int (*_dl_catch_error) (const char **, const char **,  bool *, void (*) (void *), void *);
-	void (*_dl_signal_error) (int, const char *, const char *,const char *);
+	int (*_dl_catch_error)(const char **, const char **,  bool *, void (*)(void *), void *);
+	void (*_dl_signal_error)(int, const char *, const char *, const char *);
 #endif
-	void (*_dl_mcount) (uintptr_t, uintptr_t);
+	void (*_dl_mcount)(uintptr_t, uintptr_t);
 	void * (*_dl_lookup_symbol_x) (const char *, GLIBC::DL::link_map *, const void **, void *[], const void *, int, int,  GLIBC::DL::link_map *);
 #if GLIBC_VERSION < GLIBC_2_28
-	int (*_dl_check_caller) (const void *, int);
+	int (*_dl_check_caller)(const void *, int);
 #endif
-	void *(*_dl_open) (const char *, int, const void *, GLIBC::DL::Lmid_t, int, char **, char **);
-	void (*_dl_close) (void *);
+	void *(*_dl_open)(const char *, int, const void *, GLIBC::DL::Lmid_t, int, char **, char **);
+	void (*_dl_close)(void *);
 #if GLIBC_VERSION >= GLIBC_2_34
 	int (*_dl_catch_error)(const char **, const char **, bool *, void (*)(void *), void *);
 	void (*_dl_error_free)(void *);
 #endif
-	void *(*_dl_tls_get_addr_soft) (GLIBC::DL::link_map *);
+	void *(*_dl_tls_get_addr_soft)(GLIBC::DL::link_map *);
 #if GLIBC_VERSION >= GLIBC_2_35
 	void (*_dl_libc_freeres)(void);
 	struct dl_find_object {
@@ -407,7 +411,7 @@ struct GlobalRO {
 	int (*_dl_find_object)(uintptr_t, struct dl_find_object *);
 #endif
 #if GLIBC_VERSION < GLIBC_2_36
-	int (*_dl_discover_osversion) (void);
+	int (*_dl_discover_osversion)(void);
 #endif
 #if GLIBC_VERSION >= GLIBC_2_34
 	const struct dlfcn_hook *_dl_dlfcn_hook = 0;
@@ -421,7 +425,7 @@ struct GlobalRO {
 #endif
 };
 }  // namespace RTLD
-}  // nammespace GLIBC
+}  // namespace GLIBC
 
 extern "C" GLIBC::RTLD::Global rtld_global;
 extern "C" GLIBC::RTLD::GlobalRO rtld_global_ro;

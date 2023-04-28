@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/glibc/rtld/dl.hpp"
 
 #include <dlh/log.hpp>
@@ -8,9 +12,9 @@
 
 
 int dl_starting_up = 0;
-extern __attribute__ ((alias("dl_starting_up"), visibility("default"))) int _dl_starting_up;
+extern __attribute__((alias("dl_starting_up"), visibility("default"))) int _dl_starting_up;
 
-__attribute__ ((visibility("default"))) char **_dl_argv = nullptr;
+__attribute__((visibility("default"))) char **_dl_argv = nullptr;
 
 namespace GLIBC {
 namespace RTLD {
@@ -112,9 +116,9 @@ EXPORT void __rtld_version_placeholder() {
 	/* do nothing */
 }
 
-__attribute__ ((visibility("default"))) bool __nptl_initial_report_events = false;
+__attribute__((visibility("default"))) bool __nptl_initial_report_events = false;
 
-EXPORT int __nptl_change_stack_perm (Thread *t) {
+EXPORT int __nptl_change_stack_perm(Thread *t) {
 	uintptr_t stack = reinterpret_cast<uintptr_t>(t->stackblock) + t->guardsize;
 	size_t len = t->stackblock_size - t->guardsize;
 	return Syscall::mprotect(stack, len, PROT_READ | PROT_WRITE | PROT_EXEC).error();

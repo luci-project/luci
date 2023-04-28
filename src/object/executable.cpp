@@ -1,9 +1,14 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "object/executable.hpp"
 
 #include <dlh/assert.hpp>
+#include <dlh/page.hpp>
 
 #include "loader.hpp"
-#include "page.hpp"
+
 
 bool ObjectExecutable::preload_segments(bool setup_relro) {
 	size_t load = 0;
@@ -32,9 +37,9 @@ bool ObjectExecutable::preload_segments(bool setup_relro) {
 			} else {
 				memory_map.emplace_back(*this, segment, base);
 			}
-		}
-		else if (Elf::PT_TLS == segment.type() && segment.virt_size() > 0 && this->file.tls_module_id == 0)
+		} else if (Elf::PT_TLS == segment.type() && segment.virt_size() > 0 && this->file.tls_module_id == 0) {
 			this->file.tls_module_id = this->file.loader.tls.add_module(this->file, segment.virt_size(), segment.alignment(), segment.virt_addr(), segment.size(), this->file.tls_offset);
+		}
 
 	// Shared data on updates
 	if (file_previous != nullptr) {

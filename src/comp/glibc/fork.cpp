@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include <dlh/log.hpp>
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
@@ -10,7 +14,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 	const uint32_t mask_low = 0xff;  // assume XSAVE & AVX, TODO: Use CPUID
 	const uint32_t mask_high = 0;
 	alignas(64) uint8_t buf[4096] = {};
-	asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );
+	asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
 #endif
 
 	auto loader = Loader::instance();
@@ -19,9 +23,9 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 	// Prevent modifications during fork
 	loader->lookup_sync.read_lock();
 
-	HashMap<int,int> replace_fd;
+	HashMap<int, int> replace_fd;
 	if (loader->config.dynamic_update) {
-		for (auto & i: loader->lookup)
+		for (auto & i : loader->lookup)
 			for (auto o = i.current; o != nullptr; o = o->file_previous)
 				for (auto & m : o->memory_map) {
 					int old_fd = m.target.fd;
@@ -29,7 +33,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 						int new_fd = m.shmemdup();
 						assert(new_fd != -1);
 						replace_fd.insert(old_fd, new_fd);
-						LOG_DEBUG << "Fork created copy of shared memory at " << (void*) m.target.address() << " (fd " << old_fd << " -> " << new_fd << ")" << endl;
+						LOG_DEBUG << "Fork created copy of shared memory at " << reinterpret_cast<void*>(m.target.address()) << " (fd " << old_fd << " -> " << new_fd << ")" << endl;
 					}
 				}
 		LOG_INFO << "Fork needs to replace " << replace_fd.size() << " shared memory files" << endl;
@@ -41,13 +45,13 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 		if (clone.success() && (r = clone.value()) == 0) {
 			// Remap
 			int remaps = 0;
-			for (auto & i: loader->lookup)
+			for (auto & i : loader->lookup)
 				for (auto o = i.current; o != nullptr; o = o->file_previous)
 					for (auto & m : o->memory_map) {
 						int old_fd = m.target.fd;
 						if (old_fd != -1) {
 							int new_fd = replace_fd[old_fd];
-							LOG_DEBUG << "Fork child remapping shared memory at " << (void*) m.target.address() << " (fd " << old_fd << " -> " << new_fd << ")" << endl;
+							LOG_DEBUG << "Fork child remapping shared memory at " << reinterpret_cast<void*>(m.target.address()) << " (fd " << old_fd << " -> " << new_fd << ")" << endl;
 							m.unmap();
 							assert(new_fd != -1);
 							m.target.fd = new_fd;
@@ -72,7 +76,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 	loader->lookup_sync.read_unlock();
 
 #ifndef NO_FPU
-	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory" );
+	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
 #endif
 	return r;
 }

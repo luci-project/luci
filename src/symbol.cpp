@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "symbol.hpp"
 
 #include "object/identity.hpp"
@@ -18,7 +22,7 @@ VersionedSymbol::VersionedSymbol(const Elf::Symbol & sym, const Version & versio
 	assert(sym.valid());
 }
 
-//VersionedSymbol::VersionedSymbol(const Object & object) : Elf::Symbol(object), object(object) {}
+// VersionedSymbol::VersionedSymbol(const Object & object) : Elf::Symbol(object), object(object) {}
 
 bool VersionedSymbol::operator==(const VersionedSymbol & o) const {
 	return this->_data == o._data
@@ -34,11 +38,11 @@ void * VersionedSymbol::pointer() const {
 	switch (type()) {
 		// Handle ifunc
 		case Elf::STT_GNU_IFUNC:
-		{
+		 {
 			typedef void* (*indirect_t)();
 			indirect_t func = reinterpret_cast<indirect_t>(fptr);
 			return func();
-		}
+		 }
 
 		case Elf::STT_TLS:
 			return reinterpret_cast<void*>(object().tls_address(value()));

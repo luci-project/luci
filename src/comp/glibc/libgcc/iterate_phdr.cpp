@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/glibc/libgcc/iterate_phdr.hpp"
 
 #include <dlh/log.hpp>
@@ -31,11 +35,10 @@ EXPORT int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t siz
 				/* dlpi_name = */ object_file.filename,
 				/* dlpi_phdr = */ obj->Elf::data(obj->header.e_phoff),
 				/* dlpi_phnum = */ obj->header.e_phnum,
-				/* info.dlpi_adds = */ 0, // TODO
-				/* info.dlpi_subs = */ 0, // TODO
+				/* info.dlpi_adds = */ 0,  // TODO
+				/* info.dlpi_subs = */ 0,  // TODO
 				/* dlpi_tls_modid = */ object_file.tls_module_id,
-				/* dlpi_tls_data = */ object_file.tls_module_id == 0 ? 0 : loader->tls.get_addr(Thread::self(), object_file.tls_module_id, false)
-			);
+				/* dlpi_tls_data = */ object_file.tls_module_id == 0 ? 0 : loader->tls.get_addr(Thread::self(), object_file.tls_module_id, false));
 	loader->lookup_sync.read_unlock();
 
 	int ret = 0;

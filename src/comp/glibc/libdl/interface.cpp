@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #include "comp/glibc/libdl/interface.hpp"
 
 #include <dlh/log.hpp>
@@ -31,7 +35,7 @@ EXPORT void *dlopen(const char * filename, int flags) {
 }
 
 EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
-	LOG_TRACE << "GLIBC dlmopen(" << (int)lmid << ", " << filename << ", "  << flags << ")" << endl;
+	LOG_TRACE << "GLIBC dlmopen(" << static_cast<int>(lmid) << ", " << filename << ", "  << flags << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -159,13 +163,13 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 				return 0;
 			}
 		case RTLD_DI_ORIGIN:
-			*((const char**)info) = o->path.str;
+			*reinterpret_cast<const char**>(info) = o->path.str;
 			return 0;
 		case RTLD_DI_TLS_MODID:
-			*((size_t*)info) = o->tls_module_id;
+			*reinterpret_cast<size_t*>(info) = o->tls_module_id;
 			return 0;
 		case RTLD_DI_TLS_DATA:
-			*((uintptr_t*)info) = o->tls_offset == 0 ? 0 : loader->tls.get_addr(Thread::self(), o->tls_module_id, false);
+			*reinterpret_cast<uintptr_t*>(info) = o->tls_offset == 0 ? 0 : loader->tls.get_addr(Thread::self(), o->tls_module_id, false);
 			return 0;
 		default:
 			error_msg = "Unknown request for dlinfo!";
@@ -176,7 +180,7 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 
 
 EXPORT int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int flags) {
-	LOG_TRACE << "GLIBC dladdr(" << addr << ", " << (void*)info << ", " << (void*)extra_info << ", " << flags << ")" << endl;
+	LOG_TRACE << "GLIBC dladdr(" << addr << ", " << reinterpret_cast<void*>(info) << ", " << reinterpret_cast<void*>(extra_info) << ", " << flags << ")" << endl;
 	auto loader = Loader::instance();
 	assert(loader != nullptr);
 
@@ -196,7 +200,7 @@ EXPORT int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int fla
 		// TODO: How to handle loader->dynamicDlUpdate ?
 		info->dli_saddr = o->base + sym->value();
 		if (flags == GLIBC::DL::RTLD_DL_SYMENT)
-			*extra_info = (void *)(sym->_data);
+			*extra_info = const_cast<void*>(reinterpret_cast<const void *>(sym->_data));
 	} else {
 		info->dli_sname = nullptr;
 		info->dli_saddr = 0;
@@ -205,7 +209,7 @@ EXPORT int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int fla
 }
 
 EXPORT int dladdr(void *addr, GLIBC::DL::Info *info) {
-	LOG_TRACE << "GLIBC dladdr( " << addr << " ," << (void*)info << ")" << endl;
+	LOG_TRACE << "GLIBC dladdr( " << addr << " ," << reinterpret_cast<void*>(info) << ")" << endl;
 	return dladdr1(addr, info, 0, 0);
 }
 
@@ -263,7 +267,7 @@ EXPORT void *dlvsym(void *__restrict handle, const char *__restrict symbol, cons
 	return _dlvsym(handle, symbol, version, __builtin_extract_return_addr(__builtin_return_address(0)));
 }
 
-EXPORT void _dl_rtld_di_serinfo (GLIBC::DL::link_map *loader, GLIBC::DL::Serinfo *si, bool counting) {
+EXPORT void _dl_rtld_di_serinfo(GLIBC::DL::link_map *loader, GLIBC::DL::Serinfo *si, bool counting) {
 	(void) loader;
 	(void) si;
 	(void) counting;
