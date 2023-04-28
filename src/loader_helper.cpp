@@ -214,13 +214,13 @@ void Loader::helper_loop() {
 	Memory::set(&action, 0, sizeof(struct sigaction));
 	action.sa_handler = helper_signal;
 
-	if (auto sigaction = Syscall::sigaction(SIGTERM, &action, NULL); sigaction.failed())
+	if (auto sigaction = Syscall::sigaction(SIGTERM, &action, nullptr); sigaction.failed())
 		LOG_WARNING << "Unable to set helper loop signal handler for SIGTERM: " << sigaction.error_message() << endl;
-	if (auto sigaction = Syscall::sigaction(SIGABRT, &action, NULL); sigaction.failed())
+	if (auto sigaction = Syscall::sigaction(SIGABRT, &action, nullptr); sigaction.failed())
 		LOG_WARNING << "Unable to set helper loop signal handler for SIGABRT: " << sigaction.error_message() << endl;
-	if (auto sigaction = Syscall::sigaction(SIGSEGV, &action, NULL); sigaction.failed())
+	if (auto sigaction = Syscall::sigaction(SIGSEGV, &action, nullptr); sigaction.failed())
 		LOG_WARNING << "Unable to set helper loop signal handler for SIGSEGV: " << sigaction.error_message() << endl;
-	if (auto sigaction = Syscall::sigaction(SIGILL, &action, NULL); sigaction.failed())
+	if (auto sigaction = Syscall::sigaction(SIGILL, &action, nullptr); sigaction.failed())
 		LOG_WARNING << "Unable to set helper loop signal handler for SIGILL: " << sigaction.error_message() << endl;
 
 	if (auto prctl = Syscall::prctl(PR_SET_PDEATHSIG, SIGTERM); prctl.failed())
@@ -247,9 +247,9 @@ void Loader::helper_loop() {
 			if (gettime.failed()) {
 				LOG_ERROR << "Get monotonic coarse clock time failed: " << gettime.error_message() << endl;
 			}
-			if (poll > 0 && (fds[0].revents & POLLIN) != 0)
+			if (poll.value() > 0 && (fds[0].revents & POLLIN) != 0)
 				filemodification_detect(now, worklist_load);
-			if (poll > 0 && nfds > 1 && (fds[1].revents & POLLIN) != 0)
+			if (poll.value() > 0 && nfds > 1 && (fds[1].revents & POLLIN) != 0)
 				userfault_handle();
 			if (!worklist_load.empty())
 				filemodification_load(now, worklist_load, worklist_protect);

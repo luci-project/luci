@@ -54,7 +54,6 @@ bool Trampoline::allocate(const VersionedSymbol & sym, size_t & index) {
 	if ((symbols.size() + 1) / entries_per_block >= blocks.size()) {
 		// allocate new pages
 		if (auto mmap = Syscall::mmap(0, trampolines_block + Page::SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE)) {
-			uintptr_t memptr = mmap.value();
 			uint8_t * addr = reinterpret_cast<uint8_t*>(mmap.value());
 			uintptr_t * entry = reinterpret_cast<uintptr_t*>(mmap.value() + trampolines_block);
 			for (size_t i = 0; i < entries_per_block; i ++) {

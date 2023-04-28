@@ -9,6 +9,7 @@
 #include <dlh/types.hpp>
 #include <dlh/assert.hpp>
 #include <dlh/syscall.hpp>
+#include <dlh/utility.hpp>
 
 #include "object/identity.hpp"
 #include "comp/glibc/version.hpp"
@@ -195,7 +196,8 @@ static PatchSymbol symbol_fixes[] = {
 };
 
 static bool patch_using_symbol_fixes(Object & object) {
-	Optional<Elf::SymbolTable> symtab, dynsym;
+	Optional<Elf::SymbolTable> symtab;
+	Optional<Elf::SymbolTable> dynsym;
 	for (const auto & section : object.sections)
 		if (section.type() == Elf::SHT_DYNSYM)
 			dynsym.emplace(section.get_symbol_table());
@@ -228,11 +230,11 @@ static struct {
 #pragma GCC diagnostic pop
 
 static bool patch_using_offset_fixes(Object & object) {
-	if (sizeof(offset_fixes) > 0) {
+	if (count(offset_fixes) > 0) {
 		// This looks quite messy, but it is not as expensive as it looks on a first glimpse. And after all it is only a temporary hack
-		for (auto & section : object.sections)
+		for (const auto & section : object.sections)
 			if (section.type() == Elf::SHT_NOTE)
-				for (auto & note : section.get_notes())
+				for (const auto & note : section.get_notes())
 					if (note.name() != nullptr && String::compare(note.name(), "GNU") == 0 && note.type() == Elf::NT_GNU_BUILD_ID) {
 						for (const auto & offset_fix : offset_fixes)
 							if (note.size() == count(offset_fix.buildid) && Memory::compare(offset_fix.buildid, note.description(), note.size()) == 0) {

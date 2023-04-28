@@ -5,9 +5,9 @@
 #pragma once
 
 struct dl_exception {
-	const char *objname;
-	const char *errstring;
-	char *message_buffer;
+	const char *objname = nullptr;
+	const char *errstring = nullptr;
+	char *message_buffer = nullptr;
 };
 
 // extern "C" void _dl_exception_create(dl_exception *exception, const char *objname, const char *errstring):

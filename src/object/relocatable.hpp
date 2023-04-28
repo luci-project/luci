@@ -33,7 +33,7 @@ struct ObjectRelocatable : public Object {
 
 	Optional<VersionedSymbol> resolve_symbol(const char * name, uint32_t hash, uint32_t gnu_hash, const VersionedSymbol::Version & version) const override;
 	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr) const override;
-	Optional<ElfSymbolHelper> resolve_internal_symbol(const SymbolHelper & sym) const override;
+	Optional<ElfSymbolHelper> resolve_internal_symbol(const SymbolHelper & needle) const override;
 
 	void* relocate(const Elf::Relocation & reloc) const;
 

@@ -16,12 +16,12 @@
 
 EXPORT int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void *data), void *data) {
 	LOG_TRACE << "LIBGCC dl_iterate_phdr" << endl;
-	auto loader = Loader::instance();
+	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
 
 
 	// According to libc this should be limited to the namespace of the caller:
-	void *caller = __builtin_extract_return_addr(__builtin_return_address(0));
+	// void *caller = __builtin_extract_return_addr(__builtin_return_address(0));
 	// see https://elixir.bootlin.com/glibc/latest/source/elf/dl-iteratephdr.c
 	// We will ignore this for the moment.
 
@@ -43,7 +43,7 @@ EXPORT int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t siz
 
 	int ret = 0;
 	for (auto & info : infos)
-		if ((ret = callback(&info, sizeof(info), data)))
+		if ((ret = callback(&info, sizeof(info), data)) != 0)
 			break;
 
 	return ret;

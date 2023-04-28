@@ -35,9 +35,9 @@ static void * resolve_symbol(Loader & loader, const char *name) {
 }
 void * start_entry(Loader & loader) {
 	void * symptr = nullptr;
-	if ((symptr = resolve_symbol(loader, "_start"))) {
+	if ((symptr = resolve_symbol(loader, "_start")) != nullptr) {
 		return symptr;
-	} else if ((symptr = resolve_symbol(loader, "main"))) {
+	} else if ((symptr = resolve_symbol(loader, "main")) != nullptr) {
 		ptr_main = symptr;
 		if (ptr_libc_start_main == nullptr && (ptr_libc_start_main = resolve_symbol(loader, "__libc_start_main")) == nullptr) {
 			LOG_WARNING << "No `__libc_start_main` found -- using luci dummy to execute `main`" << endl;

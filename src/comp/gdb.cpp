@@ -19,22 +19,22 @@ namespace GDB {
 
 void notify(State state) {
 	r_debug.base.r_state = state;
-	if (r_debug.base.r_brk)
+	if (r_debug.base.r_brk != 0)
 		r_debug.base.r_brk();
 }
 
 static bool set_dynamic_debug(const ObjectIdentity * object) {
 	assert(object != nullptr);
-	if (object->dynamic != 0) {
-		for (auto dyn = reinterpret_cast<Elf::Dyn *>(object->dynamic); dyn->d_tag != Elf::DT_NULL; dyn++) {
-			if (dyn->d_tag == Elf::DT_DEBUG) {
-				auto current = object->current;
-				assert(current != nullptr);
-				current->compose_pointer(dyn)->d_un.d_ptr = reinterpret_cast<uintptr_t>(&r_debug);
-				current->finalize();
-				LOG_INFO << "GDB debug structure in " << *object << " at *" << &(dyn->d_un.d_ptr) << " = " << &r_debug << endl;
-				return true;
-			}
+	if (object->dynamic == 0)
+		return false;
+	for (Elf::Dyn * dyn = reinterpret_cast<Elf::Dyn *>(object->dynamic); dyn->d_tag != Elf::DT_NULL; dyn++) {
+		if (dyn->d_tag == Elf::DT_DEBUG) {
+			Object * current = object->current;
+			assert(current != nullptr);
+			current->compose_pointer(dyn)->d_un.d_ptr = reinterpret_cast<uintptr_t>(&r_debug);
+			current->finalize();
+			LOG_INFO << "GDB debug structure in " << *object << " at *" << &(dyn->d_un.d_ptr) << " = " << &r_debug << endl;
+			return true;
 		}
 	}
 	return false;

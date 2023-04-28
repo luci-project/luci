@@ -6,7 +6,9 @@
 
 #include <elfo/elf_rel.hpp>
 #include <dlh/log.hpp>
+#include <dlh/mem.hpp>
 #include <dlh/string.hpp>
+#include <dlh/utility.hpp>
 #include <dlh/auxiliary.hpp>
 
 #include "comp/glibc/patch.hpp"
@@ -43,7 +45,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
 			this->base = data.addr - this->virt_offset();
 		} else {
 			size_t max_size = 0;
-			for (auto & segment : this->segments)
+			for (const auto & segment : this->segments)
 				if (Elf::PT_LOAD == segment.type() && segment.virt_addr() + segment.virt_size() > max_size)
 					max_size = segment.virt_addr() + segment.virt_size();
 			this->base = file.loader.next_address(max_size);
@@ -54,8 +56,7 @@ ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, b
 
 
 void * ObjectDynamic::dynamic_resolve(size_t index) const {
-	auto r = relocate(dynamic_relocations_plt.at(index), file.flags.bind_not == 0);
-	return r;
+	return relocate(dynamic_relocations_plt.at(index), file.flags.bind_not == 0);
 }
 
 bool ObjectDynamic::preload() {
@@ -67,8 +68,8 @@ bool ObjectDynamic::preload() {
 
 
 void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
-	char str_copy[String::len(str)];
-	for (auto s : String::split_inplace(String::copy(str_copy, str), ':')) {
+	char str_copy[String::len(str) + 1];
+	for (const char * s : String::split_inplace(String::copy(str_copy, str), ':')) {
 		// Apply rpath token expansion if required
 		if (String::find(str, '$') != nullptr) {
 			// TODO: Here we allocate space which is never freed yet
@@ -77,7 +78,8 @@ void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
 
 			// Origin
 			size_t origin_len = this->file.path.len - this->file.name.len - 1;
-			char origin[origin_len + 1] = {};
+			char origin[origin_len + 1];  // NOLINT
+			Memory::set(origin, 0, origin_len + 1);
 			String::copy(origin, this->file.path.c_str(), origin_len);
 			String::replace_inplace(path, PATH_MAX, "$ORIGIN", origin);
 			String::replace_inplace(path, PATH_MAX, "${ORIGIN}", origin);
@@ -122,8 +124,8 @@ void ObjectDynamic::addpath(Vector<const char *> & vec, const char * str) {
 
 bool ObjectDynamic::compatibility_setup() {
 	if (this->file_previous == nullptr) {
-		for (auto &dyn : dynamic_table) {
-			if (dyn.tag() < 80)
+		for (const auto &dyn : dynamic_table) {
+			if (static_cast<size_t>(dyn.tag()) < count(this->file.libinfo))
 				this->file.libinfo[dyn.tag()] = dyn.ptr();
 		}
 	}
@@ -136,7 +138,7 @@ bool ObjectDynamic::preload_libraries() {
 
 	// load needed libaries
 	Vector<const char *> libs;
-	for (auto &dyn : dynamic_table) {
+	for (const auto &dyn : dynamic_table) {
 		switch (dyn.tag()) {
 			case Elf::DT_NEEDED:
 				libs.emplace_back(dyn.string());
@@ -199,7 +201,7 @@ bool ObjectDynamic::preload_libraries() {
 				skip = true;
 			}
 		if (!skip) {
-			auto o = file.loader.library(lib, flags, false, this->rpath, this->runpath, file.ns);
+			ObjectIdentity * o = file.loader.library(lib, flags, false, this->rpath, this->runpath, file.ns);
 			if (o == nullptr) {
 				LOG_WARNING << *this << " has an unresolved dependency: " << lib << endl;
 				success = false;
@@ -244,7 +246,7 @@ bool ObjectDynamic::prepare() {
 
 	// PLT relocations
 	if (!error && global_offset_table != 0) {
-		auto got = reinterpret_cast<uintptr_t *>(base + global_offset_table);
+		uintptr_t * got = reinterpret_cast<uintptr_t *>(base + global_offset_table);
 		// 3 predefined got entries:
 		// got[0] is pointer to _DYNAMIC
 		got[1] = reinterpret_cast<uintptr_t>(this);
@@ -285,7 +287,7 @@ bool ObjectDynamic::update() {
 
 void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fatal) const {
 	// Initialize relocator object
-	Relocator relocator(reloc, this->global_offset_table);
+	const Relocator relocator(reloc, this->global_offset_table);
 
 	// Since we have only a few segments, iterating is just fine
 	MemorySegment * seg = nullptr;
@@ -335,7 +337,7 @@ void* ObjectDynamic::relocate(const Elf::Relocation & reloc, bool fix, bool & fa
 		if (auto symbol = file.loader.resolve_symbol(need_symbol, file.ns, &file, mode)) {
 			// Update / add symbol to cache
 			relocations.insert(reloc, symbol.value());
-			auto & symobj = symbol->object();
+			const auto & symobj = symbol->object();
 
 			auto value = relocator.value_external(this->base, symbol.value(), symobj.base, 0, symobj.file.tls_module_id, symobj.file.tls_offset);
 			LOG_TRACE << "Relocating " << need_symbol << " in " << *this << " with " << symbol->name() << " from " << symobj << " to " << reinterpret_cast<void*>(value) <<  endl;

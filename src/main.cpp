@@ -208,7 +208,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			config_loader.detect_outdated = Loader::Config::DETECT_OUTDATED_VIA_UPROBES;
 			LOG_ERROR << "Invalid mode '" << opts.detectOutdated << "' for uprobe to detect outdated -- will use default uprobe" << endl;
 		}
-		if (File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "0"))
+		if (File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "0") != 0)
 			File::contents::set("/sys/kernel/debug/tracing/uprobe_events", nullptr);
 	} else {
 		LOG_ERROR << "Yet unsupported mode to detect outdated: " << opts.detectOutdated << endl;
@@ -404,7 +404,7 @@ int main(int argc, char* argv[]) {
 			assert(start != nullptr);
 
 			for (auto & lib : preload) {
-				if (auto loaded = loader->library(lib, loader->default_flags, true)) {
+				if (ObjectIdentity * loaded = loader->library(lib, loader->default_flags, true)) {
 					LOG_INFO << "Preloaded " << lib << ": " << *loaded << endl;
 				} else {
 					LOG_WARNING << "Unable to preload '" << lib << "'!" << endl;
@@ -416,7 +416,7 @@ int main(int argc, char* argv[]) {
 					if (lib[0] == ':') {
 						// Try as filename
 						lib++;
-						if (auto loaded = loader->library(lib, loader->default_flags)) {
+						if (ObjectIdentity * loaded = loader->library(lib, loader->default_flags)) {
 							LOG_INFO << "Loaded " << lib << ": " << *loaded << endl;
 						} else {
 							LOG_ERROR << "Library file '" << lib << "' not found!" << endl;
@@ -430,7 +430,7 @@ int main(int argc, char* argv[]) {
 						// Special case: shared libc is suffixed by '.6'
 						if (lib[0] == 'c' && lib[1] == '\0')
 							filename << ".6";
-						if (auto loaded = loader->library(filename.str(), loader->default_flags)) {
+						if (ObjectIdentity * loaded = loader->library(filename.str(), loader->default_flags)) {
 							LOG_INFO << "Loaded " << lib << ": " << *loaded << endl;
 						} else {
 							LOG_ERROR << "Library file '" << filename.str() << "' not found!" << endl;
@@ -477,7 +477,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		for (auto & lib : preload) {
-			if (auto loaded = loader->library(lib, loader->default_flags, true)) {
+			if (ObjectIdentity * loaded = loader->library(lib, loader->default_flags, true)) {
 				LOG_INFO << "Preloaded " << lib << ": " << *loaded << endl;
 			} else {
 				LOG_WARNING << "Unable to preload '" << lib << "'!" << endl;

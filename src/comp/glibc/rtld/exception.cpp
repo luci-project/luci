@@ -41,6 +41,8 @@ EXPORT int _dl_catch_exception(dl_exception *exception, void (*operate)(void *),
 	(void) exception;
 	(void) operate;
 	(void) args;
+	if (exception != nullptr)
+		*exception = dl_exception{};
 	LOG_WARNING << "GLIBC _dl_catch_exception not implemented!" << endl;
 	return 0;
 }
@@ -54,14 +56,13 @@ EXPORT void _dl_signal_error(int errcode, const char *objname, const char *occas
 	          << endl;
 }
 
-EXPORT int _dl_catch_error(const char **objname, const char **errstring, bool *mallocedp, void (*operate)(void *), void *args) {
-	(void) objname;
-	(void) errstring;
-	(void) mallocedp;
-	(void) operate;
-	(void) args;
-	LOG_WARNING << "GLIBC _dl_catch_error not implemented!" << endl;
-	return 0;
+EXPORT int _dl_catch_error(const char **objname, const char **errstring, bool * mallocedp, void (*operate)(void *), void *args) {
+	struct dl_exception exception;
+	int errorcode = _dl_catch_exception(&exception, operate, args);
+	*objname = exception.objname;
+	*errstring = exception.errstring;
+	*mallocedp = exception.message_buffer == exception.errstring;
+	return errorcode;
 }
 
 int _dl_check_caller(const void *caller, int mask) {
@@ -79,7 +80,7 @@ void _dl_error_free(void *ptr) {
 EXPORT void _dl_fatal_printf(const char *fmt, ...) {
 	va_list arg;
 	va_start(arg, fmt);
-	LOG_ERROR.output(fmt, arg);
+	LOG_ERROR.format(fmt, arg);
 	va_end(arg);
 	Syscall::exit(127);
 }

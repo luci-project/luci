@@ -242,5 +242,5 @@ struct Loader {
 	bool prepare(Object * start);
 
 	/*! \brief dump process contents of initial stack */
-	void show_init_stack(uintptr_t entry, uintptr_t stack_pointer, const char ** envp);
+	void show_init_stack(uintptr_t entry, uintptr_t stack_pointer, const char ** envp) const;
 };

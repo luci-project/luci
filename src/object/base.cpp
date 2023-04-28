@@ -41,7 +41,7 @@ Object::~Object() {
 	if (file.current == this) {
 		file.current = file_previous;
 	} else {
-		for (auto tmp = file.current; tmp != nullptr; tmp = tmp->file_previous) {
+		for (Object * tmp = file.current; tmp != nullptr; tmp = tmp->file_previous) {
 			if (tmp->file_previous == this) {
 				tmp->file_previous = file_previous;
 				break;
@@ -119,7 +119,7 @@ bool Object::is_latest_version() const {
 }
 
 bool Object::memory_range(uintptr_t & start, uintptr_t & end) const {
-	if (memory_map.size() > 0) {
+	if (!memory_map.empty()) {
 		start = memory_map.front().target.page_start();
 		end = memory_map.back().target.page_end();
 		return true;
@@ -243,7 +243,7 @@ size_t Object::version() const {
 
 
 uintptr_t Object::tls_address(uintptr_t value) const {
-	auto thread = Thread::self();
+	Thread * thread = Thread::self();
 	assert(thread != nullptr);
 
 	return file.loader.tls.get_addr(thread, file.tls_module_id) + file.tls_offset + value;

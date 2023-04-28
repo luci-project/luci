@@ -65,7 +65,7 @@ void Process::init(const Vector<const char *> &arg) {
 
 	// End marker
 	assert(reinterpret_cast<uintptr_t>(stack_pointer) % 8 == 0);
-	*reinterpret_cast<void**>(stack_pointer) = NULL;
+	*reinterpret_cast<void**>(stack_pointer) = nullptr;
 	stack_pointer -= sizeof(void*);
 
 	// environment strings
@@ -98,20 +98,20 @@ void Process::init(const Vector<const char *> &arg) {
 
 	const char ** ptr_addr = reinterpret_cast<const char**>(aux_addr);
 	// environment pointer
-	*(--ptr_addr) = NULL;
+	*(--ptr_addr) = nullptr;
 	for (auto & e : env_str)
 		*(--ptr_addr) = e;
 	envp = ptr_addr;
 
 	// argument array
-	*(--ptr_addr) = NULL;
+	*(--ptr_addr) = nullptr;
 	for (auto & e : arg_str) {
 		*(--ptr_addr) = e;
 	}
 	argv = ptr_addr;
 
 	// Set argument count
-	argc = arg.size();
+	argc = static_cast<int>(arg.size());
 	stack_pointer = reinterpret_cast<uintptr_t>(ptr_addr) - sizeof(void*);
 	*reinterpret_cast<void**>(stack_pointer) = reinterpret_cast<void*>(argc);
 }

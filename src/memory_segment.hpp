@@ -143,5 +143,5 @@ struct MemorySegment {
 
  private:
 	/*! \brief create shared memory fd for this segment */
-	int shmemfd();
+	int shmemfd() const;
 };

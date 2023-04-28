@@ -84,7 +84,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 }
 
 
-ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, Elf::ehdr_type & type) {
+ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, Elf::ehdr_type & type) const {
 	// Not updatable: Allow only one (current) version
 	if (!flags.updatable && current != nullptr) {
 		LOG_WARNING << "Cannot load new version of " << *this << " - updates are not allowed!" << endl;
@@ -226,7 +226,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 		auto pathlen = String::len(path) + 1;
 		char tmp[pathlen];  // NOLINT
 		String::copy(tmp, path, pathlen);
-		auto tmpfilename = const_cast<char*>(String::find_last(tmp, '/'));
+		char * tmpfilename = const_cast<char*>(String::find_last(tmp, '/'));
 		size_t bufferlen;
 		bool success;
 		if (tmpfilename == nullptr) {
@@ -278,8 +278,11 @@ ObjectIdentity::~ObjectIdentity() {
 			LOG_ERROR << "Removing watch for " << this->path << " failed: " << inotify.error_message() << endl;
 	}
 	// Delete all versions
-	while (current != nullptr)
+	while (current != nullptr) {
+		Object * prev = current->file_previous;
 		delete current;
+		current = prev;
+	}
 }
 
 
@@ -359,8 +362,8 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 		// Debug symbols
 		if (loader.config.find_debug_symbols) {
 			DebugSymbol dbgsym{path.c_str(), loader.config.debug_symbols_root};
-			const char * debug_link = dbgsym.link(*o);
-			auto debug_symbol_path = dbgsym.find(debug_link, o->build_id);
+			const char * debug_link = DebugSymbol::link(*o);
+			const char * debug_symbol_path = dbgsym.find(debug_link, o->build_id);
 			if (debug_symbol_path != nullptr) {
 				void * debug_data = File::contents::get(debug_symbol_path, o->debug_size);
 				if (debug_data != nullptr) {
@@ -466,7 +469,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 }
 
 
-bool ObjectIdentity::prepare() {
+bool ObjectIdentity::prepare() const {  // NOLINT
 	assert(current != nullptr);
 	switch (current->status) {
 		case Object::STATUS_MAPPED:
@@ -495,7 +498,7 @@ bool ObjectIdentity::prepare() {
 }
 
 
-bool ObjectIdentity::update() {
+bool ObjectIdentity::update() const {
 	bool success = true;
 	for (Object * c = current; c != nullptr; c = c->file_previous) {
 		LOG_DEBUG << "Updating relocations at " << *c << endl;
@@ -507,7 +510,7 @@ bool ObjectIdentity::update() {
 }
 
 
-bool ObjectIdentity::finalize() {
+bool ObjectIdentity::finalize() const {
 	bool success = true;
 	for (Object * c = current; c != nullptr; c = c->file_previous) {
 		LOG_DEBUG << "Finalizing " << *c << endl;
@@ -517,7 +520,7 @@ bool ObjectIdentity::finalize() {
 }
 
 
-bool ObjectIdentity::initialize() {
+bool ObjectIdentity::initialize() {  // NOLINT
 	assert(current != nullptr);
 	if (flags.initialized == 0) {
 		flags.initialized = 1;
@@ -535,10 +538,10 @@ bool ObjectIdentity::initialize() {
 }
 
 
-void ObjectIdentity::status(ObjectIdentity::Info info) {
+void ObjectIdentity::status(ObjectIdentity::Info msg) const {
 	if (loader.statusinfofd >= 0 && loader.target != nullptr) {
 		OutputStream<512> out(loader.statusinfofd);
-		switch (info) {
+		switch (msg) {
 			case INFO_ERROR_OPEN:          out << "ERROR (opening file failed)"; break;
 			case INFO_ERROR_STAT:          out << "ERROR (retrieving file status failed)"; break;
 			case INFO_ERROR_MAP:           out << "ERROR (mapping whole file into memory failed)"; break;

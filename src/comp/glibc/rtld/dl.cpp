@@ -26,11 +26,11 @@ void starting() {
 
 EXPORT ObjectIdentity *_dl_find_dso_for_object(uintptr_t addr) {
 	LOG_TRACE << "GLIBC _dl_find_dso_for_object( " << addr << ")" << endl;
-	auto loader = Loader::instance();
+	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
 
 	GuardedReader _{loader->lookup_sync};
-	auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
+	Object * o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
 	if (o != nullptr)
 		return &(o->file);
 	return nullptr;

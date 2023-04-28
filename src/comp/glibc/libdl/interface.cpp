@@ -11,13 +11,14 @@
 #include "object/base.hpp"
 #include "loader.hpp"
 
-const void* RTLD_NEXT = reinterpret_cast<void*>(-1l);
+const void* RTLD_NEXT = reinterpret_cast<void*>(-1L);
 const void* RTLD_DEFAULT = 0;
 
 // TODO: Should be __thread
 static const char * error_msg = nullptr;
 
-EXPORT int dlclose(void *) {
+EXPORT int dlclose(void * handle) {
+	(void)handle;
 	error_msg = "Unloading is not supported (yet)";
 	LOG_WARNING << "dlclose failed: " << error_msg << endl;
 	return -1;
@@ -36,7 +37,7 @@ EXPORT void *dlopen(const char * filename, int flags) {
 
 EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
 	LOG_TRACE << "GLIBC dlmopen(" << static_cast<int>(lmid) << ", " << filename << ", "  << flags << ")" << endl;
-	auto loader = Loader::instance();
+	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
 
 	ObjectIdentity::Flags objflags = loader->default_flags;
@@ -46,7 +47,7 @@ EXPORT void *dlmopen(GLIBC::DL::Lmid_t lmid, const char *filename, int flags) {
 	objflags.bind_deep = (flags & GLIBC::DL::RTLD_DEEPBIND) != 0;
 
 	GuardedWriter _{loader->lookup_sync};
-	auto r = loader->dlopen(filename, objflags, lmid, (flags & GLIBC::DL::RTLD_NOLOAD) == 0);
+	ObjectIdentity * r = loader->dlopen(filename, objflags, lmid, (flags & GLIBC::DL::RTLD_NOLOAD) == 0);
 	if (r == nullptr) {
 		error_msg = "Unable to open shared object!";
 		LOG_WARNING << "dl[m]open of " << filename << " failed: " << error_msg << endl;
@@ -87,11 +88,11 @@ enum : int {
 
 EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info) {
 	LOG_TRACE << "GLIBC dlinfo(" << handle << ", "  << request << ", " << info << ")" << endl;
-	auto loader = Loader::instance();
+	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
 
 	GuardedReader _{loader->lookup_sync};
-	auto o = reinterpret_cast<const ObjectIdentity *>(handle);
+	const ObjectIdentity * o = reinterpret_cast<const ObjectIdentity *>(handle);
 	if (!loader->is_loaded(o)) {
 		error_msg = "Invalid handle for dlinfo!";
 		LOG_WARNING << error_msg << endl;
@@ -125,7 +126,7 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 				size_t cnt = 0;
 				size_t len = 0;
 				for (const auto & path : { o->current->rpath, loader->library_path_runtime, o->current->runpath, loader->library_path_config, loader->library_path_default }) {
-					for (auto & dir : path) {
+					for (const auto & dir : path) {
 						cnt++;
 						len += String::len(dir) + 1;
 					}
@@ -144,7 +145,7 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 				size_t buf_pos = sizeof(GLIBC::DL::Serinfo) + reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_cnt * sizeof(GLIBC::DL::Serinfo::Serpath);
 				size_t lib = 0;
 				for (const auto & path : { o->current->rpath, loader->library_path_runtime, o->current->runpath, loader->library_path_config, loader->library_path_default }) {
-					for (auto & dir : path) {
+					for (const auto & dir : path) {
 						size_t len = String::len(dir) + 1;
 						if (reinterpret_cast<GLIBC::DL::Serinfo*>(info)->dls_cnt <= lib) {
 							error_msg = "Info buffer too small for number of libraries!";
@@ -181,11 +182,11 @@ EXPORT int dlinfo(void * __restrict handle, int request, void * __restrict info)
 
 EXPORT int dladdr1(void *addr, GLIBC::DL::Info *info, void **extra_info, int flags) {
 	LOG_TRACE << "GLIBC dladdr(" << addr << ", " << reinterpret_cast<void*>(info) << ", " << reinterpret_cast<void*>(extra_info) << ", " << flags << ")" << endl;
-	auto loader = Loader::instance();
+	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
 
 	GuardedReader _{loader->lookup_sync};
-	auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
+	Object * o = loader->resolve_object(reinterpret_cast<uintptr_t>(addr));
 	if (o == nullptr)
 		return 0;
 
@@ -214,17 +215,17 @@ EXPORT int dladdr(void *addr, GLIBC::DL::Info *info) {
 }
 
 static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, const char *__restrict version, void * caller) {
-	auto loader = Loader::instance();
+	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
 
 	GuardedWriter _{loader->lookup_sync};
 	Optional<VersionedSymbol> r;
 	if (handle == RTLD_DEFAULT || handle == RTLD_NEXT) {
-		auto o = loader->resolve_object(reinterpret_cast<uintptr_t>(caller));
+		Object * o = loader->resolve_object(reinterpret_cast<uintptr_t>(caller));
 		assert(o != nullptr);
 		r = loader->resolve_symbol(symbol, version, o->file.ns, &(o->file), handle == RTLD_NEXT ? Loader::RESOLVE_AFTER_OBJECT : Loader::RESOLVE_DEFAULT);
 	} else {
-		auto o = reinterpret_cast<const ObjectIdentity *>(handle);
+		const ObjectIdentity * o = reinterpret_cast<const ObjectIdentity *>(handle);
 		if (!loader->is_loaded(o)) {
 			error_msg = "Invalid handle for dl[v]sym!";
 			LOG_WARNING << error_msg << endl;
@@ -235,13 +236,13 @@ static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, con
 	}
 
 	if (r && r->valid()) {
-		auto & identity = r->object().file;
+		const ObjectIdentity & identity = r->object().file;
 		// Assert the object is from the latest update
 		assert(identity.current == &(r->object()));
-		auto ptr = r->pointer();
+		auto * ptr = r->pointer();
 		// Use trampolines
 		if (ptr != nullptr && loader->config.dynamic_dlupdate && (r->type() == Elf::STT_FUNC || r->type() == Elf::STT_GNU_IFUNC)) {
-			auto tptr = loader->dlsyms.set(r.value());
+			auto * tptr = loader->dlsyms.set(r.value());
 			LOG_TRACE <<  "Symbol " << symbol  << " using trampoline " << tptr << " --> " << ptr << endl;
 			assert(tptr != nullptr);
 			return tptr;

@@ -43,7 +43,7 @@ bool MemorySegment::map() {
 
 	int flags =  MAP_FIXED_NOREPLACE;
 	int fd = -1;
-	int offset = 0;
+	off_t offset = 0;
 	int protection = target.protection | (copy || writable || target.relro ? PROT_WRITE : 0);
 
 	if (writable && source.object.use_data_alias()) {
@@ -55,7 +55,7 @@ bool MemorySegment::map() {
 			if ((target.fd = shmemfd()) == -1)
 				return false;
 			// This will zero the contents
-			if (auto ftruncate = Syscall::ftruncate(target.fd, target.page_size())) {
+			if (auto ftruncate = Syscall::ftruncate(target.fd, static_cast<off_t>(target.page_size()))) {
 				// TODO madvise(MADV_DONTFORK)
 				// Seal
 				if (auto fcntl = Syscall::fcntl(target.fd, F_ADD_SEALS, F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL); fcntl.failed()) {
@@ -78,7 +78,7 @@ bool MemorySegment::map() {
 		flags |= MAP_PRIVATE;
 		auto page_offset = target.address() % Page::SIZE;
 		assert(page_offset < Page::SIZE && source.offset >= page_offset);
-		offset = source.offset - page_offset;
+		offset = static_cast<off_t>(source.offset - page_offset);
 	}
 
 	LOG_DEBUG << "Mapping " << target.page_size() << " Bytes (fd " << fd << ") at " << reinterpret_cast<void*>(target.page_start()) << "..." << endl;
@@ -289,7 +289,7 @@ int MemorySegment::shmemdup() {
 			// Try fast copy
 			off_t off_target = 0;
 			off_t off_tmp = 0;
-			ssize_t len = target.page_size();
+			ssize_t len = static_cast<ssize_t>(target.page_size());
 			while (true) {
 				if (auto cfr = Syscall::copy_file_range(target.fd, &off_target, tmpfd, &off_tmp, len)) {
 					if ((len -= cfr.value()) <= 0) {
@@ -305,7 +305,7 @@ int MemorySegment::shmemdup() {
 			}
 
 			// This will zero the contents
-			if (auto ftruncate = Syscall::ftruncate(tmpfd, target.page_size())) {
+			if (auto ftruncate = Syscall::ftruncate(tmpfd, static_cast<off_t>(target.page_size()))) {
 				// Seal
 				if (auto fcntl = Syscall::fcntl(tmpfd, F_ADD_SEALS, F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL); fcntl.failed()) {
 					LOG_WARNING << "Sealing shared memory failed: " << fcntl.error_message() << endl;
@@ -332,7 +332,7 @@ int MemorySegment::shmemdup() {
 }
 
 
-int MemorySegment::shmemfd() {
+int MemorySegment::shmemfd() const {
 	// Create shared memory for data
 	StringStream<NAME_MAX + 1> shdatastr;
 	shdatastr << source.object.file.name.str;
@@ -390,7 +390,7 @@ void MemorySegment::dump(Log::Level level) const {
 			if (i < size) {
 				uint8_t byte = reinterpret_cast<uint8_t*>(data)[i];
 				logger.append().format("%02x ", byte);
-				buf[i % 16] = byte >= 32 && byte < 127 ? byte : '.';
+				buf[i % 16] = byte >= 32 && byte < 127 ? static_cast<char>(byte) : '.';
 			} else {
 				logger.append().format("   ");
 				buf[i % 16] = ' ';

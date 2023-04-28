@@ -26,7 +26,7 @@ size_t TLS::add_module(ObjectIdentity & object, size_t size, size_t align, uintp
 		// increase intital TLS size
 		initial_size += Math::align_up(size, initial_align);
 		// Offset to thread pointer
-		offset = initial_size;
+		offset = static_cast<intptr_t>(initial_size);
 	} else {
 		// dynamic modules have no fixed offset
 		offset = 0;
@@ -114,7 +114,7 @@ void TLS::dtv_free(Thread * thread) {
 }
 
 void TLS::dtv_copy(Thread * thread, size_t module_id, void * ptr) const {
-	auto & module = modules[module_id - 1];
+	const Module & module = modules[module_id - 1];
 	assert(!thread->dtv[module_id].allocated());
 	auto & dtv_ptr = thread->dtv[module_id].pointer;
 

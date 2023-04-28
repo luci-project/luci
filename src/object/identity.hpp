@@ -127,7 +127,7 @@ private:
 	bool watch(bool force = false, bool close_existing = true);
 
 	/*! \brief Open file (map into memory) */
-	Info open(uintptr_t addr, Object::Data & data, Elf::ehdr_type & type);
+	Info open(uintptr_t addr, Object::Data & data, Elf::ehdr_type & type) const;
 
 	/*! \brief create new object instance */
 	Pair<Object *, enum Info> create(Object::Data & data, Elf::ehdr_type type);
@@ -136,19 +136,19 @@ private:
 	bool memdup(Object::Data & data);
 
 	/*! \brief Prepare dependencies */
-	bool prepare();
+	bool prepare() const;
 
 	/*! \brief Update relocations */
-	bool update();
+	bool update() const;
 
 	/*! \brief Update mapping and set protection in memory */
-	bool finalize();
+	bool finalize() const;
 
 	/*! \brief call initializer */
 	bool initialize();
 
 	/*! \brief send status info message */
-	void status(Info msg);
+	void status(Info msg) const;
 
  public:
 	/*! \brief Load/get current version

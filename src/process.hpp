@@ -11,7 +11,7 @@
 class Process {
 	/*! \brief allocate Stack
 	 */
-	uintptr_t allocate_stack(size_t stack_size);
+	static uintptr_t allocate_stack(size_t stack_size);
 
  public:
 	/*! \brief argument count

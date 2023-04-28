@@ -90,7 +90,7 @@ static __attribute__((unused)) void _dl_wait_lookup_done() {
 EXPORT void _dl_debug_printf(const char *fmt, ...) {
 	va_list arg;
 	va_start(arg, fmt);
-	LOG_DEBUG.output(fmt, arg);
+	LOG_DEBUG.format(fmt, arg);
 	va_end(arg);
 }
 
@@ -117,7 +117,8 @@ static __attribute__((unused)) void * _dl_open(const char *file, int mode, const
 	return nullptr;
 }
 
-static __attribute__((unused)) void _dl_close(void *) {
+static __attribute__((unused)) void _dl_close(void * handle) {
+	(void)handle;
 	LOG_ERROR << "GLIBC _dl_close not implemented" << endl;
 }
 
@@ -128,7 +129,7 @@ static __attribute__((unused)) void _dl_libc_freeres() {
 
 static int _dl_find_object(uintptr_t address, GLIBC::RTLD::GlobalRO::dl_find_object * result) {
 	LOG_TRACE << "GLIBC _dl_find_object(" << reinterpret_cast<void*>(address) << ", " << result << ")" << endl;
-	auto loader = Loader::instance();
+	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
 
 	GuardedReader _{loader->lookup_sync};
@@ -183,7 +184,7 @@ void init_globals(const Loader & loader) {
 		const auto & aux = auxv[auxc];
 		switch (aux.a_type) {
 			case Auxiliary::AT_CLKTCK:
-				rtld_global_ro._dl_clktck = aux.value();
+				rtld_global_ro._dl_clktck = static_cast<int>(aux.value());
 				break;
 			case Auxiliary::AT_PAGESZ:
 				rtld_global_ro._dl_pagesize = aux.value();
@@ -214,29 +215,29 @@ void init_globals(const Loader & loader) {
 #endif
 
 			case Auxiliary::AT_UID:
-				uid ^= aux.value();
+				uid ^= static_cast<int>(aux.value());
 				seen |= 1;
 				break;
 			case Auxiliary::AT_EUID:
-				uid ^= aux.value();
+				uid ^= static_cast<int>(aux.value());
 				seen |= 2;
 				break;
 			case Auxiliary::AT_GID:
-				gid ^= aux.value();
+				gid ^= static_cast<int>(aux.value());
 				seen |= 4;
 				break;
 			case Auxiliary::AT_EGID:
-				gid ^= aux.value();
+				gid ^= static_cast<int>(aux.value());
 				seen |= 8;
 				break;
 			case Auxiliary::AT_SECURE:
 				seen = -1;
-				__libc_enable_secure = aux.value();
+				__libc_enable_secure = static_cast<int>(aux.value());
 				break;
 		}
 	}
 	if (seen == 0xf) {
-		__libc_enable_secure = uid != 0 || gid != 0;
+		__libc_enable_secure = static_cast<int>(uid != 0 || gid != 0);
 	}
 
 	(void) sysinfo;

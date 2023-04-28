@@ -17,7 +17,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 	asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
 #endif
 
-	auto loader = Loader::instance();
+	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
 
 	// Prevent modifications during fork
@@ -25,10 +25,10 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 
 	HashMap<int, int> replace_fd;
 	if (loader->config.dynamic_update) {
-		for (auto & i : loader->lookup)
-			for (auto o = i.current; o != nullptr; o = o->file_previous)
-				for (auto & m : o->memory_map) {
-					int old_fd = m.target.fd;
+		for (const ObjectIdentity & i : loader->lookup)
+			for (Object * o = i.current; o != nullptr; o = o->file_previous)
+				for (MemorySegment & m : o->memory_map) {
+					const int old_fd = m.target.fd;
 					if (old_fd != -1 && !replace_fd.contains(old_fd)) {
 						int new_fd = m.shmemdup();
 						assert(new_fd != -1);
@@ -41,13 +41,13 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 
 	pid_t child = 0;
 	int r = -1;
-	if (auto clone = Syscall::clone(CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | SIGCHLD, 0, NULL, &child, 0)) {
+	if (auto clone = Syscall::clone(CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | SIGCHLD, 0, nullptr, &child, 0)) {
 		if (clone.success() && (r = clone.value()) == 0) {
 			// Remap
 			int remaps = 0;
-			for (auto & i : loader->lookup)
-				for (auto o = i.current; o != nullptr; o = o->file_previous)
-					for (auto & m : o->memory_map) {
+			for (ObjectIdentity & i : loader->lookup)
+				for (Object * o = i.current; o != nullptr; o = o->file_previous)
+					for (MemorySegment & m : o->memory_map) {
 						int old_fd = m.target.fd;
 						if (old_fd != -1) {
 							int new_fd = replace_fd[old_fd];

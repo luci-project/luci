@@ -429,7 +429,7 @@ static_assert(_count == GLIBC_TUNABLE_COUNT, "Wrong number of tunables for " OSN
 
 #define TUNABLE_VALUE(TOP, NS, ID, TYPE, MIN, MAX, VAL, INIT, SECURITY, ALIAS) { #TOP "." #NS "." #ID, {Tunable::TYPE, static_cast<int64_t>(MIN), static_cast<int64_t>(MAX) }, VAL, INIT, Tunable::SECURITY, ALIAS },
 
-struct Tunable {
+struct Tunable {  // NOLINT
 	/* Internal name of the tunable.  */
 #if GLIBC_VERSION >= GLIBC_2_33
 	const char name[42];

@@ -119,7 +119,7 @@ ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags fl
 		// only file name provided - look for it in search paths
 		if (path == name) {
 			for (const auto & path : { rpath, library_path_runtime, runpath, library_path_config, library_path_default }) {
-				for (auto & dir : path)
+				for (const auto & dir : path)
 					if ((lib = open(filename, dir, flags, priority, ns)) != nullptr)
 						return lib;
 			}
@@ -147,7 +147,7 @@ ObjectIdentity * Loader::open(const char * filename, const char * directory, Obj
 }
 
 
-ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags, bool priority, namespace_t ns, uintptr_t addr, Elf::ehdr_type type) {
+ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags, bool priority, namespace_t ns, uintptr_t addr, Elf::ehdr_type type) {  // NOLINT
 	// Does file contain a valid full path or do we have a memory address?
 	if (addr != 0 || File::exists(filepath)) {
 		if (ns == NAMESPACE_NEW)
@@ -183,7 +183,7 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 
 			if (!priority && dependencies == lookup.end())
 				dependencies = i;
-			auto o = i->load(addr, type);
+			Object * o = i->load(addr, type);
 			GDB::notify(GDB::RT_CONSISTENT);
 			if (o != nullptr) {
 				return i.operator->();
@@ -426,7 +426,7 @@ static void show_auxv(T &stream, const char ** envp) {
 	stream << endl;
 }
 
-void Loader::show_init_stack(uintptr_t entry, uintptr_t stack_pointer, const char ** envp) {
+void Loader::show_init_stack(uintptr_t entry, uintptr_t stack_pointer, const char ** envp) const {
 	if (config.show_args) {
 		cerr << "Arguments for 0x" << reinterpret_cast<void*>(entry) << " (with stackpointer at 0x" << reinterpret_cast<void*>(stack_pointer) << "):" << endl;
 		show_args(cerr, stack_pointer);
@@ -461,7 +461,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	assert(start != nullptr);
 	assert(start->file_previous == nullptr);
 
-	if (start->memory_map.size() == 0)
+	if (start->memory_map.empty())
 		return false;
 
 	// Executables (and dyn. Objects) will be initialized in _start automatically
@@ -472,7 +472,7 @@ bool Loader::run(ObjectIdentity * file, const Vector<const char *> & args, uintp
 	Process p(stack_pointer, stack_size);
 
 	// TODO: Should not be hard coded...
-	p.aux[Auxiliary::AT_PHDR] = start->base + start->header.e_phoff;
+	p.aux[Auxiliary::AT_PHDR] = static_cast<long>(start->base + start->header.e_phoff);
 	p.aux[Auxiliary::AT_PHNUM] = start->header.e_phnum;
 
 	p.init(args);
@@ -509,7 +509,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 	assert(start != nullptr);
 	assert(start->file_previous == nullptr);
 
-	if (start->memory_map.size() == 0)
+	if (start->memory_map.empty())
 		return false;
 
 	// Executed binary will be initialized in _start automatically
@@ -533,7 +533,7 @@ bool Loader::run(ObjectIdentity * file, uintptr_t stack_pointer, const char * en
 		for (size_t curr = 0; curr < envc; curr++)
 			if (*(this->envp[curr]) == '\0') {
 				while (*(this->envp[--envc]) == '\0' && envc > curr) {}
-				auto tmp = this->envp[envc];
+				const char * tmp = this->envp[envc];
 				this->envp[envc] = this->envp[curr];
 				this->envp[curr] = tmp;
 			}
@@ -618,7 +618,7 @@ Optional<VersionedSymbol> Loader::resolve_symbol(const char * name, uint32_t has
 
 
 Optional<VersionedSymbol> Loader::resolve_symbol(uintptr_t addr, namespace_t ns) const {
-	auto o = resolve_object(addr, ns);
+	Object * o = resolve_object(addr, ns);
 	if (o != nullptr)
 		return o->resolve_symbol(addr);
 	return {};
@@ -629,7 +629,7 @@ Object * Loader::resolve_object(uintptr_t addr, namespace_t ns) const {
 	for (const auto & object_file : lookup) {
 		if (object_file.ns != ns)
 			continue;
-		for (auto o = object_file.current; o != nullptr; o = o->file_previous) {
+		for (Object * o = object_file.current; o != nullptr; o = o->file_previous) {
 			for (const auto & mem : o->memory_map) {
 				if (addr >= mem.target.address() && addr <= mem.target.address() + mem.target.size)
 					return o;
@@ -641,7 +641,9 @@ Object * Loader::resolve_object(uintptr_t addr, namespace_t ns) const {
 
 
 uintptr_t Loader::next_address(size_t size) const {
-	uintptr_t start = 0, end = 0, next = next_library_address;
+	uintptr_t start = 0;
+	uintptr_t end = 0;
+	uintptr_t next = next_library_address;
 	for (const auto & object_file : lookup)
 		for (Object * obj = object_file.current; obj != nullptr; obj = obj->file_previous)
 			if (obj->memory_range(start, end) && end > next && (BASEADDRESS < LIBADDRESS || end < BASEADDRESS))

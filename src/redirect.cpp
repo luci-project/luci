@@ -52,11 +52,12 @@ static RWLock redirection_sync;
 /*! \brief Helper to get compositing buffer
  * \param object the object containing the address
  * \param address the address in object which should be modified (redirected)
- * \oaram seg if pointer is set, the memory segment will be stored in it
+ * \param seg if pointer is set, the memory segment will be stored in it
+ * \note memory_map must not be modified as long as `seg` is used!
  * \return pointer to the address in compositing buffer
  */
 static uint8_t * mem(Object & object, uintptr_t address, MemorySegment ** seg = nullptr) {
-	for (auto m : object.memory_map) {
+	for (MemorySegment & m : object.memory_map) {
 		uintptr_t start = m.target.address();
 		if (address >= start && address < start + m.target.size) {
 			uintptr_t buffer = m.compose();
@@ -91,7 +92,7 @@ static bool is_numeric(const char * str) {
  */
 static bool all_tasks(TreeSet<pid_t> & tids) {
 	pid_t tid;
-	auto handler_thread = Loader::instance()->handler_thread;
+	Thread * handler_thread = Loader::instance()->handler_thread;
 	pid_t helper_tid = handler_thread != nullptr ? handler_thread->tid : -1;
 	for (auto e : Directory("/proc/self/task"))
 		if (is_numeric(e.name()) && Parser::string(tid, e.name()) && tid != helper_tid && !tids.contains(tid))
@@ -117,7 +118,7 @@ static bool check_relative_jump(uintptr_t from, uintptr_t to) {
  */
 static bool static_redirect(Object & object, uintptr_t from, uintptr_t to) {
 	MemorySegment * seg = nullptr;
-	auto m = mem(object, from, &seg);
+	uint8_t * m = mem(object, from, &seg);
 	if (m == nullptr)
 		return false;
 
@@ -210,7 +211,7 @@ static bool install_trap_handler() {
 		stack.ss_sp = reinterpret_cast<void*>(trap_handler_stack);
 		stack.ss_size = count(trap_handler_stack);
 		stack.ss_flags = 0;
-		if (auto sigaltstack = Syscall::sigaltstack(&stack, NULL)) {
+		if (auto sigaltstack = Syscall::sigaltstack(&stack, nullptr)) {
 			LOG_DEBUG << "Trap signal handler will use stack at " << stack.ss_sp << " (" << stack.ss_size << " Bytes)" << endl;
 		} else {
 			LOG_ERROR << "Setting alternative stack " << stack.ss_sp << " (" << stack.ss_size << " Bytes) for trap signal handler failed: " << sigaltstack.error_message() << endl;
@@ -221,7 +222,7 @@ static bool install_trap_handler() {
 		action.sa_flags = SA_ONSTACK | SA_SIGINFO;
 		action.sa_sigaction = trap_handler;      /* Address of a signal handler */
 		// TODO: Benchmark performance between trap and illegal opcode signal
-		if (auto sigaction = Syscall::sigaction(SIGTRAP, &action, NULL)) {
+		if (auto sigaction = Syscall::sigaction(SIGTRAP, &action, nullptr)) {
 			installed = true;
 			LOG_INFO << "Installed trap signal handler" << endl;
 		} else {

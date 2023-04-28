@@ -56,5 +56,5 @@ bool ObjectExecutable::preload_segments(bool setup_relro) {
 		}
 	}
 
-	return memory_map.size() > 0;
+	return !memory_map.empty();
 }
