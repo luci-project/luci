@@ -230,7 +230,7 @@ static struct {
 #pragma GCC diagnostic pop
 
 static bool patch_using_offset_fixes(Object & object) {
-	if (count(offset_fixes) > 0) {
+	if (sizeof(offset_fixes) != 0) {
 		// This looks quite messy, but it is not as expensive as it looks on a first glimpse. And after all it is only a temporary hack
 		for (const auto & section : object.sections)
 			if (section.type() == Elf::SHT_NOTE)
