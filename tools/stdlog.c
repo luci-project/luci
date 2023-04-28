@@ -1,3 +1,7 @@
+// Luci - a dynamic linker/loader with DSU capabilities
+// Copyright 2021-2023 by Bernhard Heinloth <heinloth@cs.fau.de>
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /* STDLOG
 enables logging of standard streams
 
@@ -32,9 +36,7 @@ or
 #include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
 #include <sys/sendfile.h>
@@ -67,14 +69,14 @@ static int pidfd_send_signal(int pidfd, int sig, siginfo_t *info, unsigned int f
 		dprintf(STDERR_FILENO, __VA_ARGS__);         \
 		write_all(STDERR_FILENO, " - abort!\n", 9);  \
 		exit(EXIT_FAILURE);                          \
-	} while(0)
+	} while (0)
 
 #define errno_message(...)                                  \
 	do {                                                    \
 		dprintf(STDERR_FILENO, __VA_ARGS__);                \
 		dprintf(STDERR_FILENO, ": %s\n", strerror(errno));  \
 		exit(EXIT_FAILURE);                                 \
-	} while(0)
+	} while (0)
 
 #define verbose_message(...)                      \
 	do {                                          \
@@ -82,7 +84,7 @@ static int pidfd_send_signal(int pidfd, int sig, siginfo_t *info, unsigned int f
 			dprintf(STDERR_FILENO, __VA_ARGS__);  \
 			write_all(STDERR_FILENO, "\n", 1);    \
 		}                                         \
-	} while(0)
+	} while (0)
 
 
 
@@ -173,10 +175,10 @@ static void write_all(int fd, const void *buf, size_t count) {
 
 static void redirect(int from, target_t * to, size_t tos, bool ignore_read_error) {
 	time_t ts = 0;
-	struct tm *tm = NULL;
-	struct tm *tr = NULL;
+	struct tm tm = {};
+	struct tm tr = {};
 
-	char buf[chunk_size];
+	char buf[chunk_size];  // NOLINT
 	ssize_t len;
 
 	while ((len = read(from, buf, chunk_size)) > 0) {
@@ -189,17 +191,17 @@ static void redirect(int from, target_t * to, size_t tos, bool ignore_read_error
 						// Is [cached] prefix fresh?
 						if (ts != to[t].prefix_update && (ts != 0 || (ts = time(NULL)) != to[t].prefix_update)) {
 							if (!to[t].prefix_relative) {
-								if (tm == NULL && (tm = localtime(&ts)) == NULL)
+								if (tm.tm_year == 0 && localtime_r(&ts, &tm) == NULL)
 									errno_message("Converting %ld to localtime failed", ts);
-							} else if (tr == NULL) {
+							} else if (tr.tm_year == 0) {
 								time_t r = ts - start;
-								if ((tr = localtime(&r)) == NULL)
+								if (localtime_r(&r, &tr) == NULL)
 									errno_message("Converting relative %ld to localtime failed", r);
 							}
 							// Format time to prefix
 							if (ts != to[t].prefix_update) {
 								to[t].prefix_update = ts;
-								to[t].prefix_len = strftime(to[t].prefix, sizeof(to[t].prefix), to[t].prefix_format, to[t].prefix_relative ? tr : tm);
+								to[t].prefix_len = strftime(to[t].prefix, sizeof(to[t].prefix), to[t].prefix_format, to[t].prefix_relative ? &tr : &tm);
 							}
 						}
 						// Print prefix
@@ -246,7 +248,6 @@ static bool epoll_handle(int from, target_t * to, size_t tos, uint32_t event, bo
 			close(from);
 			return false;
 	}
-
 }
 
 static target_t * add_target(enum Stream s) {
@@ -439,7 +440,6 @@ int main(int argc, char * argv[]) {
 					break;
 			}
 		}
-
 	}
 
 	// Read terminal settings
@@ -618,7 +618,6 @@ int main(int argc, char * argv[]) {
 				// Deregister an FD
 				if (deregister)
 					epoll_ctl(epollfd, EPOLL_CTL_DEL, events[n].data.fd, NULL);
-
 			}
 		}
 

@@ -199,7 +199,7 @@ LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
 ../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF" || true
 
 if $DEBUG_OUTPUT ; then
-	make -C ../tools stdlog
+	make -C "${BASEDIR}/../tools" stdlog
 fi
 
 echo -e "\n\e[1;4mRunning Tests on ${OS} ${OSVERSION} (${PLATFORM}) with ${COMPILER}\e[0m"
@@ -303,7 +303,7 @@ for TEST in ${TESTS} ; do
 
 		(
 			if ${DEBUG_OUTPUT} ; then
-				exec ../../tools/stdlog -t -e "$STDERR" -e- -o "$STDOUT" -o- "./${EXEC}"
+				exec "$BASEDIR/../tools/stdlog" -t -e "$STDERR" -e- -o "$STDOUT" -o- "./${EXEC}"
 			else
 				exec "./${EXEC}" 2>"$STDERR" >"$STDOUT"
 			fi

@@ -10,6 +10,12 @@ BUILDDIR ?= .build-$(OS)-$(OSVERSION)-$(PLATFORM)
 LIBBEAN = bean/libbean.a
 CXX = g++
 
+CPPLINT ?= cpplint
+CPPLINTIGNORE := bean test old test-old
+TIDY ?= clang-tidy
+TIDYCONFIG ?= .clang-tidy
+
+
 # Debian stretch only supports DWARF 4
 DWARFVERSION := 4
 
@@ -166,6 +172,18 @@ $(LIBPATH_CONF): /etc/ld.so.conf gen-libpath.sh
 $(LDLUCI_CONF): example.conf
 	$(VERBOSE) mkdir -p $(dir $@)
 	$(VERBOSE) cp $< $@
+
+lint::
+	@if $(CPPLINT) --quiet --recursive $(addprefix --exclude=,$(CPPLINTIGNORE)) . ; then \
+		echo "Congratulations, coding style obeyed!" ; \
+	else \
+		echo "Coding style violated -- see CPPLINT.cfg for details" ; \
+		exit 1 ; \
+	fi
+
+tidy:: $(TIDYCONFIG)
+	$(VERBOSE) $(TIDY) --config-file=$< --header-filter="^(?!.*(/capstone/|/test/))" --system-headers $(SOURCES) -- -stdlib=libc++ $(CXXFLAGS) -D__MODULE__="$(NAME)" $(COMPATIBILITY_MACROS)
+
 
 clean::
 	$(VERBOSE) rm -f $(DEPFILES) $(OBJECTS)

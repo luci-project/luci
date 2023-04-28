@@ -16,6 +16,12 @@ Finally, we might include this in a kernel in the future (with has no standard l
 For Linux, all required system call wrapper are embedded (copied from musl libc and glibc).
 
 
+Author & License
+----------------
+
+The *Luci*-project is being developed by [Bernhard Heinloth](https://sys.cs.fau.de/person/heinloth) of the [Department of Computer Science 4](https://sys.cs.fau.de/) at [Friedrich-Alexander-Universität Erlangen-Nürnberg](https://www.fau.eu/) and is available under the [GNU Affero General Public License, Version 3 (AGPL v3)](LICENSE.md).
+
+
 Related Work
 ------------
 

@@ -1,0 +1,5 @@
+---
+FormatStyle: google
+Checks: 'clang-diagnostic-*,clang-analyzer-*,misc-*,readability-*,google-readability-casting,google-explicit-constructor,bugprone*,-readability-magic-numbers,-readability-braces-around-statements,-readability-identifier-length,-readability-else-after-return,-readability-const-return-type,-readability-function-cognitive-complexity,-readability-use-anyofallof,-bugprone-easily-swappable-parameters,-bugprone-branch-clone,-bugprone-reserved-identifier,-clang-diagnostic-unused-command-line-argument,-misc-non-private-member-variables-in-classes,-google-explicit-constructor'
+WarningsAsErrors: true
+AnalyzeTemporaryDtors: false
