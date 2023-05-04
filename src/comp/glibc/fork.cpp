@@ -45,7 +45,7 @@ extern "C" __attribute__((__used__)) int __fork_syscall() {
 		if (clone.success() && (r = clone.value()) == 0) {
 			// Remap
 			int remaps = 0;
-			for (ObjectIdentity & i : loader->lookup)
+			for (const ObjectIdentity & i : loader->lookup)
 				for (Object * o = i.current; o != nullptr; o = o->file_previous)
 					for (MemorySegment & m : o->memory_map) {
 						int old_fd = m.target.fd;
