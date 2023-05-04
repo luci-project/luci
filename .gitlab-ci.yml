@@ -5,7 +5,7 @@ stages:
   - test-lang
 
 build-luci:
-  image: inf4/stubs:gcc-x64
+  image: inf4/luci:ubuntu-jammy
   stage: build
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
@@ -25,7 +25,7 @@ fetch-artifacts:
     - mkdir -p bean/elfo
     - 'wget --no-check-certificate -O elfo-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_NAMESPACE}%2Felfo/jobs/artifacts/master/download?job=gcc"'
     - unzip -jo elfo-artifacts.zip -d bean/elfo
-    - 'wget --no-check-certificate -O bean-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_NAMESPACE}%2Fbean/jobs/artifacts/master/download?job=build"'
+    - 'wget --no-check-certificate -O bean-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_NAMESPACE}%2Fbean/jobs/artifacts/master/download?job=gcc"'
     - unzip -jo bean-artifacts.zip -d bean
   artifacts:
     paths:
@@ -34,12 +34,10 @@ fetch-artifacts:
   retry: 1
 
 check-style:
-  image: inf4/stubs:clang-x64
+  image: inf4/luci:ubuntu-jammy
   stage: build
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
-  before_script:
-    - apt-get update && apt-get install -y python3 python3-pyparsing libc++-dev cpplint
   script:
     - make lint
     - make tidy
@@ -57,51 +55,51 @@ check-style:
   retry: 1
 
 test-debian-stretch-gcc:
-  image: heinloth/lp-build:debian-stretch
+  image: inf4/luci:debian-stretch
   extends: .test-gcc
 
 test-debian-buster-gcc:
-  image: heinloth/lp-build:debian-buster
+  image: inf4/luci:debian-buster
   extends: .test-gcc
 
 test-debian-bullseye-gcc:
-  image: heinloth/lp-build:debian-bullseye
+  image: inf4/luci:debian-bullseye
   extends: .test-gcc
 
 test-debian-bookworm-gcc:
-  image: heinloth/lp-build:debian-bookworm
+  image: inf4/luci:debian-bookworm
   extends: .test-gcc
 
 test-ubuntu-focal-gcc:
-  image: heinloth/lp-build:ubuntu-focal
+  image: inf4/luci:ubuntu-focal
   extends: .test-gcc
 
 test-ubuntu-jammy-gcc:
-  image: heinloth/lp-build:ubuntu-jammy
+  image: inf4/luci:ubuntu-jammy
   extends: .test-gcc
 
 test-almalinux-9-gcc:
-  image: heinloth/lp-build:almalinux-9
+  image: inf4/luci:almalinux-9
   extends: .test-gcc
 
 test-oraclelinux-9-gcc:
-  image: heinloth/lp-build:oraclelinux-9
+  image: inf4/luci:oraclelinux-9
   extends: .test-gcc
 
 test-rhel-9-gcc:
-  image: heinloth/lp-build:rhel-9
+  image: inf4/luci:rhel-9
   extends: .test-gcc
 
 test-fedora-36-gcc:
-  image: heinloth/lp-build:fedora-36
+  image: inf4/luci:fedora-36
   extends: .test-gcc
 
 test-fedora-37-gcc:
-  image: heinloth/lp-build:fedora-37
+  image: inf4/luci:fedora-37
   extends: .test-gcc
 
 test-opensuseleap-15-gcc:
-  image: heinloth/lp-build:opensuseleap-15
+  image: inf4/luci:opensuseleap-15
   extends: .test-gcc
 
 
@@ -117,51 +115,51 @@ test-opensuseleap-15-gcc:
   retry: 1
 
 test-debian-stretch-llvm:
-  image: heinloth/lp-build:debian-stretch
+  image: inf4/luci:debian-stretch
   extends: .test-llvm
 
 test-debian-buster-llvm:
-  image: heinloth/lp-build:debian-buster
+  image: inf4/luci:debian-buster
   extends: .test-llvm
 
 test-debian-bullseye-llvm:
-  image: heinloth/lp-build:debian-bullseye
+  image: inf4/luci:debian-bullseye
   extends: .test-llvm
 
 test-debian-bookworm-llvm:
-  image: heinloth/lp-build:debian-bookworm
+  image: inf4/luci:debian-bookworm
   extends: .test-llvm
 
 test-ubuntu-focal-llvm:
-  image: heinloth/lp-build:ubuntu-focal
+  image: inf4/luci:ubuntu-focal
   extends: .test-llvm
 
 test-ubuntu-jammy-llvm:
-  image: heinloth/lp-build:ubuntu-jammy
+  image: inf4/luci:ubuntu-jammy
   extends: .test-llvm
 
 test-almalinux-9-llvm:
-  image: heinloth/lp-build:almalinux-9
+  image: inf4/luci:almalinux-9
   extends: .test-llvm
 
 test-oraclelinux-9-llvm:
-  image: heinloth/lp-build:oraclelinux-9
+  image: inf4/luci:oraclelinux-9
   extends: .test-llvm
 
 test-rhel-9-llvm:
-  image: heinloth/lp-build:rhel-9
+  image: inf4/luci:rhel-9
   extends: .test-llvm
 
 test-fedora-36-llvm:
-  image: heinloth/lp-build:fedora-36
+  image: inf4/luci:fedora-36
   extends: .test-llvm
 
 test-fedora-37-llvm:
-  image: heinloth/lp-build:fedora-37
+  image: inf4/luci:fedora-37
   extends: .test-llvm
 
 test-opensuseleap-15-llvm:
-  image: heinloth/lp-build:opensuseleap-15
+  image: inf4/luci:opensuseleap-15
   extends: .test-llvm
 
 
@@ -177,25 +175,25 @@ test-opensuseleap-15-llvm:
   retry: 1
 
 test-debian-stretch-lang:
-  image: heinloth/lp-build:debian-stretch
+  image: inf4/luci:debian-stretch
   extends: .test-lang
 
 test-debian-buster-lang:
-  image: heinloth/lp-build:debian-buster
+  image: inf4/luci:debian-buster
   extends: .test-lang
 
 test-debian-bullseye-lang:
-  image: heinloth/lp-build:debian-bullseye
+  image: inf4/luci:debian-bullseye
   extends: .test-lang
 
 test-debian-bookworm-lang:
-  image: heinloth/lp-build:debian-bookworm
+  image: inf4/luci:debian-bookworm
   extends: .test-lang
 
 test-ubuntu-focal-lang:
-  image: heinloth/lp-build:ubuntu-focal
+  image: inf4/luci:ubuntu-focal
   extends: .test-lang
 
 test-ubuntu-jammy-lang:
-  image: heinloth/lp-build:ubuntu-jammy
+  image: inf4/luci:ubuntu-jammy
   extends: .test-lang
