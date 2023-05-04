@@ -15,22 +15,29 @@ if [ -f "/.dockerenv" ] ; then
 		ubuntu|debian)
 			ln -fs /usr/share/zoneinfo/Europe/Berlin /etc/localtime
 			export DEBIAN_FRONTEND=noninteractive
-			apt-get update
-			apt-get install -y make libcap2-bin gcc g++
+			if [ "$VERSION_CODENAME" = "stretch" ] ; then
+				sed -i -e '/stretch-updates/d' -e 's/\(security\|deb\).debian.org/archive.debian.org/' /etc/apt/sources.list
+				apt-get update
+				apt-get install -y build-essential clang-11 file gcc g++ less libcap2-bin make
+ 				update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
+			else
+				apt-get update
+				apt-get install -y build-essential clang file gcc g++ less libcap2-bin make
+			fi
 			if [ $# -eq 0 ] ; then
 				apt-get install -y gdb less
 			fi
 			;;
 
 		almalinux|fedora|ol|rhel)
-			yum install -y make diffutils gcc gcc-c++
+			yum install -y make clang diffutils gcc gcc-c++ file less make
 			if [ $# -eq 0 ] ; then
 				yum install -y gdb less
 			fi
 			;;
 
 		opensuse-*)
-			zypper install -y make libcap-progs gcc gcc-c++
+			zypper install -y clang gcc gcc-c++ file less libcap-progs make
 			if [ $# -eq 0 ] ; then
 				zypper install -y gdb less
 			fi
@@ -54,7 +61,7 @@ if [ -f "/.dockerenv" ] ; then
 elif [ $# -ge 1 ] ; then
 	IMAGE=$1
 	shift
-	if [ "$(docker images -q "${IMAGE}" 2> /dev/null)" == "" ] ; then
+	if ! docker pull -q "${IMAGE}" 2>/dev/null ; then
 		case "${IMAGE}" in
 			ol:*)
 				IMAGE="oraclelinux:${IMAGE//*:}"
