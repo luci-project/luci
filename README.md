@@ -45,6 +45,8 @@ to build *Luci* for every supported system.
 Usage
 -----
 
+*Have a look at the [`example`](example/) folder for a simple demonstration!*
+
 If you want to run a custom binary `~/example/a.out` (with parameter `foo`) with *Luci*, you can either start the *Luci* dynamic linker/loader with the binary as argument
 
     /opt/luci/ld-luci.so ~/example/a.out -- foo
@@ -65,6 +67,21 @@ You are able to control the behaviour not only by the configuration file but als
 To list the available settings, run
 
     /opt/luci/ld-luci.so -h
+
+
+### Debug Symbols
+
+While debug symbols are not required for the update, they can improve the compatibility detection.
+In case you have binaries with external debug symbols, the service `bean-elfvarsd` can be used to process them and forward the resulting hash to *Luci*.
+
+
+    bean/tools/elfvarsd.sh -c '.test-cache' 0.0.0.0:9001 /path/to/debug-dir
+
+    export LD_DEBUG_HASH=tcp:127.0.0.1:9001
+
+
+> **Please note:** Appendix E of the [DWARF4 Standard](https://dwarfstd.org/doc/DWARF4.pdf) defines compression and duplicate elimination mechanism.
+> These techniques, e.g. provided by [dwz](https://sourceware.org/dwz/) and used to reduce the size of debug packages in *Ubuntu Jammy* and *Debian Bullseye*, are not supported yet by the tools.
 
 
 Testcases

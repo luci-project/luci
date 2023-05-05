@@ -11,7 +11,7 @@ LIBBEAN = bean/libbean.a
 CXX = g++
 
 CPPLINT ?= cpplint
-CPPLINTIGNORE := bean test old test-old
+CPPLINTIGNORE := bean example test
 TIDY ?= clang-tidy
 TIDYCONFIG ?= .clang-tidy
 
