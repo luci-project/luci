@@ -210,6 +210,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 		this->flags.immutable_source = 1;  // Without updates, don't expect changes to the binaries during runtime
 	} else if (this->flags.updatable == 1) {
 		this->flags.update_outdated |= loader.config.update_outdated_relocations;
+		this->flags.ignore_identical = loader.config.force_update;
 		assert(this->flags.initialized == 0 && this->flags.premapped == 0);
 	}
 

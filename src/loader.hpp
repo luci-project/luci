@@ -74,6 +74,7 @@ struct Loader {
 
 		/*! \brief Root directory for debug symbols (if nullptr system root is used) */
 		const char * debug_symbols_root = nullptr;
+
 		/* Default constructor */
 		Config() {}
 	} config;
