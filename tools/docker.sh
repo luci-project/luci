@@ -19,7 +19,7 @@ if [ -f "/.dockerenv" ] ; then
 				sed -i -e '/stretch-updates/d' -e 's/\(security\|deb\).debian.org/archive.debian.org/' /etc/apt/sources.list
 				apt-get update
 				apt-get install -y build-essential clang-11 file gcc g++ less libcap2-bin make
- 				update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
+				update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
 			else
 				apt-get update
 				apt-get install -y build-essential clang file gcc g++ less libcap2-bin make
