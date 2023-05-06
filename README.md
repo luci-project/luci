@@ -138,13 +138,10 @@ and run the [lang test cases](test/lang) with
 
 
 On each push the [projects GitLab CI](https://gitlab.cs.fau.de/luci-project/luci/-/pipelines/) will run all default test cases on every supported distribution (using GCC and LLVM), and the language test cases on all supported Debian and Ubuntu versions.
-For this reason we provide [Docker images](https://gitlab.cs.fau.de/luci-project/docker) on [dockerhub](https://hub.docker.com/r/inf4/luci/tags) with the required tools already installed, which can be used for testing as well:
+For this reason we provide [Docker images](https://gitlab.cs.fau.de/luci-project/docker) on [dockerhub](https://hub.docker.com/r/inf4/luci/tags) on which the required tools already installed.
+You can use it for testing instead (and save time and bandwidth on subsequent runs):
 
-    docker run --rm -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --security-opt apparmor=unconfined -v $(pwd):/builds/luci-ro:ro inf4/luci:almalinux-9
-    cp -r /builds/luci-ro/ /builds/luci
-    cd /builds/luci
-    make install-only
-    ./test/run.sh -u
+    ./tools/docker-inf4.sh almalinux 9 ./test/run.sh -u "2-.*"
 
 
 Compatibility
