@@ -1,0 +1,12 @@
+fib(0) = 0
+[using Fibonacci library v1: O(2^n))]
+fib(1) = 1
+[using Fibonacci library v2: O(n))]
+fib(2) = 1
+[using Fibonacci library v3: O(n)]
+fib(3) = 2
+[using Fibonacci library v4: O(log(n))]
+fib(4) = 3
+[using Fibonacci library v5: O(1)]
+fib(5) = 5
+[using Fibonacci library v6: O(1)]
