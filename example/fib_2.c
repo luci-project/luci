@@ -1,22 +1,14 @@
-#include <stdio.h>
-
 #include "fib.h"
 
 const unsigned short version = 2;
 
 unsigned long fib(unsigned long value) {
-	unsigned long l = 0;
-	unsigned long p = 1;
-	unsigned long n = value;
-	for (unsigned long i = 1; i < value; i++) {
-		n = l + p;
-		l = p;
-		p = n;
-	}
-	return n;
+	unsigned long f[value + 2];
+	for (unsigned long n = 0; n <= value; n++)
+		f[n] = n > 1 ? f[n - 1] + f[n - 2] : n;
+	return f[value];
 }
 
-void dump_info(void) {
-	fprintf(stderr, "[using Fibonacci library v%u: O(n)]\n", version);
+int print_library_info(FILE *stream) {
+	return fprintf(stream, "[using Fibonacci library v%u: O(n))]\n", version);
 }
-
