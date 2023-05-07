@@ -60,6 +60,9 @@ struct Loader {
 		/*! \brief set comparison mode to relax patchability checks */
 		int relax_comparison = 0;
 
+		/*! \brief output status info during initialization */
+		bool early_statusinfo = false;
+
 		/*! \brief look for external debug symbols (for bean hashing)? */
 		bool find_debug_symbols = false;
 

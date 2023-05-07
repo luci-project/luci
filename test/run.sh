@@ -293,6 +293,7 @@ for TEST in ${TESTS} ; do
 		export LD_RELAX_CHECK
 		export LD_RELOCATE_OUTDATED=1
 		export LD_STATUS_INFO=$STATUS
+		export LD_EARLY_STATUS_INFO=
 		export LD_LIBRARY_PATH="$TESTDIR"
 
 		# Start test thread

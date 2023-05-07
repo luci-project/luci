@@ -540,7 +540,7 @@ bool ObjectIdentity::initialize() {  // NOLINT
 
 
 void ObjectIdentity::status(ObjectIdentity::Info msg) const {
-	if (loader.statusinfofd >= 0 && loader.target != nullptr) {
+	if (loader.statusinfofd >= 0 && (loader.config.early_statusinfo || loader.target != nullptr)) {
 		OutputStream<512> out(loader.statusinfofd);
 		switch (msg) {
 			case INFO_ERROR_OPEN:          out << "ERROR (opening file failed)"; break;

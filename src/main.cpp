@@ -61,6 +61,7 @@ struct Opts {
 	bool dynamicWeak{};
 	bool relocateCheck{};
 	bool relocateOutdated{};
+	bool earlyStatusInfo{};
 	bool bindNow{};
 	bool bindNot{};
 	bool tracing{};
@@ -176,6 +177,8 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	// Fix relocations in outdated varsions
 	if (config_loader.dynamic_update)
 		config_loader.update_outdated_relocations = (opts.relocateOutdated || config_file.value_or_default<bool>("LD_RELOCATE_OUTDATED", false));
+	// Early Status Info output
+	config_loader.early_statusinfo = opts.earlyStatusInfo ||  config_file.value_or_default<bool>("LD_EARLY_STATUS_INFO", false);
 	// Process init debug output
 	config_loader.show_args = opts.showArgs || config_file.value_or_default<bool>("LD_SHOW_ARGS", false);
 	config_loader.show_auxv = opts.showAuxv || config_file.value_or_default<bool>("LD_SHOW_AUXV", false);
@@ -329,42 +332,43 @@ int main(int argc, char* argv[]) {
 	if (base == BASEADDRESS) {
 		// Available commandline options
 		auto args = Parser::Arguments<Opts>({
-				/* short & long name,     argument, element               required, help text,  optional validation function */
-				{'v',  "verbosity",       "LEVEL",  &Opts::loglevel,         false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},  // NOLINT
-				{'A',  "logtimeabs",      nullptr,  &Opts::logtimeAbs,       false, "Use absolute time (instead of delta) in log. This option can also be enabled by setting the environment variable LD_LOGTIME_ABS to 1"},
-				{'f',  "logfile",         "FILE",   &Opts::logfile,          false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
-				{'a',  "logfile-append",  nullptr,  &Opts::logfileAppend,    false, "Append output to log file (instead of truncate). Requires logfile, can also be enabled by setting the environment variable LD_LOGFILE_APPEND to 1" },
-				{'e',  "entry",           "SYM",    &Opts::entry,            false, "Overwrite default start entry point with custom symbol or address (use preceeding '+' for relative adressing)" },
-				{'l',  "library",         "NAME",   &Opts::libload,          false, "Add library namespec to link/load (in the given order). Prefix with ':' for filename" },
-				{'L',  "library-path",    "DIR",    &Opts::libpath,          false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
-				{'c',  "library-conf",    "FILE",   &Opts::libpathconf,      false, "Library path configuration" },
-				{'C',  "luci-conf",       "FILE",   &Opts::luciconf,         false, "Luci loader configuration file" },
-				{'P',  "preload",         "FILE",   &Opts::preload,          false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
-				{'S',  "statusinfo",      "FILE",   &Opts::statusinfo,       false, "File (named pipe) for logging successful and failed updates (latter would require a restart). Disabled if empty. This option can also be activated by setting the environment variable LD_STATUS_INFO" },
-				{'d',  "debughash",       "SOCKET", &Opts::debughash,        false, "Socket URI (unix / tcp / udp) for retrieving debug data hashes. Disabled if empty. This option can also be activated by setting the environment variable LD_DEBUG_HASH" },
-				{'u',  "update",          nullptr,  &Opts::dynamicUpdate,    false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
-				{'U',  "dlupdate",        nullptr,  &Opts::dynamicDlUpdate,  false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1" },
-				{'D',  "func-dep-check",  nullptr,  &Opts::dependencyCheck,  false, "Check (recursively) all dependencies of each function for patchability -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DEPENDENCY_CHECK to 1" },
-				{'i',  "relax-check",     "MODE",   &Opts::relaxPatchCheck,  false, "Relax binary comparison check (0 will use an extended ID check [default], 1 will releax check for writeable sections, 2 for all sections except executable, 3 will only use internal ID for comparison. This can also be done using the environment variable LD_RELAX_CHECK." },
-				{'F',  "force",           nullptr,  &Opts::forceUpdate,      false, "Force dynamic update of changed files, even if they seem to be incompatible -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_FORCE_UPDATE to 1" },
-				{'T',  "tracing",         nullptr,  &Opts::tracing,          false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
-				{'r',  "reloc-check",     nullptr,  &Opts::relocateCheck,    false, "Check if contents of relocation targets in data section have been altered during execution by the user. This option can also be enabled by setting the environment variable LD_RELOCATE_CHECK to 1"},
-				{'R',  "reloc-outdated",  nullptr,  &Opts::relocateOutdated, false, "Fix relocations of outdated versions as well. This option can also be enabled by setting the environment variable LD_RELOCATE_OUTDATED to 1"},
-				{'o',  "detect-outdated", "MODE",   &Opts::detectOutdated,   false, "Detect access in old versions, allowed values are 'disabled' (default), 'userfaultfd', 'uprobes', 'uprobes_deps' and 'ptrace'. This option can also be enabled by setting the delay in environment variable LD_DETECT_OUTDATED."},
-				{'O',  "delay-outdated",  "DELAY",  &Opts::delayOutdated,    false, "Delay the installation for outdated access -- default is 1 second (default). This option can also be set using the environment variable LD_DETECT_OUTDATED_DELAY."},
-				{'m',  "mtime",           nullptr,  &Opts::modificationTime, false, "Consider modification time when detecting changed libraries. This option can also be enabled by setting the delay in environment variable LD_USE_MITME."},
-				{'w',  "weak",            nullptr,  &Opts::dynamicWeak,      false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
-				{'n',  "bind-now",        nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
-				{'N',  "bind-not",        nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
-				{'V',  "version",         nullptr,  &Opts::showVersion,      false, "Show version information" },
-				{'s',  "static",          nullptr,  &Opts::linkstatic,       false, "Perform static linking as well" },
-				{'\0', "dbgsym",          nullptr,  &Opts::debugSymbols,     false, "Search for external debug symbols to improve detection of binary updatability. This option can also be enabled by setting the environment variable LD_DEBUG_SYMBOLS to 1" },
-				{'\0', "dbgsym-root",     nullptr,  &Opts::debugSymbolsRoot, false, "Set root directory for external debug symbols. This option can also be configured using the environment variable LD_DEBUG_SYMBOLS_ROOT" },
-				{'\0', "argv0",           nullptr,  &Opts::argv0,            false, "Explicitly specify program name (argv[0])" },
-				{'\0', "show-args",       nullptr,  &Opts::showArgs,         false, "Show the arguments passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ARGS to 1" },
-				{'\0', "show-auxv",       nullptr,  &Opts::showAuxv,         false, "Show the auxiliary array passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_AUXV to 1" },
-				{'\0', "show-env",        nullptr,  &Opts::showEnv,          false, "Show the environment variables passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ENV to 1" },
-				{'h',  "help",            nullptr,  &Opts::showHelp,         false, "Show this help" }
+				/* short & long name,      argument, element               required, help text,  optional validation function */
+				{'v',  "verbosity",        "LEVEL",  &Opts::loglevel,         false, "Set log level (0 = none, 3 = warning, 6 = debug). This can also be done using the environment variable LD_LOGLEVEL.", [](const char * str) -> bool { int l = 0; return Parser::string(l, str) ? l >= Log::NONE && l <= Log::TRACE : false; }},  // NOLINT
+				{'A',  "logtimeabs",       nullptr,  &Opts::logtimeAbs,       false, "Use absolute time (instead of delta) in log. This option can also be enabled by setting the environment variable LD_LOGTIME_ABS to 1"},
+				{'f',  "logfile",          "FILE",   &Opts::logfile,          false, "Log to the given file. This can also be specified using the environment variable LD_LOGFILE" },
+				{'a',  "logfile-append",   nullptr,  &Opts::logfileAppend,    false, "Append output to log file (instead of truncate). Requires logfile, can also be enabled by setting the environment variable LD_LOGFILE_APPEND to 1" },
+				{'e',  "entry",            "SYM",    &Opts::entry,            false, "Overwrite default start entry point with custom symbol or address (use preceeding '+' for relative adressing)" },
+				{'l',  "library",          "NAME",   &Opts::libload,          false, "Add library namespec to link/load (in the given order). Prefix with ':' for filename" },
+				{'L',  "library-path",     "DIR",    &Opts::libpath,          false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
+				{'c',  "library-conf",     "FILE",   &Opts::libpathconf,      false, "Library path configuration" },
+				{'C',  "luci-conf",        "FILE",   &Opts::luciconf,         false, "Luci loader configuration file" },
+				{'P',  "preload",          "FILE",   &Opts::preload,          false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
+				{'S',  "statusinfo",       "FILE",   &Opts::statusinfo,       false, "File (named pipe) for logging successful and failed updates (latter would require a restart). Disabled if empty. This option can also be activated by setting the environment variable LD_STATUS_INFO" },
+				{'d',  "debughash",        "SOCKET", &Opts::debughash,        false, "Socket URI (unix / tcp / udp) for retrieving debug data hashes. Disabled if empty. This option can also be activated by setting the environment variable LD_DEBUG_HASH" },
+				{'u',  "update",           nullptr,  &Opts::dynamicUpdate,    false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
+				{'U',  "dlupdate",         nullptr,  &Opts::dynamicDlUpdate,  false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1" },
+				{'D',  "func-dep-check",   nullptr,  &Opts::dependencyCheck,  false, "Check (recursively) all dependencies of each function for patchability -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DEPENDENCY_CHECK to 1" },
+				{'i',  "relax-check",      "MODE",   &Opts::relaxPatchCheck,  false, "Relax binary comparison check (0 will use an extended ID check [default], 1 will releax check for writeable sections, 2 for all sections except executable, 3 will only use internal ID for comparison. This can also be done using the environment variable LD_RELAX_CHECK." },
+				{'F',  "force",            nullptr,  &Opts::forceUpdate,      false, "Force dynamic update of changed files, even if they seem to be incompatible -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_FORCE_UPDATE to 1" },
+				{'T',  "tracing",          nullptr,  &Opts::tracing,          false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
+				{'r',  "reloc-check",      nullptr,  &Opts::relocateCheck,    false, "Check if contents of relocation targets in data section have been altered during execution by the user. This option can also be enabled by setting the environment variable LD_RELOCATE_CHECK to 1"},
+				{'R',  "reloc-outdated",   nullptr,  &Opts::relocateOutdated, false, "Fix relocations of outdated versions as well. This option can also be enabled by setting the environment variable LD_RELOCATE_OUTDATED to 1"},
+				{'o',  "detect-outdated",  "MODE",   &Opts::detectOutdated,   false, "Detect access in old versions, allowed values are 'disabled' (default), 'userfaultfd', 'uprobes', 'uprobes_deps' and 'ptrace'. This option can also be enabled by setting the delay in environment variable LD_DETECT_OUTDATED."},
+				{'O',  "delay-outdated",   "DELAY",  &Opts::delayOutdated,    false, "Delay the installation for outdated access -- default is 1 second (default). This option can also be set using the environment variable LD_DETECT_OUTDATED_DELAY."},
+				{'m',  "mtime",            nullptr,  &Opts::modificationTime, false, "Consider modification time when detecting changed libraries. This option can also be enabled by setting the delay in environment variable LD_USE_MITME."},
+				{'w',  "weak",             nullptr,  &Opts::dynamicWeak,      false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
+				{'n',  "bind-now",         nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
+				{'N',  "bind-not",         nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
+				{'V',  "version",          nullptr,  &Opts::showVersion,      false, "Show version information" },
+				{'s',  "static",           nullptr,  &Opts::linkstatic,       false, "Perform static linking as well" },
+				{'\0', "early-statusinfo", nullptr,  &Opts::earlyStatusInfo,  false, "Output status info during loading the binary, so that it will also contain details about the initial libraries. This option can also be enabled by setting the environment variable LD_EARLY_STATUS_INFO to 1" },
+				{'\0', "dbgsym",           nullptr,  &Opts::debugSymbols,     false, "Search for external debug symbols to improve detection of binary updatability. This option can also be enabled by setting the environment variable LD_DEBUG_SYMBOLS to 1" },
+				{'\0', "dbgsym-root",      nullptr,  &Opts::debugSymbolsRoot, false, "Set root directory for external debug symbols. This option can also be configured using the environment variable LD_DEBUG_SYMBOLS_ROOT" },
+				{'\0', "argv0",            nullptr,  &Opts::argv0,            false, "Explicitly specify program name (argv[0])" },
+				{'\0', "show-args",        nullptr,  &Opts::showArgs,         false, "Show the arguments passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ARGS to 1" },
+				{'\0', "show-auxv",        nullptr,  &Opts::showAuxv,         false, "Show the auxiliary array passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_AUXV to 1" },
+				{'\0', "show-env",         nullptr,  &Opts::showEnv,          false, "Show the environment variables passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ENV to 1" },
+				{'h',  "help",             nullptr,  &Opts::showHelp,         false, "Show this help" }
 			},
 			File::exists,
 			[](const char *) -> bool { return true; });
