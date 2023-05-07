@@ -136,6 +136,8 @@ and run the [lang test cases](test/lang) with
 
     ./test/run.sh -g lang -u
 
+> **Please note:** Some test cases are allowed (or even expected) to fail — they contain a `.mayfail` file in their folder, preventing a fatal exit of the test suite.
+> For example, programs written in Go are not supposed to load shared libraries in Go (not related to the RTLD), since this would cause the runtime to be loaded twice. Depending on the Go version and the outcome of some racy code, test case `1-go` might work or might fail.
 
 On each push the [projects GitLab CI](https://gitlab.cs.fau.de/luci-project/luci/-/pipelines/) will run all default test cases on every supported distribution (using GCC and LLVM), and the language test cases on all supported Debian and Ubuntu versions.
 For this reason we provide [Docker images](https://gitlab.cs.fau.de/luci-project/docker) on [dockerhub](https://hub.docker.com/r/inf4/luci/tags) on which the required tools already installed.
