@@ -35,10 +35,12 @@ Since multiple versions of a binary can co-exist in the virtual memory, no globa
 Build
 -----
 
-First make sure that you are using a `x86_64` architecture, a Linux Kernel 4.11 or newer, and a compatible distribution (e.g., Debian and Ubuntu, see below), have common build utilities (`gcc`/`g++`, `make` etc.) installed and check if all submodules are (recursively) checked out - for Debian, you can run
+First make sure that you are using a `x86_64` architecture, a Linux Kernel 4.11 or newer, and a compatible distribution (e.g., Debian and Ubuntu, see below), have common build utilities (`gcc`/`g++`, `make` etc.) installed and check if all submodules are (recursively) checked out - for recent releases of Debian and Ubuntu LTS, you can run
 
-    apt-get install build-essential cpplint file gcc g++ libcap2-bin libc++-dev make python3 python3-pyparsing
+    apt-get install build-essential file git gcc g++ libcap2-bin libc++-dev make python3 python3-pyparsing sudo
     git submodule update --init --recursive
+
+> **Please note:** If you encounter any problems, you should consider using a fresh installation in a virtual machine or containerized environment to test this project — your system may have a configuration (e.g., `LD_PRELOAD`) that interferes with *Luci*.
 
 If you just want to use it on your system, we strongly recommend creating the directory `/opt/luci` (and give permission to your user)
 
@@ -49,14 +51,22 @@ A subsequent
 
     make
 
-will now build `ld-luci-${OS_NAME}-${OS_VERSION}` for your system and create a symlink `/opt/luci/ld-luci.so` to it.
+will build `ld-luci-${OS_NAME}-${OS_VERSION}` for your system (as long as your distribution and version is supported; see section *Compatibility* below) and create a symlink `/opt/luci/ld-luci.so` to the RTLD.
 Furthermore, this will generate a *Luci* configuration file `ld-luci.conf` (with sane default values) and a file `libpath.conf` containing library search paths (based on `/etc/ld.so.conf`).
 
 Use
 
     make all
 
-to build *Luci* for every supported system.
+to build *Luci* for every supported distribution/version.
+
+For a full-featured experience, please install the tools provided in the [Bean](https://gitlab.cs.fau.de/luci-project/elfo) and [Elfo](https://gitlab.cs.fau.de/luci-project/elfo) submodules.
+Make sure you meet the Python3 Packages requirements by using [pip](https://pypi.org/project/pip/), for Debian/Ubuntu with
+
+    apt install python3-pip
+    pip3 install -r bean/requirements.txt
+    make -C bean
+    make -C bean/elfo
 
 
 Usage
@@ -73,7 +83,7 @@ or change its interpreter to the `ld-luci.so` path, during compilation with `-Wl
     ./bean/elfo/elfo-setinterp ~/a.out /opt/luci/ld-luci.so
 
 > **Please note:** For this tool the new path must not be longer than the previous one - since the default is usually `/lib64/ld-linux-x86-64.so.2` (27 characters), the default path to the *ld-luci.so* symlink with only 20 characters will fit.
-> Otherwise, you might try [PatchELF](https://github.com/NixOS/patchelf), however it might reorder the sections.
+> Otherwise, you can try [PatchELF](https://github.com/NixOS/patchelf), however it might reorder the sections which could lead to issues.
 
 After you have modified the interpreter, executing
 
@@ -88,9 +98,8 @@ To list the available settings, run
 
 ### Debug Symbols
 
-While debug symbols are not required for the update, they can improve the compatibility detection.
-In case you have binaries with external debug symbols, the service `bean-elfvarsd` can be used to process them and forward the resulting hash to *Luci*.
-
+While debug symbols are not required for the update, they can contribute to the compatibility detection.
+In case you have binaries with external debug symbols (either local or using [debuginfod](https://sourceware.org/elfutils/Debuginfod.html) to retrieve them), the service `bean-elfvarsd` can process them for *Luci* and respond with the resulting hash using a (tcp/unix) socket.
 
     bean/tools/elfvarsd.sh -c '.test-cache' 0.0.0.0:9001 /path/to/debug-dir
 
@@ -123,14 +132,15 @@ Parameter `-h` will list all available options.
 > In such a case you could either try to reduce the load on your system or slightly modify the test cases to allow more flexibility.
 
 To run the test cases on a different (supported) distribution, first make sure that you have built all versions of *Luci* and then use the docker helper script — it will pull the official image, install all required dependencies (compiler and build utilities) and execute the provided command in the mounted *Luci* directory.
-for example, run certain tests with AlmaLinux:
+For example, run certain tests with AlmaLinux:
 
     make all
     ./tools/docker.sh almalinux:9 ./test/run.sh -u "2-.*"
 
-If you want to test *Luci*s dynamic update capabilities with different languages like Ada, Fortran, Go, Pascal and Rust, make sure to have the correspondent compilers installed
+If you want to test *Luci*s dynamic update capabilities with different languages like Ada, Fortran, Go, Pascal and Rust, make sure to have the correspondent compilers installed.
+On Debian/Ubuntu, install them using
 
-    apt install gnat gfortran golang gccgo
+    apt install fpc gnat gfortran golang gccgo rustc
 
 and run the [lang test cases](test/lang) with
 
@@ -139,7 +149,7 @@ and run the [lang test cases](test/lang) with
 > **Please note:** Some test cases are allowed (or even expected) to fail — they contain a `.mayfail` file in their folder, preventing a fatal exit of the test suite.
 > For example, programs written in Go are not supposed to load shared libraries in Go (not related to the RTLD), since this would cause the runtime to be loaded twice. Depending on the Go version and the outcome of some racy code, test case `1-go` might work or might fail.
 
-On each push the [projects GitLab CI](https://gitlab.cs.fau.de/luci-project/luci/-/pipelines/) will run all default test cases on every supported distribution (using GCC and LLVM), and the language test cases on all supported Debian and Ubuntu versions.
+On each push to the *Luci* main repository the [projects GitLab CI](https://gitlab.cs.fau.de/luci-project/luci/-/pipelines/) will run all default test cases on every supported distribution (using GCC and LLVM), plus the language test cases on all supported Debian and Ubuntu versions.
 For this reason we provide [Docker images](https://gitlab.cs.fau.de/luci-project/docker) on [dockerhub](https://hub.docker.com/r/inf4/luci/tags) on which the required tools already installed.
 You can use it for testing instead (and save time and bandwidth on subsequent runs):
 
