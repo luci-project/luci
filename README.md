@@ -35,9 +35,10 @@ Since multiple versions of a binary can co-exist in the virtual memory, no globa
 Build
 -----
 
-First make sure that you are using a `x86_64` architecture, a Linux Kernel 4.11 or newer, and a compatible distribution (e.g., Debian and Ubuntu, see below), have common build utilities (`gcc`/`g++`, `make` etc.) installed and check if all submodules are (recursively) checked out - for recent releases of Debian and Ubuntu LTS, you can run
+First make sure that you are using a `x86_64` architecture, a Linux Kernel 4.11 or newer, and a compatible distribution (e.g., Debian and Ubuntu, see below), have common build utilities (`gcc`/`g++`, `make` etc.) installed and check if all submodules are (recursively) checked out.
+To do this on recent releases of Debian and Ubuntu LTS, you can run
 
-    apt-get install build-essential file git gcc g++ libcap2-bin libc++-dev make python3 python3-pyparsing sudo
+    apt update && apt install -y build-essential file git gcc g++ libcap2-bin libc++-dev make python3 python3-pyparsing sudo
     git submodule update --init --recursive
 
 > **Please note:** If you encounter any problems, you should consider using a fresh installation in a virtual machine or containerized environment to test this project — your system may have a configuration (e.g., `LD_PRELOAD`) that interferes with *Luci*.
@@ -63,7 +64,7 @@ to build *Luci* for every supported distribution/version.
 For a full-featured experience, please install the tools provided in the [Bean](https://gitlab.cs.fau.de/luci-project/elfo) and [Elfo](https://gitlab.cs.fau.de/luci-project/elfo) submodules.
 Make sure you meet the Python3 Packages requirements by using [pip](https://pypi.org/project/pip/), for Debian/Ubuntu with
 
-    apt install python3-pip
+    apt install -y python3-pip
     pip3 install -r bean/requirements.txt
     make -C bean
     make -C bean/elfo

@@ -381,7 +381,7 @@ int main(int argc, char* argv[]) {
 			BuildInfo::print(cout, true);
 			return EXIT_SUCCESS;
 		} else if (args.showHelp) {
-			args.help(cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "target args");
+			args.help(cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 - 2023 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "target args");
 			return EXIT_SUCCESS;
 		}
 
