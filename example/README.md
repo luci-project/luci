@@ -43,7 +43,6 @@ Otherwise, you have to explicitly specify the *Luci* RTLD:
 or you could use the `elfo-setinterp` tool to change the default interpreter.
 
 
-
 The `main` executable will use `libfib.so`, which is by default a symbolic link to the first version of the library (`fib_1`), hence the output will look similar to
 
     WARNING      0 480031 luci:src/object/dynamic.cpp:200 ........... Library 'ld-linux-x86-64.so.2' will be skipped (exclude list)
@@ -64,7 +63,7 @@ When calculating the 50th+ Fibonacci number, this version will take a significan
 Dynamic Updates
 ---------------
 
-Now restart the example it with dynamic updates enabled:
+Now restart the example with dynamic updates enabled:
 
     LD_DYNAMIC_UPDATE=1 ./run-main
 

@@ -73,7 +73,7 @@ Make sure you meet the Python3 Packages requirements by using [pip](https://pypi
 Usage
 -----
 
-**Have a look at the [`example`](example/) folder for a quick demonstration!**
+**Have a look at the [`example`](example/) folder and run [`demo.sh`](example/demo.sh) for a quick demonstration!**
 
 If you want to run a custom binary `~/a.out` (with parameter `foo`) with *Luci*, you can either start the *Luci* dynamic linker/loader with the binary as argument
 
