@@ -8,7 +8,7 @@ Luci — the linker/loader daemon
 Its main purpose is to demonstrate dynamic software updating on off-the-shelf binaries.
 
 Currently, *Luci* is able to automatically update compatible shared libraries during runtime in a process:
-If the binary is executed using the *Luci* dynamic linker/loader (for example, as parameter or by modifying the interpreter string in the ELF file) and dynamic updates are enabled (`export LD_DYNAMIC_UPDATES=1`), the shared libraries are monitored on the file system.
+If the binary is executed using the *Luci* dynamic linker/loader (for example, as parameter or by modifying the interpreter string in the ELF file) and dynamic updates are enabled (`export LD_DYNAMIC_UPDATE=1`), the shared libraries are monitored on the file system.
 On a change (symbolic link or file itself) *Luci* will check if it is able to update the file (for example the writable section must be identical), load and relink it.
 If the update is not possible or *Luci* detects the usage of outdated code, it informs the user.
 
