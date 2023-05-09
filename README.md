@@ -216,5 +216,5 @@ Related Work
 
 ### Patching shared libraries
 
- - [libpulp](https://github.com/SUSE/libpulp), a framework for userspace live patching, requires the compiler to be compiled with patchable function entries and needs libpulp.so preloaded. Depends on ptrace
+ - [libpulp](https://github.com/SUSE/libpulp), a framework for userspace live-patching, requires the compiler to be compiled with patchable function entries and needs libpulp.so preloaded. Depends on ptrace
  - [libcare](https://github.com/cloudlinux/libcare) is employed during build time, analyzes the assembly & adds new sections (like kpatch)
