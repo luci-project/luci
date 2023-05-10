@@ -27,6 +27,9 @@
 
 
 static Loader * _instance = nullptr;
+#ifndef NO_FPU
+bool _cpu_supports_xsave = false;
+#endif
 
 void* kickoff_helper_loop(void * ptr) {
 	reinterpret_cast<Loader *>(ptr)->helper_loop();
@@ -69,6 +72,14 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
 
 	// Assign current instance
 	_instance = this;
+
+#ifndef NO_FPU
+	// Check availability of xsave
+	unsigned ecx = 0;
+	asm volatile ("cpuid" : "=c"(ecx) : "a" (1) :  "%ebx", "%edx");
+	_cpu_supports_xsave = (ecx & 0x04000000) != 0;
+	LOG_DEBUG << "Preserving FPU using " << (_cpu_supports_xsave ? "XSAVE" : "FXSAVE") << endl;
+#endif
 }
 
 

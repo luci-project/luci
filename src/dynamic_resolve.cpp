@@ -9,10 +9,15 @@
 
 extern "C" __attribute__((__used__)) void * __dlresolve(const Object & o, size_t index) {
 #ifndef NO_FPU
-	const uint32_t mask_low = 0xff;  // assume XSAVE & AVX, TODO: Use CPUID
-	const uint32_t mask_high = 0;
 	alignas(64) uint8_t buf[4096] = {};
-	asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
+	const uint32_t mask_low = 0xff;
+	const uint32_t mask_high = 0;
+	extern bool _cpu_supports_xsave;
+	if (_cpu_supports_xsave) {
+		asm volatile ("xsave (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
+	} else {
+		asm volatile ("fxsave %0" : : "m"(buf) : "memory");
+	}
 #endif
 	Loader * loader = Loader::instance();
 	assert(loader != nullptr);
@@ -22,7 +27,11 @@ extern "C" __attribute__((__used__)) void * __dlresolve(const Object & o, size_t
 	void * r = o.dynamic_resolve(index);
 	loader->lookup_sync.write_unlock();
 #ifndef NO_FPU
-	asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
+	if (_cpu_supports_xsave) {
+		asm volatile ("xrstor (%0)" : : "r"(buf), "a"(mask_low), "d"(mask_high) : "%mm0", "%ymm0", "memory");
+	} else {
+		asm volatile ("fxrstor %0" : : "m"(buf) : "memory");
+	}
 #endif
 	return r;
 }
