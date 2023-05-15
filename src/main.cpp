@@ -354,7 +354,7 @@ int main(int argc, char* argv[]) {
 				{'r',  "reloc-check",      nullptr,  &Opts::relocateCheck,    false, "Check if contents of relocation targets in data section have been altered during execution by the user. This option can also be enabled by setting the environment variable LD_RELOCATE_CHECK to 1"},
 				{'R',  "reloc-outdated",   nullptr,  &Opts::relocateOutdated, false, "Fix relocations of outdated versions as well. This option can also be enabled by setting the environment variable LD_RELOCATE_OUTDATED to 1"},
 				{'o',  "detect-outdated",  "MODE",   &Opts::detectOutdated,   false, "Detect access in old versions, allowed values are 'disabled' (default), 'userfaultfd', 'uprobes', 'uprobes_deps' and 'ptrace'. This option can also be enabled by setting the in environment variable LD_DETECT_OUTDATED."},
-				{'O',  "delay-outdated",   "DELAY",  &Opts::delayOutdated,    false, "Delay the installation for outdated access -- default is 1 second (default). This option can also be set using the environment variable LD_DETECT_OUTDATED_DELAY."},
+				{'O',  "delay-outdated",   "DELAY",  &Opts::delayOutdated,    false, "Delay the installation for outdated access -- default is 1 second. This option can also be set using the environment variable LD_DETECT_OUTDATED_DELAY."},
 				{'m',  "mtime",            nullptr,  &Opts::modificationTime, false, "Consider modification time when detecting changed libraries. This option can also be enabled by setting the delay in environment variable LD_USE_MITME."},
 				{'w',  "weak",             nullptr,  &Opts::dynamicWeak,      false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
 				{'n',  "bind-now",         nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
@@ -381,7 +381,7 @@ int main(int argc, char* argv[]) {
 			BuildInfo::print(cout, true);
 			return EXIT_SUCCESS;
 		} else if (args.showHelp) {
-			args.help(cout, "\e[1mLuci\e[0m\nA toy linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind.", argv[0], "Written 2021 - 2023 by Bernhard Heinloth <heinloth@cs.fau.de>", "file[s]", "target args");
+			args.help(cout, "\e[1mLuci\e[0m\nA linker/loader daemon experiment for academic purposes", argv[0], "Written 2021 - 2023 by Bernhard Heinloth <heinloth@cs.fau.de>\nFurther information: https://gitlab.cs.fau.de/luci-project/luci", "file[s]", "target args");
 			return EXIT_SUCCESS;
 		}
 
