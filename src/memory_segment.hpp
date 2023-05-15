@@ -97,6 +97,7 @@ struct MemorySegment {
 		}
 	} target;
 
+	/* Back buffer */
 	uintptr_t buffer = 0;
 
 	/*! \brief Constructor for Segments */

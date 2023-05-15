@@ -188,9 +188,17 @@ However, *Luci* supports additional distributions as well - with the ability to 
 
 At the moment, *Luci* is limited to the `x86_64` architecture.
 
-To be able to detect access to outdated code, Linux Kernel 4.11 or newer is required (for certain `userfaultfd` features).
-
 > **Please note:** Only a subset of glibc functionality is supported.
+
+To be able to detect access to outdated code, Linux Kernel 4.11 or newer is required (for certain `userfaultfd` features).
+In addition, [userfaultfd](https://docs.kernel.org/admin-guide/mm/userfaultfd.html) must be enabled for *Luci*.
+To do so, either assigning the *Luci* binary the required capability by executing
+
+    sudo setcap cap_sys_ptrace=eip $(readlink -f /opt/luci/ld-luci.so)
+
+or globally enable unprivileged usage:
+
+    echo 1 | sudo tee /proc/sys/vm/unprivileged_userfaultfd
 
 
 Dependencies

@@ -192,10 +192,13 @@ bool MemorySegment::disable() {
 			 */
 			uintptr_t page_start = 0;
 			if ((target.flags & flags_privanon) != flags_privanon) {
+				// Create private mapping
+				if (compose() == 0)
+					return false;
 				// save old memory address
 				page_start = buffer;
-				// Create & set private mapping
-				if (compose() == 0 || !finalize())
+				// Set private mapping
+				if (!finalize())
 					return false;
 			} else if (auto mmap = Syscall::mmap(0, target.page_size(), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)) {
 				page_start = mmap.value();

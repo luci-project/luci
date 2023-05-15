@@ -180,20 +180,6 @@ else
 	fi
 fi
 
-# Check userfaultfd permission
-USERFAULTFD="nouserfaultfd"
-LD_DETECT_OUTDATED=disabled
-LD_DETECT_OUTDATED_DELAY=1
-if [ -f /proc/sys/vm/unprivileged_userfaultfd ] ; then
-	if getcap "$(readlink -f "${LD_PATH}")" | grep -i "cap_sys_ptrace=eip" ; then
-		LD_DETECT_OUTDATED=userfaultfd
-		USERFAULTFD="userfaultfd"
-	elif [[ $(cat /proc/sys/vm/unprivileged_userfaultfd) -eq 1 ]] ; then
-		LD_DETECT_OUTDATED=userfaultfd
-		USERFAULTFD="userfaultfd"
-	fi
-fi
-
 # generate config
 LD_LIBRARY_CONF=$(readlink -f "libpath.conf")
 ../gen-libpath.sh /etc/ld.so.conf | grep -v "i386\|i486\|i686\|lib32\|libx32" > "$LD_LIBRARY_CONF" || true
@@ -202,6 +188,7 @@ if $DEBUG_OUTPUT ; then
 	make -C "${BASEDIR}/../tools" stdlog
 fi
 
+# Title line
 echo -e "\n\e[1;4mRunning Tests on ${OS} ${OSVERSION} (${PLATFORM}) with ${COMPILER}\e[0m"
 echo "using ${LD_NAME} RTLD at ${LD_PATH}"
 if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
@@ -209,6 +196,22 @@ if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
 	UPDATEFLAG='update'
 else
 	UPDATEFLAG='static'
+fi
+
+# Check userfaultfd permission
+USERFAULTFD="nouserfaultfd"
+LD_DETECT_OUTDATED=disabled
+LD_DETECT_OUTDATED_DELAY=1
+if [ -f /proc/sys/vm/unprivileged_userfaultfd ] ; then
+	if getcap "$(readlink -f "${LD_PATH}")" | grep -i "cap_sys_ptrace=eip" ; then
+		echo "with outdated code detection (userfaultfd via capabilities)"
+		LD_DETECT_OUTDATED=userfaultfd
+		USERFAULTFD="userfaultfd"
+	elif [[ $(cat /proc/sys/vm/unprivileged_userfaultfd) -eq 1 ]] ; then
+		echo "with outdated code detection (userfaultfd via sysfs)"
+		LD_DETECT_OUTDATED=userfaultfd
+		USERFAULTFD="userfaultfd"
+	fi
 fi
 
 function check() {
