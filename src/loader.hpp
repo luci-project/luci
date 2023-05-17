@@ -33,6 +33,9 @@ struct Loader {
 		/*! \brief force dynamic updates even if they seem incompatible */
 		bool force_update = false;
 
+		/*! \brief skip updates identical to previously loaded versions? */
+		bool skip_identical = false;
+
 		/*! \brief support dynamic weak definitions? */
 		bool dynamic_weak = false;
 

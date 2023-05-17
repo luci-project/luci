@@ -99,9 +99,6 @@ It is not necessary to sequentially increase the versions; you can directly appl
     fib(49) = 7778742049 (in 0.000001s)
     [using Fibonacci library v6: O(1)]
 
-
-> **Please note:** a rollback to a previously loaded library version is disabled by default (for convenience reasons in *Luci*). To disable this default behavior, you have to set the environment variable `LD_FORCE_UPDATE=1`.
-
 If you want to see further details about the dynamic linking, increase `LD_LOGLEVEL` (e.g., `6` for debugging).
 
 

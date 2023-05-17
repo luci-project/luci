@@ -57,6 +57,7 @@ struct Opts {
 	bool dependencyCheck{};
 	bool modificationTime{};
 	bool forceUpdate{};
+	bool skipIdentical{};
 	bool debugSymbols{};
 	bool dynamicWeak{};
 	bool relocateCheck{};
@@ -167,6 +168,9 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	// Force dynamic updates
 	if (config_loader.dynamic_update)
 		config_loader.force_update = opts.forceUpdate || config_file.value_or_default<bool>("LD_FORCE_UPDATE", false);
+	// Ignore identical updates
+	if (config_loader.skip_identical)
+		config_loader.skip_identical = opts.skipIdentical || config_file.value_or_default<bool>("LD_SKIP_IDENTICAL", false);
 	// Use modification time to detect changes
 	config_loader.use_mtime = opts.modificationTime || config_file.value_or_default<bool>("LD_USE_MTIME", false);
 	// Weak linking
@@ -350,12 +354,13 @@ int main(int argc, char* argv[]) {
 				{'D',  "func-dep-check",   nullptr,  &Opts::dependencyCheck,  false, "Check (recursively) all dependencies of each function for patchability -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DEPENDENCY_CHECK to 1" },
 				{'i',  "relax-check",      "MODE",   &Opts::relaxPatchCheck,  false, "Relax binary comparison check (0 will use an extended ID check [default], 1 will releax check for writeable sections, 2 for all sections except executable, 3 will only use internal ID for comparison. This can also be done using the environment variable LD_RELAX_CHECK." },
 				{'F',  "force",            nullptr,  &Opts::forceUpdate,      false, "Force dynamic update of changed files, even if they seem to be incompatible -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_FORCE_UPDATE to 1" },
+				{'I',  "skip-identical",   nullptr,  &Opts::skipIdentical,    false, "Do not apply updates if they are identical to a previously loaded version -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_SKIP_IDENTICAL to 1" },
+				{'m',  "mtime",            nullptr,  &Opts::modificationTime, false, "Consider modification time when detecting identical updates libraries -- only available if identical updates are skipped. This option can also be enabled by setting the delay in environment variable LD_USE_MTIME."},
 				{'T',  "tracing",          nullptr,  &Opts::tracing,          false, "Enable tracing (using ptrace) during dynamic updates to detect access of outdated functions. This option can also be enabled by setting the environment variable LD_TRACING to 1" },
 				{'r',  "reloc-check",      nullptr,  &Opts::relocateCheck,    false, "Check if contents of relocation targets in data section have been altered during execution by the user. This option can also be enabled by setting the environment variable LD_RELOCATE_CHECK to 1"},
 				{'R',  "reloc-outdated",   nullptr,  &Opts::relocateOutdated, false, "Fix relocations of outdated versions as well. This option can also be enabled by setting the environment variable LD_RELOCATE_OUTDATED to 1"},
 				{'o',  "detect-outdated",  "MODE",   &Opts::detectOutdated,   false, "Detect access in old versions, allowed values are 'disabled' (default), 'userfaultfd', 'uprobes', 'uprobes_deps' and 'ptrace'. This option can also be enabled by setting the in environment variable LD_DETECT_OUTDATED."},
 				{'O',  "delay-outdated",   "DELAY",  &Opts::delayOutdated,    false, "Delay the installation for outdated access -- default is 1 second. This option can also be set using the environment variable LD_DETECT_OUTDATED_DELAY."},
-				{'m',  "mtime",            nullptr,  &Opts::modificationTime, false, "Consider modification time when detecting changed libraries. This option can also be enabled by setting the delay in environment variable LD_USE_MITME."},
 				{'w',  "weak",             nullptr,  &Opts::dynamicWeak,      false, "Enable weak symbol references in dynamic files (nonstandard!). This option can also be enabled by setting the environment variable LD_DYNAMIC_WEAK to 1" },
 				{'n',  "bind-now",         nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
 				{'N',  "bind-not",         nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },

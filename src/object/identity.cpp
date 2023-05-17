@@ -116,7 +116,7 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 		}
 
 		// Check if already loaded (using modification time)
-		if (loader.config.use_mtime && !flags.ignore_mtime && !flags.ignore_identical) {
+		if (loader.config.use_mtime && !flags.ignore_mtime && flags.skip_identical) {
 			for (Object * obj = current; obj != nullptr; obj = obj->file_previous) {
 				if (obj->data.modification_time.tv_sec == data.modification_time.tv_sec && obj->data.modification_time.tv_nsec == data.modification_time.tv_nsec && obj->data.size == data.size) {
 					LOG_INFO << "Already loaded " << *this << " with same modification time -- abort loading..." << endl;
@@ -210,7 +210,7 @@ ObjectIdentity::ObjectIdentity(Loader & loader, const Flags flags, const char * 
 		this->flags.immutable_source = 1;  // Without updates, don't expect changes to the binaries during runtime
 	} else if (this->flags.updatable == 1) {
 		this->flags.update_outdated |= loader.config.update_outdated_relocations;
-		this->flags.ignore_identical = loader.config.force_update;
+		this->flags.skip_identical = loader.config.skip_identical;
 		assert(this->flags.initialized == 0 && this->flags.premapped == 0);
 	}
 
@@ -289,7 +289,7 @@ ObjectIdentity::~ObjectIdentity() {
 
 Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data, Elf::ehdr_type type) {
 	// Hash file contents
-	if (flags.updatable && !flags.ignore_identical) {
+	if (flags.updatable && flags.skip_identical) {
 		XXHash64 datahash(name.hash);  // Name hash as seed
 		datahash.add(data.addr, data.size);
 		data.hash = datahash.hash();
@@ -344,7 +344,6 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 			o = new ObjectDynamic{*this, data, true};
 			break;
 		case Elf::ET_REL:
-			flags.ignore_identical = true;
 			o = new ObjectRelocatable{*this, data};
 			break;
 		default:
