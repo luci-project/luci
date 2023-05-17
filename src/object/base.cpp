@@ -180,7 +180,7 @@ bool Object::disable() const {
 			}
 
 			// File::contents::set("/sys/kernel/debug/tracing/events/uprobes/enable", "0");
-			if (auto fd = Syscall::open("/sys/kernel/debug/tracing/uprobe_events", O_WRONLY | O_APPEND)) {
+			if (auto fd = Syscall::open("/sys/kernel/debug/tracing/uprobe_events", O_WRONLY | O_APPEND | O_SYNC)) {
 				OutputStream<1024> uprobe_events(fd.value());
 				char name[65];
 				BufferStream name_stream(name, 65);

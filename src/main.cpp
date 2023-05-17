@@ -264,7 +264,7 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			statusinfo = config_file.value("LD_STATUS_INFO");
 		}
 		if (statusinfo != nullptr) {
-			if (auto open = Syscall::open(statusinfo, O_WRONLY | O_CREAT | O_TRUNC, 0644)) {
+			if (auto open = Syscall::open(statusinfo, O_WRONLY | O_CREAT | O_TRUNC | O_SYNC, 0644)) {
 				LOG_DEBUG << "Writing status info to " << statusinfo << endl;
 				loader->statusinfofd = open.value();
 			} else {
