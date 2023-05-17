@@ -149,9 +149,9 @@ void Loader::userfault_handle() {
 					for (MemorySegment &mem : obj->memory_map) {
 						if (msg.arg.pagefault.address >= mem.target.page_start() && msg.arg.pagefault.address < mem.target.page_end()) {
 							memseg = &mem;
-							LOG_DEBUG << "Usefault found memory segment " << reinterpret_cast<void*>(mem.target.address()) << " with " << mem.target.size << " bytes"
-							          << " (Source " << mem.source.object << " at " << reinterpret_cast<void*>(mem.source.offset) << " with " << mem.source.size << " bytes)"
-							          << " for pagefault at " << reinterpret_cast<void*>(msg.arg.pagefault.address) << endl;
+							LOG_WARNING << "Detected reusing old memory segment " << reinterpret_cast<void*>(mem.target.address()) << " with " << mem.target.size << " bytes"
+							            << " (Source " << mem.source.object << " at " << reinterpret_cast<void*>(mem.source.offset) << " with " << mem.source.size << " bytes)"
+							            << " due to userspace pagefault at " << reinterpret_cast<void*>(msg.arg.pagefault.address) << endl;
 
 							// Notify
 							mem.source.object.file.status(ObjectIdentity::INFO_FAILED_REUSE);
