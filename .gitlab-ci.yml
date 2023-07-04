@@ -18,7 +18,7 @@ build-luci:
   retry: 1
 
 fetch-artifacts:
-  image: busybox
+  image: busybox:1.35
   stage: build
   script:
     - rm -rf bean
