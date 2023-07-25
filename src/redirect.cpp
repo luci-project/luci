@@ -16,6 +16,24 @@
 
 namespace Redirect {
 
+/*! \brief Mode to be used for redirections */
+static Mode mode = MODE_NOT_CONFIGURED;
+
+/*! \brief Instructions to be used in each mode */
+const struct {
+	uint8_t instructions[2];
+	uint8_t size;
+	uint8_t offset;
+	uint8_t signal;
+	const char * desc;
+} traps[MODE_NOT_CONFIGURED] = {
+	[MODE_DEBUG_TRAP]               = { { 0xcc, 0x00 }, 1, 1, SIGTRAP, "INT1 instruction for debug trap" },
+	[MODE_BREAKPOINT_TRAP]          = { { 0xf1, 0x00 }, 1, 1, SIGTRAP, "INT3 instruction for breakpoint trap" },
+	[MODE_INVALID_OPCODE]           = { { 0x0f, 0x0b }, 2, 0, SIGILL,  "UD2 instruction (two bytes!) for invalid opcode trap" },
+	[MODE_INVALID_OPCODE_HACK]      = { { 0x06, 0x00 }, 1, 0, SIGILL,  "PUSH ES instruction (not defined on x64) for invalid opcode trap" },  ///< http://ref.x86asm.net/coder64.html)
+	[MODE_GENERAL_PROTECTION_FAULT] = { { 0xf4, 0x00 }, 1, 0, SIGSEGV, "HLT instruction (general protection fault in user mode)" }
+};
+
 /*! \brief alternative stack for trap signal handler */
 static char trap_handler_stack[4096 * 4];
 static_assert(count(trap_handler_stack) >= SIGSTKSZ);
@@ -36,12 +54,16 @@ struct RedirectionEntry {
 		MADE_STATIC    /* Already made static */
 	} type;
 
-
 	/*! \brief Opcode replaced by trap */
 	uint8_t previous_opcode[16] = {};
 
 	/*! \brief Trapped threads */
 	TreeSet<pid_t> tids{};
+
+	/*! \brief Comparator */
+	bool operator==(const RedirectionEntry & other) const {
+		return this->from_object == other.from_object && this->to_address == other.to_address && this->type == other.type;
+	}
 };
 
 /*! \brief Collection of active redirection entries */
@@ -57,18 +79,7 @@ static RWLock redirection_sync;
  * \return pointer to the address in compositing buffer
  */
 static uint8_t * mem(Object & object, uintptr_t address, MemorySegment ** seg = nullptr) {
-	for (MemorySegment & m : object.memory_map) {
-		uintptr_t start = m.target.address();
-		if (address >= start && address < start + m.target.size) {
-			uintptr_t buffer = m.compose();
-			if (buffer != 0) {
-				if (seg != nullptr)
-					*seg = &m;
-				return reinterpret_cast<uint8_t *>(m.compose() + (address - start));
-			}
-		}
-	}
-	return nullptr;
+	return reinterpret_cast<uint8_t*>(object.compose_pointer(address + object.base, seg));
 }
 
 /*! \brief Check if a string contains (only) numeric characters
@@ -163,79 +174,99 @@ static bool static_redirect(Object & object, uintptr_t from, uintptr_t to) {
  */
 static void trap_handler(int signal, siginfo *si, ucontext *context) {
 	(void) si;
+	auto & trap = traps[mode];
 	auto & rip = context->uc_mcontext.gregs[REG_RIP];
-	if (signal == SIGTRAP) {
-		LOG_TRACE << "Got trap signal " << si->si_signo << ':' << si->si_code << " (" << context->uc_mcontext.gregs[REG_TRAPNO] << ") at " << reinterpret_cast<void*>(rip) << endl;
-		redirection_sync.read_lock();
-		auto i = redirection_entries.find(rip);
-		if (i) {
-			auto & entry = i->value;
-			LOG_DEBUG << "Redirecting " << reinterpret_cast<void*>(rip) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
-			// Set new RIP to the target address
-			rip = entry.to_address;
-			// In case this should be replaced by an jmp at some point...
-			if (entry.type == RedirectionEntry::MAKE_STATIC) {
-				// ... we have to wait until every task has reached this point, to ensure that we don't change code currently executed
-				auto tid = Syscall::gettid();
-				if (!entry.tids.contains(tid)) {
-					// We will change the set, hence needing write lock
-					redirection_sync.read_unlock();
-					redirection_sync.write_lock();
-					entry.tids.insert(tid);
-					// Check if all tasks of the thread have hit the trap and try to install the static redirect
-					if (all_tasks(entry.tids) && static_redirect(entry.from_object, rip, entry.to_address)) {
-						LOG_DEBUG << "Installed a static redirection from " << reinterpret_cast<void*>(rip) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
-						entry.type = RedirectionEntry::MADE_STATIC;
-					}
-					redirection_sync.write_unlock();
-					return;
-				}
-			}
-		} else {
-			LOG_ERROR << "Trap at " << reinterpret_cast<void*>(rip) << ", but not registered to any code" << endl;
-		}
-		redirection_sync.read_unlock();
-	} else {
+	if (signal != trap.signal) {
 		LOG_WARNING << "Got unexpected signal " << si->si_signo << ':' << si->si_code << " at " << reinterpret_cast<void*>(rip) << endl;
+		return;
 	}
+	for (size_t i = 0; i <  traps[mode].size; i++) {
+		auto instruction = reinterpret_cast<uint8_t*>(rip - trap.offset)[i];
+		if (instruction != trap.instructions[i]) {
+			LOG_WARNING << "Got signal " << si->si_signo << ':' << si->si_code << " at " << reinterpret_cast<void*>(rip) << " -" << trap.offset
+			            << " but trap instructions don't match: " << hex << setw(2) << setfill(0) << static_cast<int>(instruction) << " vs " << static_cast<int>(trap.instructions[i]) << endl;
+			return;
+		}
+	}
+
+	LOG_TRACE << "Got signal " << si->si_signo << ':' << si->si_code << " (" << context->uc_mcontext.gregs[REG_TRAPNO] << ") at " << reinterpret_cast<void*>(rip) << " -" <<  trap.offset << endl;
+	redirection_sync.read_lock();
+	auto i = redirection_entries.find(rip - trap.offset);  // TODO: Size of trap instruction
+	if (i) {
+		auto & entry = i->value;
+		LOG_DEBUG << "Redirecting " << reinterpret_cast<void*>(rip  - trap.offset) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
+		// Set new RIP to the target address
+		rip = entry.to_address;
+		// In case this should be replaced by an jmp at some point...
+		if (entry.type == RedirectionEntry::MAKE_STATIC) {
+			// ... we have to wait until every task has reached this point, to ensure that we don't change code currently executed
+			auto tid = Syscall::gettid();
+			if (!entry.tids.contains(tid)) {
+				// We will change the set, hence needing write lock
+				redirection_sync.read_unlock();
+				redirection_sync.write_lock();
+				entry.tids.insert(tid);
+				// Check if all tasks of the thread have hit the trap and try to install the static redirect
+				if (all_tasks(entry.tids) && static_redirect(entry.from_object, rip - trap.offset, entry.to_address)) {
+					LOG_DEBUG << "Installed a static redirection from " << reinterpret_cast<void*>(rip - trap.offset) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
+					entry.type = RedirectionEntry::MADE_STATIC;
+				}
+				redirection_sync.write_unlock();
+				return;
+			}
+		}
+	} else {
+		LOG_ERROR << "Trap at " << reinterpret_cast<void*>(rip) << ", but not registered to any code" << endl;
+	}
+	redirection_sync.read_unlock();
 }
 
-/*! \brief Helper function to install the trap signal handler
- * can be called multiple times
- * \return `true` if signal handler was installed (at least at some point in the past)
- */
-static bool install_trap_handler() {
-	static bool installed = false;
-	if (!installed) {
-		sigstack stack;
-		stack.ss_sp = reinterpret_cast<void*>(trap_handler_stack);
-		stack.ss_size = count(trap_handler_stack);
-		stack.ss_flags = 0;
-		if (auto sigaltstack = Syscall::sigaltstack(&stack, nullptr)) {
-			LOG_DEBUG << "Trap signal handler will use stack at " << stack.ss_sp << " (" << stack.ss_size << " Bytes)" << endl;
-		} else {
-			LOG_ERROR << "Setting alternative stack " << stack.ss_sp << " (" << stack.ss_size << " Bytes) for trap signal handler failed: " << sigaltstack.error_message() << endl;
-			return false;
-		}
-
-		sigaction action;
-		action.sa_flags = SA_ONSTACK | SA_SIGINFO;
-		action.sa_sigaction = trap_handler;      /* Address of a signal handler */
-		// TODO: Benchmark performance between trap and illegal opcode signal
-		if (auto sigaction = Syscall::sigaction(SIGTRAP, &action, nullptr)) {
-			installed = true;
-			LOG_INFO << "Installed trap signal handler" << endl;
-		} else {
-			LOG_ERROR << "Unable to install trap signal handler: " << sigaction.error_message() << endl;
-			return false;
-		}
+bool setup(Mode mode) {
+	if (mode >= MODE_NOT_CONFIGURED) {
+		LOG_ERROR << "Invalid mode " << static_cast<int>(mode) << endl;
+		return false;
 	}
-	return true;
+	if (Redirect::mode != MODE_NOT_CONFIGURED) {
+		LOG_ERROR << "Redirect has already been setup!" << endl;
+		return false;
+	}
+
+	Redirect::mode = mode;
+	auto & trap = traps[mode];
+	LOG_INFO << "Setting up redirections using " << trap.desc << endl;
+
+	sigstack stack;
+	stack.ss_sp = reinterpret_cast<void*>(trap_handler_stack);
+	stack.ss_size = count(trap_handler_stack);
+	stack.ss_flags = 0;
+	if (auto sigaltstack = Syscall::sigaltstack(&stack, nullptr)) {
+		LOG_DEBUG << "Trap signal handler will use stack at " << stack.ss_sp << " (" << stack.ss_size << " Bytes)" << endl;
+	} else {
+		LOG_ERROR << "Setting alternative stack " << stack.ss_sp << " (" << stack.ss_size << " Bytes) for trap signal handler failed: " << sigaltstack.error_message() << endl;
+		return false;
+	}
+
+	sigaction action;
+	action.sa_flags = SA_ONSTACK | SA_SIGINFO;
+	action.sa_sigaction = trap_handler;      /* Address of a signal handler */
+	// TODO: Benchmark performance between trap and illegal opcode signal
+	if (auto sigaction = Syscall::sigaction(trap.signal, &action, nullptr)) {
+		LOG_DEBUG << "Installed trap signal handler" << endl;
+		return true;
+	} else {
+		LOG_ERROR << "Unable to install trap signal handler: " << sigaction.error_message() << endl;
+		return false;
+	}
 }
 
 bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, size_t from_size, bool make_static, bool finalize) {
+	if (mode == MODE_NOT_CONFIGURED) {
+		LOG_ERROR << "Redirect has not been setup yet!" << endl;
+		return false;
+	}
+
 	RedirectionEntry::Type type = RedirectionEntry::ONLY_DYNAMIC;
-	size_t bytes_to_be_replaced = 1;
+	size_t bytes_to_be_replaced = traps[mode].size;
 	if (make_static) {
 		if (from_size < bytes_to_be_replaced) {
 			LOG_INFO << "Not enough space at " << reinterpret_cast<void*>(from_address) << " for static redirection -- will only use dynamic" << endl;
@@ -265,24 +296,27 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 
 	MemorySegment *seg = nullptr;
 	uint8_t * ptr = mem(from_object, from_address, &seg);
-	RedirectionEntry entry{from_object, to_address, type};
+	if (ptr == nullptr)
+		return false;
 
-	// store previous opcode (in case this should be made static at some point)
+	RedirectionEntry entry{from_object, to_address, type};
+LOG_DEBUG << "ptr: " << (void*)ptr << endl;
+	// store previous opcode (in case this should be made removed at some point)
 	for (size_t i = 0; i < bytes_to_be_replaced; i++)
 		entry.previous_opcode[i] = ptr[i];
-
+LOG_DEBUG << "insert " << (void*)(from_address + from_object.base) << endl;
 	// Add entry
-	redirection_entries.insert(from_address, entry);
+	redirection_entries.insert(from_address + from_object.base, entry);
 
-	// Add trap
-	*ptr = 0xcc;  // or 0xf1
+	LOG_DEBUG << "Bytes at adress: " << hex << static_cast<int>(*ptr) << endl;
+	for (size_t i = 0; i < bytes_to_be_replaced; i++)
+		ptr[i] = traps[mode].instructions[i];
 
 	// Apply changes
 	if (finalize)
 		seg->finalize();
 
-	// Install trap signal handler
-	return install_trap_handler();
+	return true;
 }
 
 bool add(uintptr_t from, uintptr_t to, size_t from_size, bool make_static, bool finalize) {
