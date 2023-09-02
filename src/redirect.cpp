@@ -27,11 +27,11 @@ const struct {
 	uint8_t signal;
 	const char * desc;
 } traps[MODE_NOT_CONFIGURED] = {
-	[MODE_DEBUG_TRAP]               = { { 0xcc, 0x00 }, 1, 1, SIGTRAP, "INT1 instruction for debug trap" },
-	[MODE_BREAKPOINT_TRAP]          = { { 0xf1, 0x00 }, 1, 1, SIGTRAP, "INT3 instruction for breakpoint trap" },
-	[MODE_INVALID_OPCODE]           = { { 0x0f, 0x0b }, 2, 0, SIGILL,  "UD2 instruction (two bytes!) for invalid opcode trap" },
-	[MODE_INVALID_OPCODE_HACK]      = { { 0x06, 0x00 }, 1, 0, SIGILL,  "PUSH ES instruction (not defined on x64) for invalid opcode trap" },  ///< http://ref.x86asm.net/coder64.html)
-	[MODE_GENERAL_PROTECTION_FAULT] = { { 0xf4, 0x00 }, 1, 0, SIGSEGV, "HLT instruction (general protection fault in user mode)" }
+    /* [MODE_DEBUG_TRAP]               = */  { { 0xcc, 0x00 }, 1, 1, SIGTRAP, "INT1 instruction for debug trap" },
+	/* [MODE_BREAKPOINT_TRAP]          = */  { { 0xf1, 0x00 }, 1, 1, SIGTRAP, "INT3 instruction for breakpoint trap" },
+	/* [MODE_INVALID_OPCODE]           = */  { { 0x0f, 0x0b }, 2, 0, SIGILL,  "UD2 instruction (two bytes!) for invalid opcode trap" },
+	/* [MODE_INVALID_OPCODE_HACK]      = */  { { 0x06, 0x00 }, 1, 0, SIGILL,  "PUSH ES instruction (not defined on x64) for invalid opcode trap" },  ///< http://ref.x86asm.net/coder64.html)
+	/* [MODE_GENERAL_PROTECTION_FAULT] = */  { { 0xf4, 0x00 }, 1, 0, SIGSEGV, "HLT instruction (general protection fault in user mode)" }
 };
 
 /*! \brief alternative stack for trap signal handler */
@@ -163,7 +163,7 @@ static bool static_redirect(Object & object, uintptr_t from, uintptr_t to) {
  */
 static void trap_handler(int signal, siginfo *si, ucontext *context) {
 	(void) si;
-	auto & trap = traps[mode];
+	const auto & trap = traps[mode];
 	auto & rip = context->uc_mcontext.gregs[REG_RIP];
 	if (signal != trap.signal) {
 		LOG_WARNING << "Got unexpected signal " << si->si_signo << ':' << si->si_code << " at " << reinterpret_cast<void*>(rip) << endl;
@@ -223,7 +223,7 @@ bool setup(Mode mode) {
 	}
 
 	Redirect::mode = mode;
-	auto & trap = traps[mode];
+	const auto & trap = traps[mode];
 	LOG_INFO << "Setting up redirections using " << trap.desc << endl;
 
 	sigstack stack;
@@ -324,15 +324,17 @@ bool remove(uintptr_t address, bool finalize) {
 		// Recover old opcode
 		MemorySegment *seg = nullptr;
 		uint8_t * ptr = reinterpret_cast<uint8_t*>(val.from_object.compose_pointer(address + val.from_object.base, &seg));
-		size_t bytes_to_be_recovered = val.type == RedirectionEntry::MADE_STATIC ? (check_relative_jump(address, val.to_address) ? 5 : 16) : 1;
-		for (size_t i = 0; i < bytes_to_be_recovered; i++)
-			ptr[i] = val.previous_opcode[i];
+		if (ptr != nullptr) {
+			size_t bytes_to_be_recovered = val.type == RedirectionEntry::MADE_STATIC ? (check_relative_jump(address, val.to_address) ? 5 : 16) : 1;
+			for (size_t i = 0; i < bytes_to_be_recovered; i++)
+				ptr[i] = val.previous_opcode[i];
+		}
 
 		// delete entry
 		redirection_entries.erase(e);
 
 		// Apply changes
-		if (finalize)
+		if (seg != nullptr && finalize)
 			seg->finalize();
 
 		return true;
