@@ -391,8 +391,10 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 		uint32_t bean_flags = Bean::FLAG_NONE;
 		// Resolve internal relocations to improve patchable detection
 		bean_flags |= Bean::FLAG_RESOLVE_INTERNAL_RELOCATIONS;
-		if (flags.reconst_relocs == 1)
+		if (loader.config.update_mode >= Loader::Config::UPDATE_MODE_CODEREL) {
 			bean_flags |= Bean::FLAG_RECONSTRUCT_RELOCATIONS;
+			bean_flags |= Bean::FLAG_HASH_ATTRIBUTES_FOR_ID;
+		}
 
 		o->binary_hash.emplace(*o, o->debug_symbols, bean_flags);
 		// if previous version exist, check if we can patch it

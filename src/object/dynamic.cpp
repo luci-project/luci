@@ -11,10 +11,14 @@
 #include <dlh/utility.hpp>
 #include <dlh/auxiliary.hpp>
 
+#include <bean/update.hpp>
+
 #include "comp/glibc/patch.hpp"
 #include "comp/glibc/init.hpp"
+#include "bean_interface.hpp"
 #include "dynamic_resolve.hpp"
 #include "loader.hpp"
+#include "redirect.hpp"
 
 ObjectDynamic::ObjectDynamic(ObjectIdentity & file, const Object::Data & data, bool position_independent)
   : ObjectExecutable{file, data},
@@ -273,14 +277,76 @@ bool ObjectDynamic::in_data(const Elf::Relocation & reloc) const {
 	return false;
 }
 
+struct ObjectData {
+	Object & from;
+	Object & to;
+};
+
+static bool update_redirect(uintptr_t from, uintptr_t to, size_t size, ObjectData * objs) {
+	if (Redirect::add(objs->from, from - objs->from.base, to, size, size > 0)) {
+		LOG_INFO << "Redirecting " << objs->from << " at " << reinterpret_cast<void*>(from) << " to " << objs->from  << " at " << reinterpret_cast<void*>(to) << endl;
+		return true;
+	} else {
+		LOG_WARNING << "Redirect " << objs->from << " at " << reinterpret_cast<void*>(from) << " to " << objs->from  << " at " << reinterpret_cast<void*>(to) << " failed" << endl;
+		return false;
+	}
+}
+
+static bool update_relocate(const Bean::SymbolRelocation & rel, uintptr_t to, const Bean::Symbol & target, ObjectData * objs) {
+	(void)to;
+	BeanInterface::Symbol bean_sym(target);
+	BeanInterface::Relocation bean_rel(objs->to, rel);
+	const Relocator relocator{bean_rel, objs->from.global_offset_table};
+
+	MemorySegment * seg = nullptr;
+	for (auto &mem : objs->from.memory_map)
+		if (mem.target.contains(relocator.address(objs->from.base))) {
+			seg = &mem;
+			break;
+		}
+
+	auto value = relocator.value_external(objs->from.base, bean_sym, objs->to.base, objs->to.base + bean_sym.value(), objs->to.file.tls_module_id, objs->to.file.tls_offset);
+	if (relocator.valid_value(value)) {
+		auto addr = objs->from.base + (seg != nullptr ? seg->compose() - seg->target.address() : 0);
+		LOG_INFO << "Relocating " << bean_sym.name() << " in " << objs->from << " at " << reinterpret_cast<void*>(addr) << " with " << reinterpret_cast<void*>(value) <<  endl;
+
+		// if (relocator.is_copy() || relocator.read_value(this->base) != value)
+		auto r = relocator.fix_value_external(addr, bean_sym, value);
+		return r != 0;
+	} else {
+		return false;
+	}
+}
+
+static void update_skip(uintptr_t from, uintptr_t to, const char * reason, ObjectData * objs) {
+	LOG_INFO << "Skipping " << objs->from << " at " << reinterpret_cast<void*>(from) << " (to " << objs->from  << " at " << reinterpret_cast<void*>(to) << ")";
+	if (reason != nullptr)
+		LOG_INFO_APPEND << ": " << reason << endl;
+}
+
+
 bool ObjectDynamic::update() {
 	// Apply (external) relocations
 	for (const auto & r : relocations) {
 		// Update only if target has changed (relocation does not point to latest version).
 		// And if this is not the latest version, then omit (shared) data section relocations
 		// since they are performed in the latest version of this object
+
+		// TODO Check for redirections in the instruction (if enabled)
 		if (!r.value.object().is_latest_version() && (is_latest_version() || !in_data(r.key)))
 			relocate(r.key, file.flags.bind_not == 0);
+	}
+	// Change internal relocations
+	if (file.loader.config.update_mode >= Loader::Config::UPDATE_MODE_CODEREL && is_latest_version()) {
+		uint32_t flags = BeanUpdate::FLAG_USE_SYMBOL_NAMES | BeanUpdate::FLAG_ONLY_EXECUTABLE | BeanUpdate::FLAG_ONLY_BRANCH_RELS;  // TODO: test
+		if (file.loader.config.update_mode == Loader::Config::UPDATE_MODE_CODEREL)
+			flags |= BeanUpdate::FLAG_IGNORE_LOCAL_RELS;
+		BeanUpdate updater(flags);
+		for (auto * prev = file_previous; prev != nullptr; prev = prev->file_previous) {
+			assert(this->binary_hash && prev->binary_hash);
+			ObjectData data{*prev, *this};
+			updater.process<ObjectData, update_redirect, update_relocate, update_skip>(*(prev->binary_hash), *(this->binary_hash), prev->base, this->base, &data);
+		}
 	}
 	return true;
 }
@@ -418,7 +484,7 @@ Optional<VersionedSymbol> ObjectDynamic::resolve_symbol(const char * name, uint3
 				return file_previous->resolve_symbol(sym);
 		}
 */
-		if (naked_sym.section_index() != SHN_UNDEF && naked_sym.bind() != Elf::STB_LOCAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
+		if (!naked_sym.undefined() && naked_sym.bind() != Elf::STB_LOCAL && naked_sym.visibility() == Elf::STV_DEFAULT) {
 			auto symbol_version_index = dynamic_symbols.version(found);
 			VersionedSymbol vs{naked_sym, get_version(symbol_version_index), hash, gnu_hash};
 			return Optional<VersionedSymbol>{ vs };
