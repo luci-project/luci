@@ -140,7 +140,7 @@ struct MemorySegment {
 	int shmemdup();
 
 	/*! \brief dump memory to log */
-	void dump(Log::Level level = Log::DEBUG) const;
+	void dump(Log::Level level = Log::TRACE) const;
 
  private:
 	/*! \brief create shared memory fd for this segment */
