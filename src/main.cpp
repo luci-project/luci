@@ -37,6 +37,8 @@
 struct Opts {
 	int loglevel{Log::WARNING};
 	int relaxPatchCheck{0};
+	int updateMode{Loader::Config::UPDATE_MODE_GOT};
+	int trapMode{Redirect::MODE_BREAKPOINT_TRAP};
 	const char * logfile{};
 	Vector<const char *> libpath{};
 	Vector<const char *> libload{};
@@ -147,8 +149,6 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		LOG_ERROR << "Tracing not implemented yet!" << endl;
 	}
 
-
-
 	// New Loader
 	if (luci_path == nullptr || luci_path[0] == '\0') {
 		luci_path = config_file.value("LD_PATH");
@@ -226,9 +226,17 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 		LOG_DEBUG << "Delay for detecting outdated access is " << config_loader.detect_outdated_delay << "s" << endl;
 	}
 
-	// Set comparison mode for patchability checks
-	config_loader.relax_comparison = Math::max(config_loader.relax_comparison, config_file.value_or_default<int>("LD_RELAX_CHECK", config_loader.relax_comparison));
+	// Set update mode for patchability
+	config_loader.update_mode = static_cast<Loader::Config::UpdateMode>(Math::max(opts.updateMode, config_file.value_or_default<int>("LD_UPDATE_MODE", config_loader.update_mode)));
+	if (config_loader.dynamic_update)
+		LOG_DEBUG << "Using update mode " << config_loader.update_mode << endl;
 
+	config_loader.trap_mode = static_cast<Redirect::Mode>(Math::max(opts.trapMode, config_file.value_or_default<int>("LD_TRAP_MODE", config_loader.trap_mode)));
+	if (config_loader.dynamic_update)
+		LOG_DEBUG << "Using trap mode " << config_loader.trap_mode << endl;
+
+	// Set comparison mode for patchability checks
+	config_loader.relax_comparison = Math::max(opts.relaxPatchCheck, config_file.value_or_default<int>("LD_RELAX_CHECK", config_loader.relax_comparison));
 	if (config_loader.relax_comparison > 0)
 		LOG_DEBUG << "Relaxing comparison of patchability to mode " << config_loader.relax_comparison << endl;
 
@@ -351,8 +359,10 @@ int main(int argc, char* argv[]) {
 				{'d',  "debughash",        "SOCKET", &Opts::debughash,        false, "Socket URI (unix / tcp / udp) for retrieving debug data hashes. Disabled if empty. This option can also be activated by setting the environment variable LD_DEBUG_HASH" },
 				{'u',  "update",           nullptr,  &Opts::dynamicUpdate,    false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
 				{'U',  "dlupdate",         nullptr,  &Opts::dynamicDlUpdate,  false, "Enable updates of functions loaded using the DL interface -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DYNAMIC_DLUPDATE to 1" },
+				{'M',  "update-mode",      "MODE",   &Opts::updateMode,       false, "Set mode for dynamic update. This can also be done using the environment variable LD_UPDATE_MODE." },
 				{'D',  "func-dep-check",   nullptr,  &Opts::dependencyCheck,  false, "Check (recursively) all dependencies of each function for patchability -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_DEPENDENCY_CHECK to 1" },
 				{'i',  "relax-check",      "MODE",   &Opts::relaxPatchCheck,  false, "Relax binary comparison check (0 will use an extended ID check [default], 1 will releax check for writeable sections, 2 for all sections except executable, 3 will only use internal ID for comparison. This can also be done using the environment variable LD_RELAX_CHECK." },
+				{'t',  "trap",             "MODE",   &Opts::trapMode,         false, "Set redirection trap mode. This option can also be enabled by setting the environment variable LD_TRAP_MODE" },
 				{'F',  "force",            nullptr,  &Opts::forceUpdate,      false, "Force dynamic update of changed files, even if they seem to be incompatible -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_FORCE_UPDATE to 1" },
 				{'I',  "skip-identical",   nullptr,  &Opts::skipIdentical,    false, "Do not apply updates if they are identical to a previously loaded version -- only available if dynamic updates are enabled. This option can also be enabled by setting the environment variable LD_SKIP_IDENTICAL to 1" },
 				{'m',  "mtime",            nullptr,  &Opts::modificationTime, false, "Consider modification time when detecting identical updates libraries -- only available if identical updates are skipped. This option can also be enabled by setting the delay in environment variable LD_USE_MTIME."},

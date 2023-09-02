@@ -24,6 +24,7 @@
 #include "comp/gdb.hpp"
 #include "object/base.hpp"
 #include "process.hpp"
+#include "redirect.hpp"
 
 
 static Loader * _instance = nullptr;
@@ -80,6 +81,10 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
 	_cpu_supports_xsave = (ecx & 0x04000000) != 0;
 	LOG_DEBUG << "Preserving FPU using " << (_cpu_supports_xsave ? "XSAVE" : "FXSAVE") << endl;
 #endif
+
+	// Configure redirection
+	if (config.dynamic_update)
+		Redirect::setup(config.trap_mode);
 }
 
 
@@ -149,6 +154,7 @@ ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags fl
 ObjectIdentity * Loader::open(const char * filename, const char * directory, ObjectIdentity::Flags flags, bool priority, namespace_t ns) {
 	auto filename_len = String::len(filename);
 	auto directory_len = String::len(directory);
+
 	char path[directory_len + filename_len + 2];  // NOLINT
 	String::copy(path, directory, directory_len);
 	path[directory_len] = '/';

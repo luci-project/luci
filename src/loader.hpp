@@ -16,6 +16,7 @@
 
 #include "object/identity.hpp"
 #include "trampoline.hpp"
+#include "redirect.hpp"
 #include "symbol.hpp"
 #include "tls.hpp"
 
@@ -48,8 +49,15 @@ struct Loader {
 		/*! \brief update relocations in outdated (old) versions as well? */
 		bool update_outdated_relocations = false;
 
+		/*! \brief mode for updates */
+		enum UpdateMode {
+			UPDATE_MODE_GOT,                // just update global offset table
+			UPDATE_MODE_CODEREL,            // update relocations in machine code
+			UPDATE_MODE_CODEREL_LOCALINT,   // update relocations in machine code and intercept local branches
+		} update_mode = UPDATE_MODE_GOT;
+
 		/*! \brief detect execution of outdated files? (value is delay in seconds after update) */
-		enum {
+		enum DetectOutdated {
 			DETECT_OUTDATED_DISABLED,
 			DETECT_OUTDATED_VIA_USERFAULTFD,
 			DETECT_OUTDATED_VIA_UPROBES,
@@ -59,6 +67,9 @@ struct Loader {
 
 		/*! \brief delay (in seconds) after an update before enabling detection of access of outdated libs */
 		unsigned detect_outdated_delay = 1;
+
+		/*! \brief Trap for code redirection */
+		enum Redirect::Mode trap_mode = Redirect::MODE_BREAKPOINT_TRAP;
 
 		/*! \brief set comparison mode to relax patchability checks */
 		int relax_comparison = 0;
