@@ -4,10 +4,12 @@
 
 #include "object/relocatable.hpp"
 
-#include <elfo/elf_rel.hpp>
 #include <dlh/log.hpp>
+#include <dlh/is_in.hpp>
 #include <dlh/string.hpp>
 #include <dlh/auxiliary.hpp>
+
+#include <elfo/elf_rel.hpp>
 
 #include "comp/glibc/start.hpp"
 #include "loader.hpp"
@@ -58,7 +60,7 @@ bool ObjectRelocatable::preload() {
 	// Check availability of external symbols on updates
 	if (this->file_previous != nullptr && !file.loader.config.force_update)
 		for (const auto & sym : symbol_table())
-			if (sym.section_index() == Elf::SHN_UNDEF && sym.bind() == STB_GLOBAL && !file.loader.resolve_symbol(sym.name(), nullptr, file.ns, &file).has_value()) {
+			if (sym.undefined() && sym.bind() == STB_GLOBAL && !file.loader.resolve_symbol(sym.name(), nullptr, file.ns, &file).has_value()) {
 				LOG_WARNING << "Missing external symbol " << sym.name() << " -- abort updating object!" << endl;
 				return false;
 			}
@@ -66,7 +68,6 @@ bool ObjectRelocatable::preload() {
 	for (const auto & section : this->sections) {
 		if (section.size() == 0)
 			continue;
-
 		if (section.tls() && section.allocate()) {
 			// Fixup section entry,
 			assert(section.virt_addr() == 0);
@@ -93,7 +94,7 @@ bool ObjectRelocatable::preload() {
 			case SHT_PREINIT_ARRAY:
 				if (section.allocate()) {
 					size_t additional_size = 0;
-					if (this->file_previous == nullptr && section.type() == SHT_PROGBITS &&  (strcmp(section.name(), ".init", 5) == 0 || strcmp(section.name(), ".fini", 5) == 0)) {
+					if (this->file_previous == nullptr && section.type() == SHT_PROGBITS && (strcmp(section.name(), ".init", 5) == 0 || strcmp(section.name(), ".fini", 5) == 0)) {
 						// The init/fini section consists only from calls.
 						// They need to be fixed after mapping
 						init_sections.push_back(section);
@@ -195,7 +196,7 @@ bool ObjectRelocatable::adjust_offsets(uintptr_t offset, const Elf::Section & se
 							}
 						}
 						// For general symbols adjust entry
-						if (sym.type() == STT_OBJECT || sym.type() == STT_FUNC || sym.type() == STT_SECTION || sym.type() == STT_GNU_IFUNC || sym.type() == STT_TLS) {
+						if (is(sym.type()).in(STT_OBJECT, STT_FUNC, STT_SECTION, STT_GNU_IFUNC, STT_TLS)) {
 							// This is only allowed since we have a COW mapping
 							Elf::Sym * data = const_cast<Elf::Sym *>(sym.ptr());
 							// Fixup value (= offset)
@@ -315,7 +316,7 @@ bool ObjectRelocatable::update() {
 		// Update only if target has changed (relocation does not point to latest version).
 		// And if this is not the latest version, then omit (shared) data section relocations
 		// since they are performed in the latest version of this object
-		if (!r.value.object().is_latest_version() && r.value.type() == STT_FUNC)
+		if (!r.value.object().is_latest_version() && is(r.value.type()).in(STT_FUNC, STT_SECTION))
 			relocate(r.key);
 	}
 
@@ -336,7 +337,7 @@ bool ObjectRelocatable::patchable() const {
 
 Optional<ElfSymbolHelper> ObjectRelocatable::resolve_internal_symbol(const SymbolHelper & needle) const {
 	const auto sym = symbols.find(needle);
-	if (sym != symbols.end() && sym->section_index() != Elf::SHN_UNDEF) {
+	if (sym != symbols.end() && !sym->undefined()) {
 		return Optional<ElfSymbolHelper>{ *sym };
 	}
 
@@ -351,7 +352,7 @@ Optional<VersionedSymbol> ObjectRelocatable::resolve_symbol(const char * name, u
 	(void) hash;
 	(void) version;
 	const auto sym = symbols.find(SymbolHelper{name, gnu_hash});
-	if (sym != symbols.end() && sym->section_index() != Elf::SHN_UNDEF && sym->bind() != Elf::STB_LOCAL && sym->visibility() == Elf::STV_DEFAULT) {
+	if (sym != symbols.end() && !sym->undefined() && sym->bind() != Elf::STB_LOCAL && sym->visibility() == Elf::STV_DEFAULT) {
 		VersionedSymbol vs{ *sym };
 		return Optional<VersionedSymbol>{ vs };
 	}
@@ -363,7 +364,7 @@ Optional<VersionedSymbol> ObjectRelocatable::resolve_symbol(uintptr_t addr) cons
 	if (addr > base) {
 		uintptr_t offset = addr - base;
 		for (const auto & sym : symbols)
-			if (sym.section_index() != Elf::SHN_UNDEF && offset >= sym.value() && offset <= sym.value() + sym.size()) {
+			if (!sym.undefined() && offset >= sym.value() && offset <= sym.value() + sym.size()) {
 				VersionedSymbol vs{sym};
 				return Optional<VersionedSymbol>{ vs };
 			}
@@ -374,6 +375,27 @@ Optional<VersionedSymbol> ObjectRelocatable::resolve_symbol(uintptr_t addr) cons
 void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 	// Initialize relocator object
 	Relocator relocator(reloc, 0);
+
+	// Since we have only a few segments, iterating is just fine
+	MemorySegment * seg = nullptr;
+	/*for (auto &mem : memory_map)
+		if (mem.target.contains(relocator.address(this->base))) {
+			seg = &mem;
+			break;
+		}
+*/
+	// Special case: reading address of GOTPCRELX
+	if (is(reloc.type()).in(Elf::R_X86_64_REX_GOTPCRELX, Elf::R_X86_64_GOTPCRELX)) {
+		auto * instruction = reinterpret_cast<uint8_t*>(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0) + reloc.offset() - 2);
+		// check if instruction is MOV (+ register)
+		if (*instruction == 0x8b) {
+			LOG_DEBUG << "Rewriting MOV with GOTPCRELX relocation to LEA at " << reinterpret_cast<void*>(instruction) << endl;
+			// Addend must be -4
+			assert(reloc.addend() == -4);
+			// Change to LEA
+			*instruction += 2;
+		}
+	}
 	// find symbol
 	if (reloc.symbol_index() == 0) {
 		// Local relocation (without symbol) -- not sure if can occure at all
@@ -383,20 +405,22 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 		const auto needed_symbol = reloc.symbol();
 		// We omit the PLT and directly link the target, hence replacing `plt_entry` with `base + symbol.value()``
 		auto plt_entry = base + needed_symbol.value();
-		if (needed_symbol.section_index() != Elf::SHN_UNDEF) {
+		if (!needed_symbol.undefined()) {
 			// Special case: We have a newer version of a function
-			if (!is_latest_version() && (needed_symbol.type() == STT_FUNC || needed_symbol.type() == STT_GNU_IFUNC)) {
+			if (!is_latest_version() && is(needed_symbol.type()).in(STT_FUNC, STT_GNU_IFUNC, STT_SECTION)) {
 				auto latest_symbol = this->file.current->resolve_internal_symbol(needed_symbol.name());
 				if (latest_symbol.has_value() && needed_symbol.type() == latest_symbol->type()) {
 					relocations.insert(reloc, latest_symbol.value());
-					LOG_INFO << "Updating symbol " << needed_symbol.name() << " in " << *this << " with " << latest_symbol->name() << " from " << *file.current << endl;
-					return reinterpret_cast<void*>(relocator.fix_external(this->base, latest_symbol.value(), file.current->base, file.current->base + latest_symbol->value(), this->file.tls_module_id, this->file.tls_offset));
+					auto value = relocator.value_external(this->base, latest_symbol.value(), file.current->base, file.current->base + latest_symbol->value(), this->file.tls_module_id, this->file.tls_offset);
+					LOG_TRACE << "Updating symbol " << needed_symbol.name() << " in " << *this << " with " << latest_symbol->name() << " from " << *file.current << " to " << reinterpret_cast<void*>(value) << endl;
+					return reinterpret_cast<void*>(relocator.fix_value_external(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), latest_symbol.value(), value));
 				}
 			}
 			// Local symbol
 			relocations.insert(reloc, needed_symbol);
-			LOG_INFO << "Relocating local symbol " << needed_symbol.name() << " @ " << reinterpret_cast<void*>(base + needed_symbol.value()) << " in " << *this << endl;
-			return reinterpret_cast<void*>(relocator.fix_internal(this->base, plt_entry, this->file.tls_module_id, this->file.tls_offset));
+			auto value = relocator.value_internal(this->base, plt_entry, this->file.tls_module_id, this->file.tls_offset);
+			LOG_TRACE << "Relocating local symbol " << needed_symbol.name() << " @ " << reinterpret_cast<void*>(base + needed_symbol.value()) << " in " << *this << " to " << reinterpret_cast<void*>(value) << endl;
+			return reinterpret_cast<void*>(relocator.fix_value_internal(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), value));
 		} else {
 			// external symbol
 			// COPY Relocations have a defined symbol with the same name
@@ -404,8 +428,9 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 			if (auto external_symbol = file.loader.resolve_symbol(needed_symbol.name(), nullptr, file.ns, &file, mode)) {
 				relocations.insert(reloc, external_symbol.value());
 				const auto & external_symobj = external_symbol->object();
-				LOG_INFO << "Relocating symbol " << needed_symbol.name() << " in " << *this << " with " << external_symbol->name() << " from " << external_symobj << endl;
-				return reinterpret_cast<void*>(relocator.fix_external(this->base, external_symbol.value(), external_symobj.base, external_symobj.base + external_symbol->value(), file.tls_module_id, file.tls_offset));
+				auto value = relocator.value_external(this->base, external_symbol.value(), external_symobj.base, external_symobj.base + external_symbol->value(), file.tls_module_id, file.tls_offset);
+				LOG_TRACE << "Relocating symbol " << needed_symbol.name() << " in " << *this << " with " << external_symbol->name() << " from " << external_symobj << " to " << reinterpret_cast<void*>(value) << endl;
+				return reinterpret_cast<void*>(relocator.fix_value_external(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), external_symbol.value(), value));
 			} else if (needed_symbol.bind() == STB_WEAK) {
 				LOG_DEBUG << "Unable to resolve weak symbol " << needed_symbol.name() << "..." << endl;
 			} else {
