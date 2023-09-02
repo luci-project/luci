@@ -132,14 +132,25 @@ struct Object : public Elf {
 	/*! \brief Does this object use memory aliasing for data? */
 	virtual bool use_data_alias() const { return false; }
 
-	/*! \brief Helper to get pointer in compose buffer corresponding to an active address */
+	/*! \brief Helper to get pointer in compose buffer corresponding to an active address
+	 * \param pointer the address in object which should be modified (redirected)
+	 * \param mem_seg if pointer is set, the memory segment will be stored in it
+	 * \note memory_map must not be modified as long as `seg` is used!
+	 * \return pointer to the address in compositing buffer
+	 */
 	template<typename T>
-	T * compose_pointer(T * pointer) {
+	T compose_pointer(T pointer, MemorySegment ** mem_seg = nullptr) {
 		auto ptr = reinterpret_cast<uintptr_t>(pointer);
 		for (auto & seg : memory_map)
-			if (seg.target.contains(ptr))
-				return reinterpret_cast<T *>(seg.compose() + ptr - seg.target.address());
-		return nullptr;
+			if (seg.target.contains(ptr)) {
+				uintptr_t buffer = seg.compose();
+				if (buffer == 0)
+					break;
+				if (mem_seg != nullptr)
+					*mem_seg = &seg;
+				return reinterpret_cast<T>(buffer + ptr - seg.target.address());
+			}
+		return static_cast<T>(0);
 	}
 
 	/*! \brief Update mapping and set protection in memory */
