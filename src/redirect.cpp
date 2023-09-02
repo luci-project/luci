@@ -71,17 +71,6 @@ static HashMap<uintptr_t, RedirectionEntry> redirection_entries;
 /*! \brief Helper to synchronize concurrent collection access */
 static RWLock redirection_sync;
 
-/*! \brief Helper to get compositing buffer
- * \param object the object containing the address
- * \param address the address in object which should be modified (redirected)
- * \param seg if pointer is set, the memory segment will be stored in it
- * \note memory_map must not be modified as long as `seg` is used!
- * \return pointer to the address in compositing buffer
- */
-static uint8_t * mem(Object & object, uintptr_t address, MemorySegment ** seg = nullptr) {
-	return reinterpret_cast<uint8_t*>(object.compose_pointer(address + object.base, seg));
-}
-
 /*! \brief Check if a string contains (only) numeric characters
  *  \param str string to be checked
  *  \return `true` if length is non-zero and all characters contain numerics
@@ -129,7 +118,7 @@ static bool check_relative_jump(uintptr_t from, uintptr_t to) {
  */
 static bool static_redirect(Object & object, uintptr_t from, uintptr_t to) {
 	MemorySegment * seg = nullptr;
-	uint8_t * m = mem(object, from, &seg);
+	uint8_t * m = reinterpret_cast<uint8_t*>(object.compose_pointer(from, &seg));
 	if (m == nullptr)
 		return false;
 
@@ -194,7 +183,9 @@ static void trap_handler(int signal, siginfo *si, ucontext *context) {
 	auto i = redirection_entries.find(rip - trap.offset);  // TODO: Size of trap instruction
 	if (i) {
 		auto & entry = i->value;
-		LOG_DEBUG << "Redirecting " << reinterpret_cast<void*>(rip  - trap.offset) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
+		// Trap address
+		auto trap_address = rip  - trap.offset;
+		LOG_DEBUG << "Redirecting " << reinterpret_cast<void*>(trap_address) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
 		// Set new RIP to the target address
 		rip = entry.to_address;
 		// In case this should be replaced by an jmp at some point...
@@ -207,8 +198,8 @@ static void trap_handler(int signal, siginfo *si, ucontext *context) {
 				redirection_sync.write_lock();
 				entry.tids.insert(tid);
 				// Check if all tasks of the thread have hit the trap and try to install the static redirect
-				if (all_tasks(entry.tids) && static_redirect(entry.from_object, rip - trap.offset, entry.to_address)) {
-					LOG_DEBUG << "Installed a static redirection from " << reinterpret_cast<void*>(rip - trap.offset) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
+				if (all_tasks(entry.tids) && static_redirect(entry.from_object, trap_address, entry.to_address)) {
+					LOG_DEBUG << "Installed a static redirection from " << reinterpret_cast<void*>(trap_address) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
 					entry.type = RedirectionEntry::MADE_STATIC;
 				}
 				redirection_sync.write_unlock();
@@ -295,16 +286,17 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 	}
 
 	MemorySegment *seg = nullptr;
-	uint8_t * ptr = mem(from_object, from_address, &seg);
+	uint8_t * ptr = reinterpret_cast<uint8_t*>(from_object.compose_pointer(from_address + from_object.base, &seg));
 	if (ptr == nullptr)
 		return false;
+	assert(seg != nullptr);
 
 	RedirectionEntry entry{from_object, to_address, type};
-LOG_DEBUG << "ptr: " << (void*)ptr << endl;
+
 	// store previous opcode (in case this should be made removed at some point)
 	for (size_t i = 0; i < bytes_to_be_replaced; i++)
 		entry.previous_opcode[i] = ptr[i];
-LOG_DEBUG << "insert " << (void*)(from_address + from_object.base) << endl;
+
 	// Add entry
 	redirection_entries.insert(from_address + from_object.base, entry);
 
@@ -331,7 +323,7 @@ bool remove(uintptr_t address, bool finalize) {
 		auto & val = e->value;
 		// Recover old opcode
 		MemorySegment *seg = nullptr;
-		uint8_t * ptr = mem(val.from_object, address, &seg);
+		uint8_t * ptr = reinterpret_cast<uint8_t*>(val.from_object.compose_pointer(address + val.from_object.base, &seg));
 		size_t bytes_to_be_recovered = val.type == RedirectionEntry::MADE_STATIC ? (check_relative_jump(address, val.to_address) ? 5 : 16) : 1;
 		for (size_t i = 0; i < bytes_to_be_recovered; i++)
 			ptr[i] = val.previous_opcode[i];
@@ -343,6 +335,17 @@ bool remove(uintptr_t address, bool finalize) {
 		if (finalize)
 			seg->finalize();
 
+		return true;
+	} else {
+		return false;
+	}
+}
+
+bool is_set(uintptr_t from, uintptr_t * to) {
+	GuardedReader _(redirection_sync);
+	if (const auto & e = redirection_entries.find(from)) {
+		if (to != nullptr)
+			*to =  e->value.to_address;
 		return true;
 	} else {
 		return false;

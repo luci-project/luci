@@ -13,7 +13,7 @@ namespace Redirect {
 enum Mode {
 	MODE_DEBUG_TRAP,                ///< int1 instruction
 	MODE_BREAKPOINT_TRAP,           ///< int3 instruction
-	MODE_INVALID_OPCODE,            ///< ud2 two2 byte!)
+	MODE_INVALID_OPCODE,            ///< ud2 two byte!)
 	MODE_INVALID_OPCODE_HACK,       ///< push es (which is not available on x64)
 	MODE_GENERAL_PROTECTION_FAULT,  ///< hlt (which is not allowed in ring 3)
 
@@ -23,7 +23,7 @@ enum Mode {
 /*! \brief Setup redirection
  *  installs the trap signal handler
  *  \param mode set the instructions should be used for interruption
- *  \return `true` if signal handler was installed 
+ *  \return `true` if signal handler was installed
  */
 bool setup(Mode mode = MODE_BREAKPOINT_TRAP);
 
@@ -88,6 +88,23 @@ bool remove(uintptr_t address, bool finalize = false);
 template<typename Symbol>
 bool remove(Symbol & from, bool finalize = false) {
 	return from.valid() ? remove(reinterpret_cast<uintptr_t>(from.pointer()), finalize) : false;
+}
+
+/*! \brief check if there is a redirection set
+ *  \param from memory address to check
+ *  \param to pointer to variable to store the target address (or nullptr to ignore)
+ *  \return `true` if a redirection is set to this address
+ */
+bool is_set(uintptr_t from, uintptr_t * to = nullptr);
+
+/*! \brief Remove redirection
+ *  \param from symbol to check
+ *  \param to pointer to variable to store the target address (or nullptr to ignore)
+ *  \return `true` if a redirection is set to this address
+ */
+template<typename Symbol>
+bool is_set(Symbol & from, uintptr_t * to = nullptr) {
+	return from.valid() ? is_set(reinterpret_cast<uintptr_t>(from.pointer()), to) : false;
 }
 
 }  // namespace Redirect
