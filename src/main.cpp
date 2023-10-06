@@ -332,6 +332,37 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	return loader;
 }
 
+enum LibName {
+	LIB_NAME_COLON,
+	LIB_NAME_SHARED,
+	LIB_NAME_STATIC,
+};
+static bool load_library_by_name(Loader * loader, const char * lib, enum LibName libname) {
+	// Try as namespec
+	StringStream<255> filename;
+	// TODO: static libraries (.a)
+	switch (libname) {
+		case LIB_NAME_COLON:
+			filename << lib + 1;
+			break;
+		case LIB_NAME_SHARED:
+			filename << "lib" << lib << ".so";
+			// Special case: shared libc / libm is suffixed by '.6'
+			if ((lib[0] == 'c' || lib[0] == 'm') && lib[1] == '\0')
+				filename << ".6";
+			break;
+		case LIB_NAME_STATIC:
+			filename << "lib" << lib << ".a";
+			break;
+	}
+	if (ObjectIdentity * loaded = loader->library(filename.str(), loader->default_flags)) {
+		LOG_INFO << "Loaded " << lib << ": " << *loaded << endl;
+		return true;
+	} else {
+		return false;
+	}
+}
+
 int main(int argc, char* argv[]) {
 	// We do no (implicit) self relocation, hence make sure it is already correct
 	assert(reinterpret_cast<uintptr_t>(&_DYNAMIC) - _GLOBAL_OFFSET_TABLE_[0] == 0);
@@ -431,32 +462,11 @@ int main(int argc, char* argv[]) {
 			}
 
 			if (args.linkstatic)
-				for (auto & lib : args.libload) {
-					if (lib[0] == ':') {
-						// Try as filename
-						lib++;
-						if (ObjectIdentity * loaded = loader->library(lib, loader->default_flags)) {
-							LOG_INFO << "Loaded " << lib << ": " << *loaded << endl;
-						} else {
-							LOG_ERROR << "Library file '" << lib << "' not found!" << endl;
-							return EXIT_FAILURE;
-						}
-					} else {
-						// Try as namespec
-						StringStream<255> filename;
-						// TODO: static libraries (.a)
-						filename << "lib" << lib << ".so";
-						// Special case: shared libc is suffixed by '.6'
-						if (lib[0] == 'c' && lib[1] == '\0')
-							filename << ".6";
-						if (ObjectIdentity * loaded = loader->library(filename.str(), loader->default_flags)) {
-							LOG_INFO << "Loaded " << lib << ": " << *loaded << endl;
-						} else {
-							LOG_ERROR << "Library file '" << filename.str() << "' not found!" << endl;
-							return EXIT_FAILURE;
-						}
+				for (auto & lib : args.libload)
+					if ((lib[0] == ':' && !load_library_by_name(loader, lib, LIB_NAME_COLON)) || (!load_library_by_name(loader, lib, LIB_NAME_SHARED) && !load_library_by_name(loader, lib, LIB_NAME_STATIC))) {
+						LOG_ERROR << "Cannot proceed since library '" << lib << "' is missing!" << endl;
+						return EXIT_FAILURE;
 					}
-				}
 
 			LOG_DEBUG << "Library search order:" << endl;
 			for (auto & obj : loader->lookup) {
@@ -487,9 +497,12 @@ int main(int argc, char* argv[]) {
 		// Load target binary
 		const char * bin = reinterpret_cast<const char *>(Auxiliary::vector(Auxiliary::AT_EXECFN).pointer());
 		auto flags = loader->default_flags;
-		flags.updatable = 0;
-		flags.premapped = 1;
-		ObjectIdentity * start = loader->open(bin, flags, true, NAMESPACE_BASE, base);
+		// TODO: We currently ignore the premapped binary if updates are enabled.
+		flags.updatable = loader->config.dynamic_update;
+		flags.premapped = !loader->config.dynamic_update;
+		flags.executed_binary = true;
+		ObjectIdentity * start = loader->open(bin, flags, true, NAMESPACE_BASE, flags.premapped == 1 ? base : 0);
+
 		if (start == nullptr) {
 			LOG_ERROR << "Failed loading " << bin << endl;
 			return EXIT_FAILURE;
