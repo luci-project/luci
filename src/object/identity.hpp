@@ -53,7 +53,7 @@ struct ObjectIdentity {
 	/*! \brief Loader */
 	Loader & loader;
 
-	/*! \brief Library name (SONAME) */
+	/*! \brief Library name (SONAME) for shared libraries, archive entry name for static libraries */
 	StrPtr name;
 
 	/*! \brief path to file */

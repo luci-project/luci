@@ -169,7 +169,7 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 	}
 
 	// Adjust permission if required
-	if (addr != 0 && flags.premapped == 0 && ((flags.immutable_source && type == Elf::ET_REL) || (!flags.immutable_source && type != Elf::ET_REL))) {
+	if (data.addr != 0 && flags.premapped == 0 && ((flags.immutable_source && type == Elf::ET_REL) || (!flags.immutable_source && type != Elf::ET_REL))) {
 		// Keep it writable for relocatable Objects only
 		if (auto mprotect = Syscall::mprotect(data.addr, data.size, PROT_READ | (type == Elf::ET_REL ? PROT_WRITE : 0)); mprotect.failed())
 			LOG_WARNING << "Unable to adjust protection of target memory: " << mprotect.error_message() << endl;
