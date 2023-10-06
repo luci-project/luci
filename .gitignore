@@ -3,3 +3,4 @@
 ld-luci*.so
 libpath.conf
 versions.txt
+*.local
