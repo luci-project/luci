@@ -11,6 +11,7 @@
 class Trampoline {
 	Vector<uintptr_t> blocks;  // a block starts with two code pages (similar to PLT) and an additional redirection table (GOT)
 	Vector<VersionedSymbol> symbols;  // list of assigned symbols, index corresponds to entry
+	uintptr_t (*address_callback)(size_t);  // callback for mmap address
 
 	/*! \brief Get vector index of symbol */
 	bool index(const VersionedSymbol & sym, size_t & index) const;
@@ -22,6 +23,9 @@ class Trampoline {
 	bool allocate(const VersionedSymbol & sym, size_t & index);
 
  public:
+	/*! \brief Constructor with optional callback for the address */
+	Trampoline(uintptr_t (*address_callback)(size_t) = nullptr) : address_callback(address_callback) {}
+
 	/*! \brief Return address of trampoline code for symbol (or nullptr if not found) */
 	void * get(const VersionedSymbol & sym) const;
 

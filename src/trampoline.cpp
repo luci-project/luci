@@ -53,7 +53,11 @@ bool Trampoline::pointer(size_t index, void* & trampoline_function, uintptr_t* &
 bool Trampoline::allocate(const VersionedSymbol & sym, size_t & index) {
 	if ((symbols.size() + 1) / entries_per_block >= blocks.size()) {
 		// allocate new pages
-		if (auto mmap = Syscall::mmap(0, trampolines_block + Page::SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE)) {
+		uintptr_t mmap_address = 0;
+		uintptr_t mmap_size = trampolines_block + Page::SIZE;
+		if (address_callback != nullptr)
+			mmap_address = address_callback(mmap_size);
+		if (auto mmap = Syscall::mmap(mmap_address, mmap_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE)) {
 			uint8_t * addr = reinterpret_cast<uint8_t*>(mmap.value());
 			uintptr_t * entry = reinterpret_cast<uintptr_t*>(mmap.value() + trampolines_block);
 			for (size_t i = 0; i < entries_per_block; i ++) {
