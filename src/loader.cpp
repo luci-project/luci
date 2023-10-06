@@ -61,9 +61,11 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
 	static_flags.premapped = 1;
 
 	// Add vDSO (if available)
-	if (auto vdso = Auxiliary::vector(Auxiliary::AT_SYSINFO_EHDR)) {
-		if (open("linux-vdso.so.1", static_flags, true, NAMESPACE_BASE, vdso.value()) == nullptr)
-			LOG_WARNING << "Unable to load vDSO!" << endl;
+	if (config.enable_vdso) {
+		if (auto vdso = Auxiliary::vector(Auxiliary::AT_SYSINFO_EHDR)) {
+			if (open("linux-vdso.so.1", static_flags, true, NAMESPACE_BASE, vdso.value()) == nullptr)
+				LOG_WARNING << "Unable to load vDSO!" << endl;
+		}
 	}
 
 	// add self as dynamic exec

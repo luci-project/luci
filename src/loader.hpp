@@ -31,6 +31,9 @@ struct Loader {
 		/*! \brief check all dependencies when comparing of functions*/
 		bool dependency_check = false;
 
+		/*! \brief use vDSO */
+		bool enable_vdso = true;
+
 		/*! \brief force dynamic updates even if they seem incompatible */
 		bool force_update = false;
 
