@@ -37,9 +37,12 @@ function dump_offsets() {
 		DEBUGINFOD_URLS="$DEBUGINFOD_URL $DEBUGINFOD_URLS" objdump -WK -t "$1" 2>/dev/null | sort -u > "$OBJDUMP"
 		if grep "^no symbols$" "$OBJDUMP" >/dev/null ; then
 			DEBUGINFO=$(mktemp)
-			wget -O "$DEBUGINFO" "${DEBUGINFOD_URL}/buildid/${BUILDID}/debuginfo" >/dev/null 2>&1
-			objdump -t "$DEBUGINFO" | sort -u > "$OBJDUMP"
-			rm "$DEBUGINFO"
+			if wget -O "$DEBUGINFO" "${DEBUGINFOD_URL}/buildid/${BUILDID}/debuginfo" >/dev/null 2>&1 ; then
+				objdump -t "$DEBUGINFO" | sort -u > "$OBJDUMP"
+				rm "$DEBUGINFO"
+			else
+				echo "no symbols" > "$OBJDUMP"
+			fi
 		fi
 		if grep "^no symbols$" "$OBJDUMP" >/dev/null ; then
 			echo "	// (no debug symbols found)" >&2
@@ -67,7 +70,13 @@ function dump_offsets() {
 	fi
 }
 
-if [[ $# -ge 1 ]] ; then
+if ! command -v objdump &> /dev/null ; then
+	echo "objdump not found (install binutils package)" >&2
+	exit 1
+elif ! command -v wget &> /dev/null ; then
+	echo "wget not found (install wget package)" >&2
+	exit 1
+elif [[ $# -ge 1 ]] ; then
 	for FILE in $@ ; do
 		echo "	// File $FILE"
 		dump_offsets "$FILE"
