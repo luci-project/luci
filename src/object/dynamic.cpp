@@ -284,10 +284,10 @@ struct ObjectData {
 
 static bool update_redirect(uintptr_t from, uintptr_t to, size_t size, ObjectData * objs) {
 	if (Redirect::add(objs->from, from - objs->from.base, to, size, size > 0)) {
-		LOG_INFO << "Redirecting " << objs->from << " at " << reinterpret_cast<void*>(from) << " to " << objs->from  << " at " << reinterpret_cast<void*>(to) << endl;
+		LOG_INFO << "Redirecting " << objs->from << " at " << reinterpret_cast<void*>(from) << " to " << objs->to  << " at " << reinterpret_cast<void*>(to) << endl;
 		return true;
 	} else {
-		LOG_WARNING << "Redirect " << objs->from << " at " << reinterpret_cast<void*>(from) << " to " << objs->from  << " at " << reinterpret_cast<void*>(to) << " failed" << endl;
+		LOG_WARNING << "Redirect " << objs->from << " at " << reinterpret_cast<void*>(from) << " to " << objs->to  << " at " << reinterpret_cast<void*>(to) << " failed" << endl;
 		return false;
 	}
 }
