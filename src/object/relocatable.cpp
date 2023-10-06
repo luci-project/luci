@@ -198,7 +198,7 @@ bool ObjectRelocatable::adjust_offsets(uintptr_t offset, const Elf::Section & se
 							}
 						}
 						// For general symbols adjust entry
-						if (is(sym.type()).in(STT_OBJECT, STT_FUNC, STT_SECTION, STT_GNU_IFUNC, STT_TLS)) {
+						if (is(sym.type()).in(STT_NOTYPE, STT_OBJECT, STT_FUNC, STT_SECTION, STT_GNU_IFUNC, STT_TLS)) {
 							// This is only allowed since we have a COW mapping
 							Elf::Sym * data = const_cast<Elf::Sym *>(sym.ptr());
 							// Fixup value (= offset)
