@@ -176,8 +176,8 @@ struct Loader {
 	}
 
 	/*! \brief Load file */
-	ObjectIdentity * open(const char * filename, const char * directory, ObjectIdentity::Flags flags, bool priority = false, namespace_t ns = NAMESPACE_BASE);
-	ObjectIdentity * open(const char * path, ObjectIdentity::Flags flags, bool priority = false, namespace_t ns = NAMESPACE_BASE, uintptr_t addr = 0, Elf::ehdr_type type = Elf::ET_NONE);
+	ObjectIdentity * open(const char * filename, const char * directory, ObjectIdentity::Flags flags, bool priority = false, namespace_t ns = NAMESPACE_BASE, const char * altname = nullptr);
+	ObjectIdentity * open(const char * path, ObjectIdentity::Flags flags, bool priority = false, namespace_t ns = NAMESPACE_BASE, uintptr_t addr = 0, Elf::ehdr_type type = Elf::ET_NONE, const char * altname = nullptr);
 	inline ObjectIdentity * open(const char * path) {
 		return open(path, default_flags);
 	}
@@ -246,6 +246,7 @@ struct Loader {
 
 	/*! \brief Delayed object loading after file modifiaction (called in helper loop) */
 	void filemodification_load(unsigned long now, TreeSet<Pair<unsigned long, ObjectIdentity*>> & worklist_load, TreeSet<Pair<unsigned long, Object*>> & worklist_protect);
+	bool filemodification_load_helper(ObjectIdentity* object, uintptr_t addr = 0);
 
 	/*! \brief Delayed object protection after file modifiaction (called in helper loop) */
 	void filemodification_protect(unsigned long now, TreeSet<Pair<unsigned long, Object*>> & worklist_protect);

@@ -157,7 +157,7 @@ ObjectIdentity * Loader::library(const char * filename, ObjectIdentity::Flags fl
 }
 
 
-ObjectIdentity * Loader::open(const char * filename, const char * directory, ObjectIdentity::Flags flags, bool priority, namespace_t ns) {
+ObjectIdentity * Loader::open(const char * filename, const char * directory, ObjectIdentity::Flags flags, bool priority, namespace_t ns, const char * altname) {
 	auto filename_len = String::len(filename);
 	auto directory_len = String::len(directory);
 
@@ -166,11 +166,11 @@ ObjectIdentity * Loader::open(const char * filename, const char * directory, Obj
 	path[directory_len] = '/';
 	String::copy(path + directory_len + 1, filename, filename_len + 1);
 
-	return open(path, flags, priority, ns);
+	return open(path, flags, priority, ns, 0, Elf::ET_NONE, altname);
 }
 
 
-ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags, bool priority, namespace_t ns, uintptr_t addr, Elf::ehdr_type type) {  // NOLINT
+ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags, bool priority, namespace_t ns, uintptr_t addr, Elf::ehdr_type type, const char * altname) {  // NOLINT
 	// Does file contain a valid full path or do we have a memory address?
 	if (addr != 0 || File::exists(filepath)) {
 		if (ns == NAMESPACE_NEW)
@@ -194,14 +194,19 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 				for (auto & entry : archive) {
 					if (entry.is_regular()) {
 						LOG_DEBUG << "Loading " << entry.name() << " from library " << filepath << endl;
-						obj = open(filepath, flags, priority, ns, reinterpret_cast<uintptr_t>(entry.data()));
+						auto addr = reinterpret_cast<uintptr_t>(entry.data());
+						auto size = entry.size();
+						// Create full in-memory copy
+						if (auto anon = Syscall::mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0))
+							addr = Memory::copy(anon.value(), addr, size);
+						obj = open(filepath, flags, priority, ns, addr, Elf::ET_NONE, String::duplicate(entry.name()));
 					}
 				}
 				return obj;
 			}
 		} else if (format == File::contents::FORMAT_ELF) {
 			GDB::notify(GDB::RT_ADD);
-			auto i = lookup.emplace(priority ? dependencies : lookup.end(), *this, flags, filepath, ns, nullptr);
+			auto i = lookup.emplace(priority ? dependencies : lookup.end(), *this, flags, filepath, ns, altname);
 			assert(i);
 
 			if (!priority && dependencies == lookup.end())
