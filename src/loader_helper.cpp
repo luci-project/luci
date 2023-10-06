@@ -4,6 +4,7 @@
 
 #include "loader.hpp"
 
+#include <dlh/parser/ar.hpp>
 #include <dlh/syscall.hpp>
 #include <dlh/error.hpp>
 #include <dlh/file.hpp>
@@ -34,12 +35,10 @@ void Loader::filemodification_detect(unsigned long now, TreeSet<Pair<unsigned lo
 	ssize_t len = read.value();
 	if (len <= 0)
 		return;
-
 	char *ptr = buf;
 	while (ptr < buf + len) {
 		const struct inotify_event * event = reinterpret_cast<const struct inotify_event *>(ptr);
 		ptr += sizeof(struct inotify_event) + event->len;
-
 		assert((event->mask & IN_ISDIR) == 0);
 		bool check_all = false;
 		if ((event->mask & IN_Q_OVERFLOW) != 0) {
@@ -53,6 +52,10 @@ void Loader::filemodification_detect(unsigned long now, TreeSet<Pair<unsigned lo
 				if (check_all /* && object_file.flags.updatable == 1 */) {
 					worklist_load.emplace(now + SECOND_NS, &object_file);
 				} else if (event->wd == object_file.wd) {
+					// Ignore update if already in list
+					// TODO: Check full list & update timer
+					if (!worklist_load.empty() && worklist_load.highest()->second == &object_file)
+						continue;
 					LOG_DEBUG << "Notification for file modification in " << object_file.path << endl;
 					/*if (object_file.flags.updatable == 1) {
 						LOG_ERROR << "Unable to update " << object_file << " since it is marked as non updateable!" << endl;
@@ -69,6 +72,33 @@ void Loader::filemodification_detect(unsigned long now, TreeSet<Pair<unsigned lo
 	}
 }
 
+bool Loader::filemodification_load_helper(ObjectIdentity* object, uintptr_t addr) {
+	auto format = addr != 0 ? File::contents::format(reinterpret_cast<const char *>(addr), 6) : File::contents::format(object->path.c_str());
+	switch (format) {
+		case File::contents::FORMAT_AR:
+		 {
+			AR archive(object->path.c_str());
+			if (archive.is_valid())
+				for (auto & entry : archive)
+					if (entry.is_regular() && entry.name() == object->name) {
+						auto addr = reinterpret_cast<uintptr_t>(entry.data());
+						auto size = entry.size();
+						if (auto anon = Syscall::mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0))
+							addr = Memory::copy(anon.value(), addr, size);
+						return filemodification_load_helper(object, addr);
+					}
+			break;
+		}
+		case File::contents::FORMAT_ELF:
+			if (object->load(addr) != nullptr)
+				return true;
+			break;
+		default:
+			LOG_ERROR << "Invalid file format (" << format_description(format) << ") for updated " << *object << endl;
+	}
+	return false;
+}
+
 void Loader::filemodification_load(unsigned long now, TreeSet<Pair<unsigned long, ObjectIdentity*>> & worklist_load, TreeSet<Pair<unsigned long, Object*>> & worklist_protect) {
 	GuardedWriter _{lookup_sync};
 	bool updated = false;
@@ -77,7 +107,7 @@ void Loader::filemodification_load(unsigned long now, TreeSet<Pair<unsigned long
 		if (i->first <= now) {
 			assert(i->second != nullptr);
 			LOG_INFO << "Loading " << *(i->second) << endl;
-			if (i->second->load() != nullptr) {
+			if (filemodification_load_helper(i->second)) {
 				updated = true;
 				if (config.detect_outdated != Loader::Config::DETECT_OUTDATED_DISABLED) {
 					assert(i->second->current != nullptr && i->second->current->file_previous != nullptr);
