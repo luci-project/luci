@@ -26,7 +26,7 @@ const struct {
 	uint8_t offset;
 	uint8_t signal;
 	const char * desc;
-} traps[MODE_NOT_CONFIGURED] = {
+} traps[MODE_NONE] = {
     /* [MODE_DEBUG_TRAP]               = */  { { 0xcc, 0x00 }, 1, 1, SIGTRAP, "INT1 instruction for debug trap" },
 	/* [MODE_BREAKPOINT_TRAP]          = */  { { 0xf1, 0x00 }, 1, 1, SIGTRAP, "INT3 instruction for breakpoint trap" },
 	/* [MODE_INVALID_OPCODE]           = */  { { 0x0f, 0x0b }, 2, 0, SIGILL,  "UD2 instruction (two bytes!) for invalid opcode trap" },
@@ -223,6 +223,9 @@ bool setup(Mode mode) {
 	}
 
 	Redirect::mode = mode;
+	if (mode == MODE_NONE) {
+		return false;
+	}
 	const auto & trap = traps[mode];
 	LOG_INFO << "Setting up redirections using " << trap.desc << endl;
 
@@ -251,7 +254,9 @@ bool setup(Mode mode) {
 }
 
 bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, size_t from_size, bool make_static, bool finalize) {
-	if (mode == MODE_NOT_CONFIGURED) {
+	if (mode == MODE_NONE) {
+		return false;
+	} else if (mode == MODE_NOT_CONFIGURED) {
 		LOG_ERROR << "Redirect has not been setup yet!" << endl;
 		return false;
 	}
@@ -312,11 +317,15 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 }
 
 bool add(uintptr_t from, uintptr_t to, size_t from_size, bool make_static, bool finalize) {
+	if (mode == MODE_NONE)
+		return false;
 	Object * object = Loader::instance()->resolve_object(from);
 	return object == nullptr ? false : add(*object, from, to, from_size, make_static, finalize);
 }
 
 bool remove(uintptr_t address, bool finalize) {
+	if (mode == MODE_NONE)
+		return false;
 	GuardedWriter _(redirection_sync);
 	auto e = redirection_entries.find(address);
 	if (e) {
@@ -344,6 +353,8 @@ bool remove(uintptr_t address, bool finalize) {
 }
 
 bool is_set(uintptr_t from, uintptr_t * to) {
+	if (mode == MODE_NONE)
+		return false;
 	GuardedReader _(redirection_sync);
 	if (const auto & e = redirection_entries.find(from)) {
 		if (to != nullptr)

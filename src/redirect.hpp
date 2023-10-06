@@ -17,6 +17,8 @@ enum Mode {
 	MODE_INVALID_OPCODE_HACK,       ///< push es (which is not available on x64)
 	MODE_GENERAL_PROTECTION_FAULT,  ///< hlt (which is not allowed in ring 3)
 
+	MODE_NONE,                      ///< disabled redirection
+
 	MODE_NOT_CONFIGURED             ///< not set yet
 };
 
