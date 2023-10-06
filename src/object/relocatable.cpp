@@ -124,7 +124,9 @@ bool ObjectRelocatable::preload() {
 
 			case SHT_REL:
 			case SHT_RELA:
-				relocation_tables.push_back(section.get_relocations());
+				// Only relocations for allocated sections (linked in the info attribute)
+				if (section.info() != 0 && this->sections[section.info()].allocate())
+					relocation_tables.push_back(section.get_relocations());
 				break;
 		}
 	}
