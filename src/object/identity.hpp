@@ -73,7 +73,8 @@ struct ObjectIdentity {
 			         ignore_mtime     : 1,  // Do not rely on modification time when checking for file modifications
 			         skip_identical   : 1,  // Skip update if identical file was already loaded
 			         initialized      : 1,  // Do not executed INIT functions / constructors (again)
-			         premapped        : 1;  // Already mapped into target memory
+			         premapped        : 1,  // Already mapped into target memory
+			         executed_binary  : 1;  // The object was executed by the system (and requires special handling in watching)
 		};
 		unsigned value;
 

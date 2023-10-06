@@ -73,7 +73,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 			if (flags.premapped == 0)
 				Syscall::munmap(data.addr, data.size);
 			Syscall::close(data.fd);
-		} else if (!watch()) {
+		} else if (!watch(flags.executed_binary, flags.executed_binary)) {
 			info = INFO_ERROR_INOTIFY;
 		}
 	}
@@ -190,7 +190,7 @@ bool ObjectIdentity::watch(bool force, bool close_existing) {
 				LOG_WARNING << "Cannot remove old watch for modification of " << this->path << ": " << inotify.error_message() << endl;
 			}
 		}
-		if (auto inotify = Syscall::inotify_add_watch(loader.filemodification_inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW)) {
+		if (auto inotify = Syscall::inotify_add_watch(loader.filemodification_inotifyfd, this->path.str, IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF | IN_DONT_FOLLOW | (flags.executed_binary ? IN_ATTRIB : 0))) {
 			LOG_DEBUG << "Watching for modifications at " << this->path << endl;
 			wd = inotify.value();
 		} else {
