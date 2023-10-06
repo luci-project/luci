@@ -242,7 +242,7 @@ static void *_dlvsym(void *__restrict handle, const char *__restrict symbol, con
 		auto * ptr = r->pointer();
 		// Use trampolines
 		if (ptr != nullptr && loader->config.dynamic_dlupdate && (r->type() == Elf::STT_FUNC || r->type() == Elf::STT_GNU_IFUNC)) {
-			auto * tptr = loader->dlsyms.set(r.value());
+			auto * tptr = loader->symbol_trampoline.set(r.value());
 			LOG_TRACE <<  "Symbol " << symbol  << " using trampoline " << tptr << " --> " << ptr << endl;
 			assert(tptr != nullptr);
 			return tptr;

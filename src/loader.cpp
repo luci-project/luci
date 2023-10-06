@@ -37,8 +37,12 @@ void* kickoff_helper_loop(void * ptr) {
 	return nullptr;
 }
 
+static uintptr_t symbol_trampoline_address_callback(size_t size) {
+	return _instance->next_address(size);
+}
+
 Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
- : config(config), dependencies(lookup.end()) {
+ : config(config), symbol_trampoline(symbol_trampoline_address_callback), dependencies(lookup.end()) {
 	default_flags.bind_global = 1;
 
 	if (config.dynamic_update) {
@@ -255,8 +259,7 @@ bool Loader::relocate(bool update) {
 		}
 
 		// update dlsym trampolines
-		if (config.dynamic_dlupdate)
-			dlsyms.update();
+		symbol_trampoline.update();
 	}
 
 	// Protect memory

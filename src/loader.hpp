@@ -128,8 +128,8 @@ struct Loader {
 	/*! \brief thread local storage */
 	TLS tls;
 
-	/*! \brief Trampoline to dynamically loaded symbols (using dlsym) - for dynamic_dlupdate */
-	Trampoline dlsyms;
+	/*! \brief Trampoline used for dynamically loaded symbols (using dlsym) - for dynamic_dlupdate */
+	Trampoline symbol_trampoline;
 
 	/*! \brief socket to receive elf hash */
 	Socket::Client debug_hash_socket;
@@ -211,7 +211,7 @@ struct Loader {
 
 	/*! \brief get next (page aligned) memory address */
 	uintptr_t next_address(size_t size = 0) const;
-	/*! \brief reset start address (required to free allocated address on aborting loading */
+	/*! \brief reset start address (required to free allocated address on aborting loading) */
 	void reset_address(uintptr_t addr) const;
 
 	/*! \brief check if object is already loaded */
