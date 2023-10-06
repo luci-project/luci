@@ -1,21 +1,20 @@
-Luci example
-============
+Example updating a shared library
+=================================
 
-This directory contains six versions of a shared library calculating the Fibonacci sequence, all sharing the [same interface (API)](fib.h):
-
- * [`fib_1`](fib_1.c) uses the well-known recursive algorithm with exponential time complexity O(n²)
- * [`fib_2`](fib_2.c) uses dynamic programming with linear time complexity O(n), which is noticeably faster.
- * [`fib_3`](fib_3.c) employs a more space-efficient iterative algorithm with linear time complexity O(n).
- * [`fib_4`](fib_4.c) is based on a matrix algorithm with logarithmic time complexity O(log(n)) – while there shouldn't be any perceptible difference compared to the iterative approach, this example demonstrates that new helper functions can be introduced as well.
- * [`fib_5`](fib_5.c) implements Binet's formula (using the golden ratio) and therefore has constant time complexity O(1) – since this example requires math functions like square root, the library itself is linked against `libm.so`, therefore demonstrates *Luci*'s ability to handle versions with changed dependencies or its usage of new external functions.
- * [`fib_6`](fib_6.c) contains a lookup table with all relevant Fibonacci sequence numbers, having a constant time complexity O(1) while being slightly faster than the previous version. This version illustrates that changing/introducing (non-writable) data does not pose an issue for *Luci*.
-
-(all versions are based on the examples at [geeksforgeeks.org](https://www.geeksforgeeks.org/program-for-nth-fibonacci-number/))
+Demonstration of *Luci* handling changed shared libraries.
+A detailed description of the different functions calculating Fibonacci sequence can be found in the [parent directory](../README.md)
+The [`run-main`](main.c) binary will employ the shared library interface to calculate Fibonacci numbers, the second binary [`run-measure`](measure.c) has the ability to measure the duration of each `fib` library function call.
 
 
-The [`run-main`](main.c) binary will employ the shared library interface to calculate Fibonacci numbers (endless loop, but only the first 93 values will be valid due to overflows).
-To relax the CPU, it will wait a second in between calculating the next number (can be changed/disabled using the `DELAY` macro).
-There is a second binary [`run-measure`](measure.c) with the ability to measure the duration of the `fib` library function call.
+Quick Start
+-----------
+
+Run
+
+    ./demo.sh
+
+to build the example and start the `run-measure` binary, automatically replacing the shared library `libfib.so` (→ dynamically updating it) every 10 seconds with another version in random order.
+The script performs the tasks described below.
 
 
 Preparation
@@ -75,29 +74,29 @@ After a certain time in a different terminal window (but same working directory)
 If a call to `fib` is executed during the update, it will finish in library version 1, but subsequent calls will be made in the corresponding function of library version 2 - you should notice a significant performance boost and a different output in the lines starting with square brackets:
 
     fib(43) = 433494437
-    [using Fibonacci library v1: O(2^n))]
+    [using Fibonacci v1: O(2^n))]
     fib(44) = 701408733
-    [using Fibonacci library v1: O(2^n))]
+    [using Fibonacci v1: O(2^n))]
     fib(45) = 1134903170
-    [using Fibonacci library v2: O(n)]
+    [using Fibonacci v2: O(n)]
     fib(46) = 1836311903
-    [using Fibonacci library v2: O(n)]
+    [using Fibonacci v2: O(n)]
 
 In the same way, you can also change to any other version (e.g., `ln -sf fib_3/libfib.so`).
 It is not necessary to sequentially increase the versions; you can directly apply version 6. For example, here an output running `run-measure` with two consecutive updates:
 
     fib(44) = 701408733 (in 1.574935s)
-    [using Fibonacci library v1: O(2^n))]
+    [using Fibonacci v1: O(2^n))]
     fib(45) = 1134903170 (in 2.627559s)
-    [using Fibonacci library v1: O(2^n))]
+    [using Fibonacci v1: O(2^n))]
     fib(46) = 1836311903 (in 4.181815s)
-    [using Fibonacci library v2: O(n))]
+    [using Fibonacci v2: O(n))]
     fib(47) = 2971215073 (in 0.000001s)
-    [using Fibonacci library v2: O(n))]
+    [using Fibonacci v2: O(n))]
     fib(48) = 4807526976 (in 0.000038s)
-    [using Fibonacci library v6: O(1)]
+    [using Fibonacci v6: O(1)]
     fib(49) = 7778742049 (in 0.000001s)
-    [using Fibonacci library v6: O(1)]
+    [using Fibonacci v6: O(1)]
 
 If you want to see further details about the dynamic linking, increase `LD_LOGLEVEL` (e.g., `6` for debugging).
 
@@ -118,7 +117,7 @@ For example, if we change the automatic variable (= located on stack) `f` in `fi
                     return value;
     -       unsigned long f[4] = {1, 1, 1, 0};
     +       static unsigned long f[4] = {1, 1, 1, 0};
-     
+
                     power(f, value - 1);
             return f[0];
 
@@ -130,7 +129,7 @@ The `bean` utilities might help you to detect and understand certain compatibili
 
 will output an overview of all changes (together with internal ID used in *Luci*)
 
-    # Changes at update of  (19328 bytes) with  (23552 bytes)
+    # Changes at update of fib_3/libfib.so (19328 bytes) with fib_4/libfib.so (23552 bytes)
     {ID               ID refs         } [Ref / Rel / Dep] - Address              Size Type     Bind  Flag Name (Section)
     {f80c01b018c54985 0000000000000000} [  0 /   0 /   0] - 0x00000000000002a8     32 unknown  local      (.note.gnu.property)
     {eb918d257d75043c 0000000000000000} [  0 /   0 /   0] - 0x00000000000002c8     36 unknown  local      (.note.gnu.build-id)
@@ -154,7 +153,7 @@ will output an overview of all changes (together with internal ID used in *Luci*
     {63ee4d1095c0e94d 0000000000000000} [  0 /   0 /   3] - 0x0000000000004020     32 object   local  W   f.0 (.data)
     {6a00f430077b5d2c 0000000000000000} [  0 /   0 /   3] - 0x0000000000004040      1 object   local  W   completed.0 (.bss)
     {f94b1c0dad11489b 0000000000000000} [  0 /   0 /   0] - 0x0000000000004041      7 unknown  local  W   (.bss)
-    
+
     # Critical sections have changed - not updateable...
 
 If you want to dig deeper, try
@@ -167,22 +166,22 @@ for a detailed output
     -          0x4000                          00
     -  3 depending on this
     -  ID: {e029702676d69e52 0000000000000000}
-    
+
     -unnamed 7 bytes @ 0x4009, .bss [rw-]:
     -          0x4000                             00 00 00 00 00 00 00
     -  ID: {e8c1a8a4ddac200f 0000000000000000}
-    
+
     +f.0 (32 bytes @ 0x4020, .data [rw-]):
     +          0x4020  01 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00
     +          0x4030  01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     +  3 depending on this
     +  ID: {63ee4d1095c0e94d 0000000000000000}
-    
+
     +completed.0 (1 bytes @ 0x4040, .bss [rw-]):
     +          0x4040  00
     +  3 depending on this
     +  ID: {6a00f430077b5d2c 0000000000000000}
-    
+
     +unnamed 7 bytes @ 0x4041, .bss [rw-]:
     +          0x4040     00 00 00 00 00 00 00
     +  ID: {f94b1c0dad11489b 0000000000000000}
@@ -254,19 +253,3 @@ which will show details and color-highlight any incompatibilities (if supported 
 The different size of `.data` and hash in `.debug RW` prevent the update.
 Hence, for subsequent updates from version 1 to 6, you would have to restart twice to run *all* library versions.
 Otherwise, *Luci* will just skip version 4, directly updating from 3 to 5, as indicated in previous matrix overview.
-
-
-### Notes on RELRO
-
-The example employs the [full relocation read-only (RELRO)](https://www.redhat.com/en/blog/hardening-elf-binaries-using-relocation-read-only-relro) for the libraries in the `Makefile`s `LDFLAGS`.
-This common mitigation technique places the global offset table (GOT) completely in the non-writable section, requiring to bind all references on load-time (`BIND_NOW`).
-Without full RELRO, calling new functions (like the math functions `sqrtl` and `powl` in `fib_5`) would not be possible because it changes the size of the GOT (➔ different writable section makes it incompatible).
-
-In addition, the default compiler flags might include `-fstack-protector`, which will result in calls to `__stack_chk_fail` in some versions, having the same effect on the GOT.
-While there is a big chance that this would be always present in bigger libraries, our example libraries are tiny and therefore this GOT entry might be omitted if the code does not contain any functions with arrays on the stack.
-
-In LLVM, a similar case might happen with the recursion in `fib` (in the first version), which will allocate an extra GOT slot.
-
-Without full RELRO (by omitting `BIND_NOW` / no `-z now` linker flag), GCC 11 would only have 27% compatible updates and 40% with clang/LLVM 14 (on Ubuntu Jammy) due to the reasons described above.
-
-Nevertheless, while the described *unintended* incompatibilities are quite likely in very small libraries like the provided examples, we have observed they are rather seldom in real-world libraries — even without hardening techniques like RELRO.

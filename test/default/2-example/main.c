@@ -1,1 +1,1 @@
-../../../example/main.c
+../../../example/fibonacci/_source/main.c

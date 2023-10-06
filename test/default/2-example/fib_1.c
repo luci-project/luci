@@ -1,1 +1,1 @@
-../../../example/fib_1.c
+../../../example/fibonacci/_source/fib_1.c

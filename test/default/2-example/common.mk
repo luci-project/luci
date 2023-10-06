@@ -1,1 +1,1 @@
-../../../example/Makefile
+../../../example/fibonacci/shared-library/Makefile
