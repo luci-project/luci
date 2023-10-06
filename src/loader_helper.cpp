@@ -72,7 +72,7 @@ void Loader::filemodification_detect(unsigned long now, TreeSet<Pair<unsigned lo
 	}
 }
 
-bool Loader::filemodification_load_helper(ObjectIdentity* object, uintptr_t addr) {
+bool Loader::filemodification_load_helper(ObjectIdentity* object, uintptr_t addr) {  // NOLINT
 	auto format = addr != 0 ? File::contents::format(reinterpret_cast<const char *>(addr), 6) : File::contents::format(object->path.c_str());
 	switch (format) {
 		case File::contents::FORMAT_AR:

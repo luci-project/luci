@@ -24,7 +24,7 @@ class Trampoline {
 
  public:
 	/*! \brief Constructor with optional callback for the address */
-	Trampoline(uintptr_t (*address_callback)(size_t) = nullptr) : address_callback(address_callback) {}
+	explicit Trampoline(uintptr_t (*address_callback)(size_t) = nullptr) : address_callback(address_callback) {}
 
 	/*! \brief Return address of trampoline code for symbol (or nullptr if not found) */
 	void * get(const VersionedSymbol & sym) const;
