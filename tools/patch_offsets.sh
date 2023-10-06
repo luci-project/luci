@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export LC_ALL=C
+DEBUGINFOD_URL="https://debuginfod.elfutils.org/"
 
 LIBC=( "/lib64/libc.so.6" "/lib/x86_64-linux-gnu/libc.so.6" )
 
@@ -18,38 +19,46 @@ function filter_symbol() {
 
 function dump_offsets() {
 	if [[ -f "$1" ]] ; then
-		echo "	{"
+		BUILDID=""
+		BUILDID_ARRAY=""
 		while read -r line ; do
 			if [[ $line =~ ^[\ ]*Build\ ID:\ ([0-9a-f]+)$ ]] ; then
-				echo -n "		{ "
+				BUILDID=${BASH_REMATCH[1]}
 				for (( n = 0; n < ${#BASH_REMATCH[1]}; n += 2 )) ; do
 					if (( n != 0 )) ; then
-						echo -n ", "
+						BUILDID_ARRAY+=", "
 					fi
-					echo -n "0x${BASH_REMATCH[1]:$n:2}"
+					BUILDID_ARRAY+="0x${BASH_REMATCH[1]:$n:2}"
 				done
-				echo " },"
 			fi
 		done < <(readelf -n "$1" 2>/dev/null | grep Build)
 
-
-
-
 		OBJDUMP=$(mktemp)
-		objdump -WK -t "$1" | sort -u > "$OBJDUMP"
-
-		echo "		{"
-		cat "$OBJDUMP" | filter_symbol "_dl_addr"             "nops_jmp" "_dl_addr_patch"
-		cat "$OBJDUMP" | filter_symbol "__libc_dlopen_mode"   "nops_jmp" "dlopen"
-		cat "$OBJDUMP" | filter_symbol "__libc_dlclose"       "nops_jmp" "dlclose"
-		cat "$OBJDUMP" | filter_symbol "__libc_dlsym"         "nops_jmp" "dlsym"
-		cat "$OBJDUMP" | filter_symbol "__libc_dlvsym"        "nops_jmp" "dlvsym"
-
-		if ! cat "$OBJDUMP" | filter_symbol "_Fork"       "redirect_fork_syscall" "_fork_syscall" ; then
-			cat $OBJDUMP | filter_symbol "__libc_fork" "redirect_fork_syscall" "_fork_syscall"
+		DEBUGINFOD_URLS="$DEBUGINFOD_URL $DEBUGINFOD_URLS" objdump -WK -t "$1" 2>/dev/null | sort -u > "$OBJDUMP"
+		if grep "^no symbols$" "$OBJDUMP" >/dev/null ; then
+			DEBUGINFO=$(mktemp)
+			wget -O "$DEBUGINFO" "${DEBUGINFOD_URL}/buildid/${BUILDID}/debuginfo" >/dev/null 2>&1
+			objdump -t "$DEBUGINFO" | sort -u > "$OBJDUMP"
+			rm "$DEBUGINFO"
 		fi
-		echo "		}"
-		echo "	},"
+		if grep "^no symbols$" "$OBJDUMP" >/dev/null ; then
+			echo "	// (no debug symbols found)" >&2
+		else
+			echo "	{"
+			echo "		{ $BUILDID_ARRAY },"
+			echo "		{"
+			cat "$OBJDUMP" | filter_symbol "_dl_addr"             "nops_jmp" "_dl_addr_patch"
+			cat "$OBJDUMP" | filter_symbol "__libc_dlopen_mode"   "nops_jmp" "dlopen"
+			cat "$OBJDUMP" | filter_symbol "__libc_dlclose"       "nops_jmp" "dlclose"
+			cat "$OBJDUMP" | filter_symbol "__libc_dlsym"         "nops_jmp" "dlsym"
+			cat "$OBJDUMP" | filter_symbol "__libc_dlvsym"        "nops_jmp" "dlvsym"
+
+			if ! cat "$OBJDUMP" | filter_symbol "_Fork"       "redirect_fork_syscall" "_fork_syscall" ; then
+				cat $OBJDUMP | filter_symbol "__libc_fork" "redirect_fork_syscall" "_fork_syscall"
+			fi
+			echo "		}"
+			echo "	},"
+		fi
 		rm "$OBJDUMP"
 	else
 		echo "GLIBC file '$1' not found" >&2
