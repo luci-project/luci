@@ -37,6 +37,8 @@ LIBADDRESS = 0x600000000000
 # Default config file path
 LIBPATH_CONF = /opt/$(NAME)/libpath.conf
 LDLUCI_CONF = /opt/$(NAME)/ld-$(NAME).conf
+# Local patch offset file
+PATCH_OFFSETS_LOCAL = src/comp/glibc/patch.offsets.local
 
 ifeq ($(OPTIMIZE), 1)
 	CXXFLAGS := -O3 -DNDEBUG
@@ -131,6 +133,10 @@ test: $(TARGET_FILE)
 	$(VERBOSE) uname -m | sed -e "s/^x86_64$$/x64/" | xargs test "$(PLATFORM)" =
 	$(VERBOSE) ./tools/docker.sh $(OS):$(OSVERSION) /bin/sh -c "./test/run.sh && ./test/run.sh -u"
 
+$(PATCH_OFFSETS_LOCAL):
+	@echo "GEN		$@"
+	$(VERBOSE) tools/patch_offsets.sh > $@
+
 $(LIBBEAN):
 	@echo "GEN		$@"
 	$(VERBOSE) $(MAKE) VERBOSE_MODE=0 DWARFVERSION=$(DWARFVERSION) OPTIMIZE=$(OPTIMIZE) -C $(@D)
@@ -143,10 +149,10 @@ $(SOPATH)$(SONAME): $(SOPATH)$(TARGET_FILE)
 	@echo "LINK		$@"
 	$(VERBOSE) ln -f -r -s $< $@
 
-$(TARGET_FILE): $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
+$(TARGET_FILE): $(PATCH_OFFSETS_LOCAL) $(OBJECTS) | $(LIBBEAN) $(BUILDDIR)
 	@echo "LD		$@"
 	$(VERBOSE) $(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) -L$(dir $(LIBBEAN)) -Wl,--whole-archive -l$(patsubst lib%.a,%,$(notdir $(LIBBEAN))) -Wl,--no-whole-archive -Wl,$(subst $(SPACE),$(COMMA),$(LDFLAGS))
-	$(VERBOSE) setcap cap_sys_ptrace=eip $@ 1>/dev/null 2>&1 && echo "CAP		$@" || true
+	$(VERBOSE) setcap cap_sys_ptrace=eip $@ >/dev/null 2>&1 && echo "CAP		$@" || true
 
 $(BUILDDIR)/%.d : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 	@echo "DEP		$<"

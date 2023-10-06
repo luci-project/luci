@@ -167,6 +167,9 @@ Furthermore, distributions not only tend to use different configurations but oft
 
 Hence, *Luci* must be tailored to each distribution and version, providing the required data structures and intercepting certain inlined functions from the libc (mainly methods used to dynamically load objects, e.g., `__libc_dlopen_mode`).
 
+> **Please note:** Since newer glibc versions are distributed without symbol table, *Luci* uses the script `tools/patch_offsets.sh` to retrieve the offsets of the corresponding symbols from the debug binaries (downloading them via [debuginfod](https://sourceware.org/elfutils/Debuginfod.html) in case they are not available locally).
+> Hence, *Luci* has to be updated/recompiled if the local glibc version changes.
+
 Since the two main debianoid distributions (Debian and Ubuntu) have an excellent archive of previously released packages (and are a great target for backtesting), these are well-tested in *Luci*.
 However, *Luci* supports additional distributions as well - with the ability to at least successfully run the [default test suite](test/default).
 

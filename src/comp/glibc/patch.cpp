@@ -225,6 +225,11 @@ static struct {
 	uint8_t buildid[20];
 	PatchOffset patches[6];
 } offset_fixes[] = {
+#if defined __has_include
+#  if __has_include ("comp/glibc/patch.offsets.local")
+#    include "comp/glibc/patch.offsets.local"
+#  endif
+#endif
 #include "comp/glibc/patch.offsets"
 };
 #pragma GCC diagnostic pop
