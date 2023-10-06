@@ -431,6 +431,12 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 				relocations.insert(reloc, external_symbol.value());
 				const auto & external_symobj = external_symbol->object();
 				auto value = relocator.value_external(this->base, external_symbol.value(), external_symobj.base, external_symobj.base + external_symbol->value(), file.tls_module_id, file.tls_offset);
+				// Special case for PLT: Trampoline in case a function is unreachable
+				if (!relocator.valid_value(value) && external_symbol.value().type() == Elf::STT_FUNC && reloc.type() == Elf::R_X86_64_PLT32) {
+					auto trampoline_address = reinterpret_cast<uintptr_t>(file.loader.symbol_trampoline.set(external_symbol.value()));
+					value = relocator.value(this->base, external_symbol.value(), external_symobj.base, trampoline_address, file.tls_module_id, file.tls_offset);
+					LOG_TRACE << "Using trampoline at " << reinterpret_cast<void*>(trampoline_address) << " (-> new offset " << reinterpret_cast<void*>(value) << ") for " << needed_symbol.name() << " at " << reinterpret_cast<void*>(external_symobj.base + external_symbol->value()) << endl;
+				}
 				LOG_TRACE << "Relocating symbol " << needed_symbol.name() << " in " << *this << " with " << external_symbol->name() << " from " << external_symobj << " to " << reinterpret_cast<void*>(value) << endl;
 				return reinterpret_cast<void*>(relocator.fix_value_external(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), external_symbol.value(), value));
 			} else if (needed_symbol.bind() == STB_WEAK) {
