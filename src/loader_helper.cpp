@@ -52,11 +52,6 @@ void Loader::filemodification_detect(unsigned long now, TreeSet<Pair<unsigned lo
 				if (check_all /* && object_file.flags.updatable == 1 */) {
 					worklist_load.emplace(now + SECOND_NS, &object_file);
 				} else if (event->wd == object_file.wd) {
-					// Ignore update if already in list
-					// TODO: Check full list & update timer
-					if (!worklist_load.empty() && worklist_load.highest()->second == &object_file)
-						continue;
-					LOG_DEBUG << "Notification for file modification in " << object_file.path << endl;
 					/*if (object_file.flags.updatable == 1) {
 						LOG_ERROR << "Unable to update " << object_file << " since it is marked as non updateable!" << endl;
 					} else */ if ((event->mask & IN_IGNORED) != 0) {
@@ -64,7 +59,22 @@ void Loader::filemodification_detect(unsigned long now, TreeSet<Pair<unsigned lo
 						if (!object_file.watch(true))
 							LOG_ERROR << "Unable to watch for updates of " << object_file.path << endl;
 					} else {
-						worklist_load.emplace(now + SECOND_NS, &object_file);
+						// Ignore update if already in list
+						auto it = worklist_load.begin();
+						for (; it != worklist_load.end() && it->second != &object_file; ++it) {}
+						if (it != worklist_load.end()) {
+							if (it->first == now + SECOND_NS) {
+								LOG_TRACE << "Skip notification for file modification in " << object_file.path << " since it is already in worklist"<< endl;
+							} else {
+								LOG_DEBUG << "Skip notification for file modification in " << object_file.path << " since it is already in worklist, but update time" << endl;
+								auto && e = move(worklist_load.extract(it));
+								e.value().first = now + SECOND_NS;
+								worklist_load.insert(move(e));
+							}
+						} else {
+							LOG_DEBUG << "Notification for file modification in " << object_file.path << endl;
+							worklist_load.emplace(now + SECOND_NS, &object_file);
+						}
 					}
 				}
 			}
