@@ -12,6 +12,8 @@
 #include <dlh/file.hpp>
 #include <dlh/log.hpp>
 
+#include <elfo/elf.hpp>
+
 #include "object/base.hpp"
 #include "build_info.hpp"
 #include "loader.hpp"
@@ -497,9 +499,14 @@ int main(int argc, char* argv[]) {
 		// Load target binary
 		const char * bin = reinterpret_cast<const char *>(Auxiliary::vector(Auxiliary::AT_EXECFN).pointer());
 		auto flags = loader->default_flags;
-		// TODO: We currently ignore the premapped binary if updates are enabled.
-		flags.updatable = loader->config.dynamic_update;
-		flags.premapped = !loader->config.dynamic_update;
+		// TODO: We currently ignore the premapped binary if updates are enabled (for dynamic Elfs).
+		if (loader->config.dynamic_update && reinterpret_cast<Elf::Header*>(base)->type() == Elf::ET_DYN) {
+			flags.updatable = true;
+			flags.premapped = false;
+		} else {
+			flags.updatable = false;
+			flags.premapped = true;
+		}
 		flags.executed_binary = true;
 		ObjectIdentity * start = loader->open(bin, flags, true, NAMESPACE_BASE, flags.premapped == 1 ? base : 0);
 
