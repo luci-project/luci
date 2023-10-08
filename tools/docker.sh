@@ -18,11 +18,11 @@ if [ -f "/.dockerenv" ] ; then
 			if [ "$VERSION_CODENAME" = "stretch" ] ; then
 				sed -i -e '/stretch-updates/d' -e 's/\(security\|deb\).debian.org/archive.debian.org/' /etc/apt/sources.list
 				apt-get update
-				apt-get install -y build-essential clang-11 file gcc g++ less libcap2-bin make
+				apt-get install -y build-essential clang-11 file gcc g++ less libcap2-bin make wget
 				update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 110 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-11
 			else
 				apt-get update
-				apt-get install -y build-essential clang file gcc g++ less libcap2-bin make
+				apt-get install -y build-essential clang file gcc g++ less libcap2-bin make wget
 			fi
 			if [ $# -eq 0 ] ; then
 				apt-get install -y gdb less
@@ -30,14 +30,14 @@ if [ -f "/.dockerenv" ] ; then
 			;;
 
 		almalinux|fedora|ol|rhel)
-			yum install -y make clang diffutils gcc gcc-c++ file less make
+			yum install -y make clang diffutils gcc gcc-c++ file less make wget
 			if [ $# -eq 0 ] ; then
 				yum install -y gdb less
 			fi
 			;;
 
 		opensuse-*)
-			zypper install -y clang gcc gcc-c++ file less libcap-progs make
+			zypper install -y clang gcc gcc-c++ file less libcap-progs make wget
 			if [ $# -eq 0 ] ; then
 				zypper install -y gdb less
 			fi
