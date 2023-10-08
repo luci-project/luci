@@ -82,7 +82,6 @@ endef
 define each_version
 	$(VERBOSE) echo "$(1)ing luci for each version..."
 	$(call custom_version,$(1),almalinux,9,x64)
-	$(call custom_version,$(1),arch,202211,x64)
 	$(call custom_version,$(1),debian,stretch,x64)
 	$(call custom_version,$(1),debian,buster,x64)
 	$(call custom_version,$(1),debian,bullseye,x64)
