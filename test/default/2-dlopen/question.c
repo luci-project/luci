@@ -5,7 +5,7 @@
  #include <dlfcn.h>
 
 
-int (*answer)() = NULL;
+int (*answer)(char *, int) = NULL;
 
 const int buf_len = 10;
 
