@@ -307,11 +307,10 @@ static bool update_relocate(const Bean::SymbolRelocation & rel, uintptr_t to, co
 
 	auto value = relocator.value_external(objs->from.base, bean_sym, objs->to.base, objs->to.base + bean_sym.value(), objs->to.file.tls_module_id, objs->to.file.tls_offset);
 	if (relocator.valid_value(value)) {
-		auto addr = objs->from.base + (seg != nullptr ? seg->compose() - seg->target.address() : 0);
-		LOG_INFO << "Relocating " << bean_sym.name() << " in " << objs->from << " at " << reinterpret_cast<void*>(addr) << " with " << reinterpret_cast<void*>(value) <<  endl;
+		LOG_INFO << "Relocating " << bean_sym.name() << " in " << objs->from << " at " << reinterpret_cast<void*>(relocator.address(objs->from.base)) << " with " << reinterpret_cast<void*>(value) <<  endl;
 
 		// if (relocator.is_copy() || relocator.read_value(this->base) != value)
-		auto r = relocator.fix_value_external(addr, bean_sym, value);
+		auto r = relocator.fix_value_external(objs->from.base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), bean_sym, value);
 		return r != 0;
 	} else {
 		return false;
@@ -319,7 +318,7 @@ static bool update_relocate(const Bean::SymbolRelocation & rel, uintptr_t to, co
 }
 
 static void update_skip(uintptr_t from, uintptr_t to, const char * reason, ObjectData * objs) {
-	LOG_INFO << "Skipping " << objs->from << " at " << reinterpret_cast<void*>(from) << " (to " << objs->from  << " at " << reinterpret_cast<void*>(to) << ")";
+	LOG_DEBUG << "Skipping " << objs->from << " at " << reinterpret_cast<void*>(from) << " (to " << objs->from  << " at " << reinterpret_cast<void*>(to) << ")";
 	if (reason != nullptr)
 		LOG_INFO_APPEND << ": " << reason << endl;
 }
