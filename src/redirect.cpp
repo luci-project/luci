@@ -262,13 +262,13 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 	}
 
 	RedirectionEntry::Type type = RedirectionEntry::ONLY_DYNAMIC;
-	size_t bytes_to_be_replaced = traps[mode].size;
+	size_t bytes_to_preserve = traps[mode].size;
 	if (make_static) {
-		if (from_size < bytes_to_be_replaced) {
+		bytes_to_preserve = check_relative_jump(from_address, to_address) ? 5 : 16;
+		if (from_size < bytes_to_preserve) {
 			LOG_INFO << "Not enough space at " << reinterpret_cast<void*>(from_address) << " for static redirection -- will only use dynamic" << endl;
 		} else {
 			type = RedirectionEntry::MAKE_STATIC;
-			bytes_to_be_replaced = check_relative_jump(from_address, to_address) ? 5 : 16;
 		}
 	}
 
@@ -279,8 +279,16 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 		auto & val = e->value;
 		if (val.type == RedirectionEntry::MADE_STATIC) {
 			// In case it is not the correct target we can directly change the jump
-			if (type == RedirectionEntry::MAKE_STATIC)
-				return val.to_address == to_address ? true : static_redirect(from_object, from_address, to_address);
+			if (type == RedirectionEntry::MAKE_STATIC) {
+				if (val.to_address == to_address) {
+					// Already configured
+					return true;
+				} else {
+					// Update
+					val.to_address = to_address;
+					return static_redirect(from_object, from_address, to_address);
+				}
+			}
 		} else if (&(val.from_object) == &from_object && val.to_address == to_address && val.type == type) {
 			// already configured
 			return true;
@@ -299,14 +307,14 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 	RedirectionEntry entry{from_object, to_address, type};
 
 	// store previous opcode (in case this should be made removed at some point)
-	for (size_t i = 0; i < bytes_to_be_replaced; i++)
+	for (size_t i = 0; i < bytes_to_preserve; i++)
 		entry.previous_opcode[i] = ptr[i];
 
 	// Add entry
 	redirection_entries.insert(from_address + from_object.base, entry);
 
-	LOG_DEBUG << "Bytes at adress: " << hex << static_cast<int>(*ptr) << endl;
-	for (size_t i = 0; i < bytes_to_be_replaced; i++)
+	// Add trap instruction
+	for (size_t i = 0; i < traps[mode].size; i++)
 		ptr[i] = traps[mode].instructions[i];
 
 	// Apply changes
