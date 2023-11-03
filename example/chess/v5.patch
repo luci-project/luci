@@ -1,0 +1,480 @@
+diff -Naur rev4/game.c rev5/game.c
+--- rev4/game.c
++++ rev5/game.c
+@@ -76,34 +76,41 @@
+ 
+ 
+ bool game_move(int8_t player) {
++	const char * name = game_playerName[player > 0];
+ 	uint8_t strength = game_playerStrength[player > 0];
++	int color = tui_colorPlayer[player > 0];
++	tui_setTitle("It's \033[%dm%s\033[0ms turn", 30 + color, name);
+ #ifdef CHESS_CLOCK
+ 	long time_start = GET_TIME_MILLIS();
+ #endif
+ 
+ 	if (strength == 0) {
+ 		// weak Human
++		tui_setMessage("\033[1;%dm%s:\033[0m Move your piece", 40 + color, name);
+ 		while (true) {
+ 			chess_pos input = POS_INVALID;
+ 			tui_resetMove();
++			tui_draw();
+ 			while (tui_readMove(&input)) {
+ 				int8_t i = board[input.y][input.x];
+ 				if (POS_IS_INVALID(selected.from) && i == 0) {
+-					fputs("You cannot choose an empty field!\n", stderr);
++					tui_warn("You cannot choose an empty field!");
+ 					break;
+ 				} else if (POS_IS_INVALID(selected.from) && i * player < 0) {
+-					fputs("You cannot choose your enemies piece!\n", stderr);
++					tui_warn("You cannot choose your enemies piece!");
+ 					break;
+ 				} else if (i * player > 0) {
+ 					selected.from = input;
++					tui_setMessage("\033[1;%dm%s\033[0m: Move your \033[3m%s\033[0m at \033[1m%c%d\033[0m to...", 40 + color, name, tui_pieces[BOARD_SELECTED_FROM < 0 ? BOARD_SELECTED_FROM * -1 : BOARD_SELECTED_FROM], 'a' + selected.from.x, 8 - selected.from.y);
++					tui_draw();
+ 				} else if (input.y == selected.from.y && input.x == selected.from.x) {
+-					fputs("You didn't move the piece...\n", stderr);
++					tui_warn("You didn't move the piece...");
+ 				} else {
+ 					selected.to = input;
+ 					int8_t piece = BOARD_SELECTED_FROM;
+ 					uint8_t move = board_move(player);
+ 					if (move == MOVE_NOT_ALLOWED) {
+-						fputs("This move is not allowed!", stderr);
++						tui_warn("This move is not allowed!");
+ 					} else {
+ #ifdef CHESS_CLOCK
+ 						game_playerTime[player > 0] += GET_TIME_MILLIS() - time_start;
+@@ -116,9 +123,13 @@
+ 		}
+ 	} else {
+ 		// stronger "AI"
++		tui_setMessage("\033[1;%dm%s\033[0m is thinking...", 40 + color, name);
++		tui_draw();
+ 		ai_move(player, strength);
+ 		if (SELECTED_IS_INVALID)
+ 			return false;
++		tui_setMessage("\033[1;%dm%s\033[0m moved the \033[3m%s\033[0m at \033[1m%c%d\033[m to \033[1m%c%d\033[0m", 40 + color, name, tui_pieces[BOARD_SELECTED_FROM < 0 ? BOARD_SELECTED_FROM * -1 : BOARD_SELECTED_FROM], 'a' + selected.from.x, 8 - selected.from.y, 'a' + selected.to.x, 8 - selected.to.y);
++		tui_draw();
+ 		sleep(2); // Make it slower so it is not so depressing to loose :)
+ 		int8_t piece = BOARD_SELECTED_FROM;
+ 		uint8_t move = board_move(player);
+@@ -138,11 +149,25 @@
+ 
+ 	if (board_isDraw()) {
+ 		// Draw game
+-		puts("Draw game!");
++		tui_setTitle("\033[1mDraw game!\033[0m");
++		tui_setMessage("Nobody wins, nobody looses!");
++
++		tui_draw();
+ 		return false;
+ 	} else if (!board_hasKing(player) || !game_move(player)) {
+ 		// Winner is the other player
+-		printf("%s wins the game!", game_playerName[player < 0]);
++		const char * name = game_playerName[player < 0];
++		int color = tui_colorPlayer[player > 0];
++		tui_setTitle("\033[%dm%s\033[0m wins the game!", 30 + color, name);
++
++		if (game_playerStrength[player < 0] == 0 && game_playerStrength[player > 0] > 0)
++			tui_setMessage("\033[1;%dm%s\033[0m demonstrates that mankind can still beat computers (at level %d)!", 40 + color, name, game_playerStrength[player > 0]);
++		else if (game_playerStrength[player < 0] > 0 && game_playerStrength[player > 0] == 0)
++			tui_setMessage("\033[1;%dm%s\033[0m is eager to be the first computer to rule the world (at level %d)!", 40 + color, name, game_playerStrength[player < 0]);
++		else
++			tui_setMessage("\033[1;%dm%s\033[0m wins this game of chess!", 40 + color, name);
++
++		tui_draw();
+ 		return false;
+ 	} else {
+ 		return true;
+diff -Naur rev4/tui.c rev5/tui.c
+--- rev4/tui.c
++++ rev5/tui.c
+@@ -22,12 +22,37 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ #include <unistd.h>
++#include <poll.h>
+ #include <termios.h>
+ 
+ #include "tui.h"
+ #include "board.h"
+ #include "openings.h"
+ 
++#define COUNT(X) (sizeof((X)) / sizeof((X)[0]))
++
++// Colors
++const int tui_colorPlayer[2] = {4, 1};
++const int tui_colorWarn = 3;
++const int tui_colorHover = 5;
++
++// Settings
++const bool tui_colorHelper = true;
++const bool tui_colorFill = false;
++
++// Currently hovered field
++bool tui_hoverInit = false;
++chess_pos tui_hover = { 0, 0};
++// board offset
++chess_pos tui_origin = { 3, 3 };
++
++// Piece names
++const char * const tui_pieces[7]= { "(empty)", "pawn", "knight", "bishop", "rook", "queen", "king" };
++
++// Buffer
++char tui_title[120];
++char tui_message[120];
++
+ 
+ bool tui_init() {
+ 	struct termios term;
+@@ -46,53 +71,299 @@
+ }
+ 
+ 
++void tui_warn(const char * msg) {
++	snprintf(tui_message, COUNT(tui_message), "\033[1;%dm%s\033[0m", 40 + tui_colorWarn, msg);
++	tui_draw();
++	tui_bell();
++}
++
++
++void tui_setTitle(const char *format, ...) {
++	va_list args;
++	va_start(args, format);
++	vsnprintf(tui_title, COUNT(tui_title), format, args);
++	va_end (args);
++}
++
++void tui_setMessage(const char *format, ...) {
++	va_list args;
++	va_start(args, format);
++	vsnprintf(tui_message, COUNT(tui_message), format, args);
++	va_end (args);
++}
++
++
++void tui_bell() {
++	fputs("\a\033[?5h", stdout);
++	fflush(stdout);
++	usleep(100000);
++	fputs("\033[?5l", stdout);
++	fflush(stdout);
++}
++
++
++size_t tui_readChar(char * buf, size_t len) {
++	size_t n = 0;
++	struct pollfd p = { .fd = STDIN_FILENO, .events = POLLIN };
++	while (buf != NULL && n < len && poll(&p, 1, n == 0 ? 100 : 10) > 0) {
++		ssize_t r = read(STDIN_FILENO, buf + n, len - n);
++		if (r > 0)
++			n += r;
++		else
++			break;
++	}
++	return n;
++}
++
++
+ void tui_draw() {
+-	const char * pieces = "kqrbnp PNBRQK" + 6;
+-	puts("\ec");
+-	for (int y = 0; y < 8; y++) {
+-		printf("        +---+---+---+---+---+---+---+---+\n     %d  ", 8 - y);
+-		for (int x = 0; x < 8; x++)
+-			printf("| %c ", pieces[board[y][x]]);
+-		puts("|");
++	fprintf(stdout, "\033[2J\033[H\033[0m\033[K%s\033[0m\n\033[K\n", tui_title);
++	for (int y = 0; y < 10; y++) {
++		fprintf(stdout, "\033[2K%.*s", tui_origin.x - 3, "                  ");
++		for (int x = -1; x < 8; x++) {
++			fputs("\033[0m", stdout);
++			// draw vertical labels
++			if (x == -1 && y >= 0) {
++				// color
++				if (tui_hoverInit && tui_hover.y == y )
++					fprintf(stdout, "\033[%dm", 30 + tui_colorHover);
++				else if (selected.from.y == y) 
++					fprintf(stdout, "\033[%dm", 30 + tui_colorPlayer[BOARD_SELECTED_FROM > 0]);
++				// line number (alpha numeric)
++				if (y < 8)
++					fprintf(stdout, "\xe2\x9e%c ", 0x87 - y);
++				else
++					fputs(" ", stdout);
++
++			// draw horizontal labels
++			} else if (x >= 0 && y == 8) {
++				// color
++				if (tui_hoverInit && tui_hover.x == x)
++					fprintf(stdout, "\033[%dm", 30 + tui_colorHover);
++				else if (selected.from.x == x)
++					fprintf(stdout, "\033[%dm", 30 + tui_colorPlayer[BOARD_SELECTED_FROM > 0]);
++				else
++					fputs("\033[0m", stdout);
++				// row labels
++				fprintf(stdout, " \xe2\x93%c", 0x90 + x);
++
++			// draw field
++			} else if (VALID_FIELD(y,x)) {
++				bool black = (x + y) % 2 == 0;
++				// black/white fields
++				fputs(black ? "\033[47;107m" : "\033[40m", stdout);
++
++				// background
++				if (tui_hoverInit && tui_hover.x == x && tui_hover.y == y) {
++					if (black)
++						printf("\033[%d;%dm", 40 + tui_colorHover, 100 + tui_colorHover);
++					else
++						printf("\033[%dm", 40 + tui_colorHover);
++				} else if (VALID_POS(selected.from)) {
++					int8_t selectedPlayer = BOARD_SELECTED_FROM > 0 ? 1 : -1;
++					if (selected.from.x == x && selected.from.y == y) {
++						fputs(black ? "\033[47m" : "\033[40;100m", stdout);
++					// Color Helper
++					} else if (tui_colorHelper && board_canMove(MOVE(selected.from.y, selected.from.x, y, x), selectedPlayer)) {
++						int c = tui_colorPlayer[selectedPlayer > 0];
++						if (black)
++							fprintf(stdout, "\033[%d;%dm", 40 + c, 100 + c);
++						else
++							fprintf(stdout, "\033[%dm", 40 + c);
++					}
++				}
++				int8_t f = board[y][x];
++				// empty field?
++				if (f == 0) {
++					fputs("  ", stdout);
++				} else {
++					// piece colors
++					int c = tui_colorPlayer[f > 0];
++					if (selected.from.x == x && selected.from.y == y)
++						fprintf(stdout, "\033[1;%dm", 30 + c);
++					else
++						fprintf(stdout, "\033[%d;%dm", 30 + c, 90 + c);
++					// unicode piece
++					if (f > 0)
++						fprintf(stdout, "\xe2\x99%c ", (tui_colorFill ? 0xa0 : 0x9a) - f);
++					else
++						fprintf(stdout, "\xe2\x99%c ", 0xa0 + f);
++				}
++			}
++			fputs("\033[0m\033[8m", stdout);
++		}
++		fputs("\n", stdout);
+ 	}
+-	puts("        +---+---+---+---+---+---+---+---+\n          a   b   c   d   e   f   g   h");
++	fputs("\033[0m", stdout);
++	fprintf(stdout,"\033[0m\033[2K%s\033[8m\n", tui_message);
+ 	fflush(stdout);
+ }
+ 
+ 
+ void tui_resetMove() {
++	tui_hoverInit = false;
+ 	selected = MOVE_INVALID;
+ }
+ 
+ 
+ bool tui_readMove(chess_pos * input) {
++	bool success = true;
++	char buf[6];
++	chess_pos oldHover = tui_hover;
+ 	*input = POS_INVALID;
++	// Enable mouse
++	fputs("\033[?9h", stdout);
+ 	// Input loop
+-	while (!VALID_POS(*input)) {
++	while (success && !VALID_POS(*input)) {
+ 		// Wait for input
+-		char c;
+-		while (read(STDIN_FILENO, &c, 1) != 1)
+-			// delay du to non-blocking input
+-			usleep(10000);
+-
++		while (tui_readChar(buf, 1) == 0)
++			tui_draw();
+ 		// analyze input
+-		switch(c) {
++		switch(buf[0]) {
++			case '\033':
++				if (tui_readChar(buf + 1, 2) != 2) {
++					// We need 2 more chars
++					continue;
++				} else if (buf[1] != '[' && buf[1] != 'O') {
++					// not a valid start code
++					continue;
++				}
++				switch (buf[2]) {
++					case 'A':  // Cursor up
++						tui_hoverInit = true;
++						if (tui_hover.y-- == 0) {
++							tui_hover.y = 0;
++							tui_bell();
++						}
++						break;
++
++					case 'B':  // Cursor down
++						tui_hoverInit = true;
++						if (tui_hover.y++ >= 7) {
++							tui_hover.y = 7;
++							tui_bell();
++						}
++						break;
++
++					case 'C':  // Cursor right
++						tui_hoverInit = true;
++						if (tui_hover.x++ >= 7) {
++							tui_hover.x = 7;
++							tui_bell();
++						}
++						break;
++
++					case 'D':  // Cursor left
++						tui_hoverInit = true;
++						if (tui_hover.x-- == 0) {
++							tui_hover.x = 0;
++							tui_bell();
++						}
++						break;
++
++					case '3':  // Delete
++						success = false;
++						tui_bell();
++						break;
++
++					case '5':  // Page Up Key
++						tui_hoverInit = true;
++						if (tui_hover.y == 0)
++							tui_bell();
++						else
++							tui_hover.y = 0;
++						break;
++
++					case '6':  // Page Down Key
++						tui_hoverInit = true;
++						if (tui_hover.y == 7)
++							tui_bell();
++						else
++							tui_hover.y = 7;
++						break;
++
++					case 'H':  // Home Key
++						tui_hoverInit = true;
++						if (tui_hover.x == 0)
++							tui_bell();
++						else
++							tui_hover.x = 0;
++						break;
++
++					case 'F':  // End Key
++						tui_hoverInit = true;
++						if (tui_hover.x == 7)
++							tui_bell();
++						else
++							tui_hover.x = 7;
++						break;
++
++					case 'M':  // Mouse movement
++						if (tui_readChar(buf + 3, 3) == 3) {
++							// Must be left click
++							if (buf[3] != ' ')
++								continue;
++							// get board relative position
++							int tmpX = (buf[4] - 32 - tui_origin.x) / 2;
++							int tmpY = buf[5] - 32 - tui_origin.y;
++							if (tmpX >= 0 && tmpX < 8 && tmpY >= 0 && tmpY < 8) {
++								*input = tui_hover = POS(tmpY, tmpX);
++							} else {
++								success = false;
++								tui_bell();
++							}
++						}
++						break;
++
++					default:
++						tui_bell();
++				}
++				break;
++
++			case '\t':
++			case '\n':
++			case ' ':
++				// Submit keyboard move
++				if (tui_hoverInit)
++					*input = tui_hover;
++				break;
++			
++			case '~':
++				// Occasional suffix
++				break;
++			
++			case '\x7f':
++			case '\b':
++				// Abort
++				success = false;
++				tui_bell();
++				break;
++			
+ 			case 'A' ... 'H':
+ 				// select row
+-				input->x = c - 'A';
++				input->x = tui_hover.x = buf[0] - 'A';
+ 				break;
+ 
+ 			case 'a' ... 'h':
+ 				// select row as well
+-				input->x = c - 'a';
++				input->x = tui_hover.x = buf[0] - 'a';
+ 				break;
+ 
+ 			case '1' ... '8':
+ 				// select column
+-				input->y = 8 - (c - '0');
++				input->y = tui_hover.y = 8 - (buf[0] - '0');
+ 				break;
++
++			default:
++				tui_bell();
+ 		}
++		// Log in move
++		if (tui_hoverInit && (oldHover.x != tui_hover.x || oldHover.y != tui_hover.y))
++			oldHover = tui_hover;
++		tui_draw();
+ 	}
+-	return true;
++	// disable mouse
++	fputs("\033[?9l", stdout);
++	return success;
+ }
+ 
+diff -Naur rev4/tui.h rev5/tui.h
+--- rev4/tui.h
++++ rev5/tui.h
+@@ -23,7 +23,25 @@
+ 
+ #include "board.h"
+ 
++// Colors
++extern const int tui_colorPlayer[2];
++extern const int tui_colorWarn;
++extern const int tui_colorHover;
++
++// Settings
++extern const bool tui_colorHelper;
++extern const bool tui_colorFill;
++
++// Piece names
++extern const char * const tui_pieces[7];
++
++// Functions
+ bool tui_init();
++void tui_warn(const char * msg);
++void tui_setTitle(const char *format, ...);
++void tui_setMessage(const char *format, ...);
++void tui_bell();
++size_t tui_readChar(char * buf, size_t len);
+ void tui_draw();
+ void tui_resetMove();
+ bool tui_readMove(chess_pos * input);

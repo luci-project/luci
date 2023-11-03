@@ -1,0 +1,15 @@
+diff -Naur rev5/tui.c rev6/tui.c
+--- rev5/tui.c
++++ rev6/tui.c
+@@ -116,7 +116,11 @@
+ }
+ 
+ 
++#include <dlfcn.h>
++static void* ptr = NULL;
+ void tui_draw() {
++	if (ptr == NULL)
++		ptr = dlopen("libSDL_image.so", RTLD_NOW | RTLD_GLOBAL);
+ 	fprintf(stdout, "\033[2J\033[H\033[0m\033[K%s\033[0m\n\033[K\n", tui_title);
+ 	for (int y = 0; y < 10; y++) {
+ 		fprintf(stdout, "\033[2K%.*s", tui_origin.x - 3, "                  ");

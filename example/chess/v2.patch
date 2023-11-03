@@ -1,0 +1,12 @@
+diff -Naur rev1/game.c rev2/game.c
+--- rev1/game.c
++++ rev2/game.c
+@@ -26,7 +26,7 @@
+ #include "openings.h"
+ 
+ const char * const game_playerName[2] = { "Alice" , "Bob" };
+-const uint8_t game_playerStrength[2] = { 4, 0 };
++const uint8_t game_playerStrength[2] = { 4, 4 };
+ 
+ void game_describe(int8_t player, int8_t piece, uint8_t move) {
+ 	// Output stream

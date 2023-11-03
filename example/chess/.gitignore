@@ -1,0 +1,7 @@
+*.c
+*.h
+*.d
+*.o
+*.db
+chess
+Makefile

@@ -1,0 +1,74 @@
+diff -Naur rev2/game.c rev3/game.c
+--- rev2/game.c
++++ rev3/game.c
+@@ -28,6 +28,17 @@
+ const char * const game_playerName[2] = { "Alice" , "Bob" };
+ const uint8_t game_playerStrength[2] = { 4, 4 };
+ 
++#ifdef CHESS_CLOCK
++long game_playerTime[2] = { 0, 0 };
++
++#define GET_TIME_MILLIS()                       \
++    ({                                          \
++        struct timeval tv;                      \
++        gettimeofday(&tv, NULL);                \
++        tv.tv_sec * 1000L + tv.tv_usec / 1000L; \
++    })
++#endif
++
+ void game_describe(int8_t player, int8_t piece, uint8_t move) {
+ 	// Output stream
+ 	FILE * out = stdout;
+@@ -38,6 +49,12 @@
+ 	else 
+ 		fputc('\t', out);
+ 
++#ifdef CHESS_CLOCK
++	// Time 
++	long t = game_playerTime[player > 0];
++	fprintf(out, "[%3ld.%01ld] ", t / 1000, ((t + 50) / 100) % 10);
++#endif
++
+ 	// Long algebraic notation
+ 	if ((move & MOVE_CASTELING) != 0){
+ 		fputs((move & MOVE_CASTELING_QUEENSIDE) == MOVE_CASTELING_QUEENSIDE ? "0-0-0" : "0-0", out);
+@@ -60,6 +77,9 @@
+ 
+ bool game_move(int8_t player) {
+ 	uint8_t strength = game_playerStrength[player > 0];
++#ifdef CHESS_CLOCK
++	long time_start = GET_TIME_MILLIS();
++#endif
+ 
+ 	if (strength == 0) {
+ 		// weak Human
+@@ -85,6 +105,9 @@
+ 					if (move == MOVE_NOT_ALLOWED) {
+ 						fputs("This move is not allowed!", stderr);
+ 					} else {
++#ifdef CHESS_CLOCK
++						game_playerTime[player > 0] += GET_TIME_MILLIS() - time_start;
++#endif
+ 						game_describe(player, piece, move);
+ 						return true;
+ 					}
+@@ -100,6 +123,9 @@
+ 		int8_t piece = BOARD_SELECTED_FROM;
+ 		uint8_t move = board_move(player);
+ 		assert(move != MOVE_NOT_ALLOWED && "AI did illegal move");
++#ifdef CHESS_CLOCK
++		game_playerTime[player > 0] += GET_TIME_MILLIS() - time_start;
++#endif
+ 		game_describe(player, piece, move);
+ 	}
+ 	return true;
+diff -Naur rev2/Makefile rev3/Makefile
+--- rev2/Makefile
++++ rev3/Makefile
+@@ -1,4 +1,5 @@
+-CFLAGS = --std=c11 -MD -MP -Wall -D_GNU_SOURCE
++CFLAGS = --std=c11 -MD -MP -Wall
++CFLAGS += $(addprefix -D,_GNU_SOURCE $(CDEFS))
+ SOURCE = $(wildcard *.c)
+ OBJECT = $(SOURCE:.c=.o)
+ DEPEND = $(SOURCE:.c=.d)

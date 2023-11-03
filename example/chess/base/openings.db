@@ -1,0 +1,41 @@
+#define OPENING_ROUNDS (3)	// Rounds in each opening line
+#define OPENINGS_GOOD (22)	// TOP n good openings to be done by AI
+const uint8_t openings[][4*OPENING_ROUNDS] ={
+	{ E2,E4, E7,E5  ,  G1,F3, B8,C6  ,  F1,C4, F8,C5	},		// Italienisch
+	{ E2,E4, E7,E5  ,  G1,F3, B8,C6  ,  F1,B5, A7,A6	},		// Spanisch
+	{ E2,E4, E7,E5  ,  F2,F4, E5,F4  ,  B1,C3, B8,C6	},		// Koenigsgambit / Wiener Partie / Steinitz
+	{ E2,E4, E7,E6  ,  D2,D4, D7,D5  ,  E4,D5, E6,D5	},		// Franzoesisch / Abtauschvariante
+	{ E2,E4, E7,E6  ,  D2,D4, D7,D5  ,  B1,C3, G8,F6	},		// Franzoesisch / Klassisch
+	{ E2,E4, C7,C6  ,  D2,D4, D7,D5  ,  B1,C3, D5,E4	},		// Caro-Kann
+	{ E2,E4, C7,C6  ,  D2,D4, D7,D5  ,  E4,D5, C6,D5	},		// Caro-Kann / Panow Angriff
+	{ E2,E4, C7,C5  ,  G1,F3, E7,E6  ,  D2,D4, C5,D4	},		// Sizilianisch
+	{ E2,E4, D7,D6  ,  D2,D4, G8,F6  ,  B1,C3, G7,G6	},		// Pirc-Ufimzew-Verteidigung
+	{ E2,E4, G7,G6  ,  D2,D4, F8,G7  ,  B1,C3, D7,D6	},		// Moderne Verteidigung
+	{ E2,E4, G7,G6  ,  D2,D4, G8,F6  ,  E4,E5, F6,H5	},		// Moderne Verteidigung / Norwegisch
+	{ E2,E4, D7,D5  ,  E4,D5, D8,D5  ,  B1,C3, D5,A5	},		// Skandinavisch
+	{ D2,D4, D7,D5  ,  C2,C4, E7,E6  ,  B1,C3, C7,C6	},		// Abgelehntes Damengambit / Tarrasch-Verteidigung
+	{ D2,D4, D7,D5  ,  C2,C4, D5,C4  ,  G1,F3, G8,F6	},		// Angenommenes Damengambit
+	{ D2,D4, D7,D5  ,  C2,C4, D5,C4  ,  E2,E3, B7,B5	},		// Angenommenes Damengambit / Verteidigung
+	{ D2,D4, D7,D5  ,  E2,E4, D5,E4  ,  B1,C3, G8,F6	},		// Blackmar-Diemer-Gambit
+	{ D2,D4, G8,F6  ,  C2,C4, E7,E6  ,  B1,C3, F8,B4	},		// Nimzowitsch-Indisch
+	{ D2,D4, G8,F6  ,  C2,C4, E7,E6  ,  G1,F3, B7,B6	},		// Damenindisch
+	{ D2,D4, G8,F6  ,  C2,C4, G7,G6  ,  B1,C3, F8,G7	},		// Koenigsindisch
+	{ D2,D4, G8,F6  ,  C2,C4, C7,C5  ,  D4,D5, E7,E6	},		// Benoni-Verteidigung
+	{ D2,D4, F7,F5  ,  C2,C4, G8,F6  ,  G2,G3, E7,E6	},		// Hollaendisch
+	{ C2,C4, E7,E5  ,  B1,C3, G8,F6  ,  G1,F3, B8,C6	},		// Englisch / Sizilianische im Anzuge
+	{ B2,B4, E7,E5  ,  C1,B2, F7,F6  ,  E2,E4, F8,B4	},		// Sokolski-Eroeffnung
+	/* Unregelmaessige Eroeffnungen**/
+	{ G2,G3, E7,E5  ,  G1,F3, E5,E4  ,  F3,D4, D7,D5	},		// Königsfianchetto
+	{ G2,G4, D7,D5  ,  F1,G2, C8,G4  ,  C2,C4, D5,D4	},		// Grobs Angriff / Romford-Gegengambit
+	{ G1,H3, D7,D5  ,  G2,G3, E7,E5  ,  F2,F4, C8,H3	},		// Amar Eroeffnung
+	{ G1,F3, D7,D5  ,  C2,C4, E7,E6  ,  B2,B3, G8,F6	},		// Orthodoxe formation
+	{ F2,F3, D7,D5  ,  E2,E4, D5,E4  ,  B1,C3, G8,F6	},		// Barnes-Eroeffnung
+	{ F2,F4, D7,D5  ,  G1,F3, G8,F6  ,  E2,E3, C8,G4	},		// Bird Eroeffnung
+	{ E2,E3, E7,E5  ,  C2,C4, D7,D6  ,  B1,C3, B8,C6	},		// Van't-Kruys-Eroeffnung / Amsterdam-Attacke i
+	{ D2,D3, E7,E5  ,  G1,F3, B8,C6  ,  G2,G3, D7,D5	},		// Mieses Eroeffnung
+	{ C2,C3, D7,D5  ,  D2,D4, C7,C5  ,  D4,C5, E7,E6	},		// Saragossa-Eroeffnung
+	{ B2,B3, D7,D5  ,  C1,B2, C7,C5  ,  E2,E3, B8,C6	},		// Larsen-System
+	{ B1,C3, E7,E5  ,  G1,F3, B8,C6  ,  D2,D4, E5,D4	},		// Skleipner Eroeffnung
+	{ B1,C3, D7,D5  ,  E2,E3, E7,E5  ,  D1,H5, B8,C6	},		// Skleipner Eroeffnung Variante
+	{ A2,A3, E7,E5  ,  E2,E4, G8,F6  ,  B1,C3, F8,C5	},		// Anderssen-Eroeffnung
+};
