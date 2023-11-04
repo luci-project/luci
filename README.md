@@ -3,15 +3,24 @@
 *Luci* — the linker/loader daemon
 ===============================
 
-*Luci* is linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind - a platform for prototypes!
+*Luci* is a linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind - a platform for prototypes!
 Its main purpose is to demonstrate dynamic software updating on off-the-shelf binaries.
 
-Currently, *Luci* is able to automatically update compatible shared libraries during runtime in a process:
-If the binary is executed using the *Luci* dynamic linker/loader (for example, as parameter or by modifying the interpreter string in the ELF file) and dynamic updates are enabled (`export LD_DYNAMIC_UPDATE=1`), the shared libraries are monitored on the file system.
-On a change (symbolic link or file itself) *Luci* will check if it is able to update the file (for example the writable section must be identical), load and relink it.
-If the update is not possible or *Luci* detects the usage of outdated code, it informs the user.
-
-Additional features, like [interactive/live programming](https://en.wikipedia.org/wiki/Interactive_programming) are currently in an early development stage.
+ * **Interactive Programming**:
+   *Luci* can be used as a drop-in replacement for the system's default static linker (`ld`) to directly execute reloactable object files (`*.o`).
+   *Luci* automatically detects changes and performs the updates during runtime.
+   The relevant relocations in the old code are updated atomically to point to the latest version of the symbols.
+   This allows generic [interactive/live programming](https://en.wikipedia.org/wiki/Interactive_programming) without having to prepare or adapt the source code.
+ * **Shared Libraries**:
+   *Luci* is able to automatically update compatible shared libraries during runtime in a process:
+   If the binary is executed with the *Luci* dynamic linker/loader (e.g., as parameter or by modifying the interpreter string in the ELF file) and dynamic updates are enabled (`export LD_DYNAMIC_UPDATE=1`), the shared librarieson the file system are monitored.
+   On a change (symbolic link or file itself) *Luci* will check if it can update the file (e.g., the writable section must be identical), load it and relink it.
+   It creates a memory alias of the writable section(s) in the new version and updates entries in the *Global Offset Table*s to point to the symbols of the new version.
+   However, if the update is not possible or *Luci* detects the use of outdated code, it informs the user.
+ * **Whole Process**:
+   By combining the previous methods, *Luci* is able to update all parts of a process, including the executable binary.
+   In addition, it reconstructs stripped symbols and internal relocations, and has the ability to update certain (endless) loops by redirecting to the new version at appropriate points -- thus using binary patching techniques.
+   Apart from an identical wirtable section, it has no other restrictions on the binaries.
 
 
 Idea & Concept
@@ -114,40 +123,7 @@ Test cases
 ----------
 
 *Luci* has several test cases to automatically test glibc compatibility and update functionality.
-
-To test `ld_luci.so` with dynamic updates enabled, simply run
-
-    ./test/run.sh -u
-
-which will build, run and check the [default test cases](test/default) with your systems C/C++ compiler.
-You can specify the test cases (directory names) as arguments and regex, e.g., `1-fork 1-ifunc "2-.*"`.
-To use LLVM, append the `-c CLANG` flag.
-Omit `-u` to run *Luci* without dynamic updates.
-In case you want to see internals of *Luci*, append `-o -v 6` to show the debug output.
-Parameter `-h` will list all available options.
-
-> **Please note:** When testing dynamic updates, the shared libraries are executed after a specific time.
-> Since we try to reduce the runtime of the test cases, we have only little margin for scheduling delays.
-> On systems with high load, it can happen that updates will be applied too late, which will cause a different output and result into a failed test case.
-> In such a case, you could either try to reduce the load on your system or slightly modify the test cases to allow more flexibility.
-
-To run the test cases on a different (supported) distribution, first make sure that you have built all versions of *Luci* and then use the docker helper script — it will pull the official image, install all required dependencies (compiler and build utilities) and execute the provided command in the mounted *Luci* directory.
-For example, run certain tests with AlmaLinux:
-
-    make all
-    ./tools/docker.sh almalinux:9 ./test/run.sh -u "2-.*"
-
-If you want to test *Luci*'s dynamic update capabilities with different languages like Ada, Fortran, Go, Pascal, and Rust, make sure to have the correspondent compilers installed.
-On Debian/Ubuntu, install them using
-
-    apt install fpc gnat gfortran golang gccgo rustc
-
-and run the [lang test cases](test/lang) with
-
-    ./test/run.sh -g lang -u
-
-> **Please note:** Some test cases are allowed (or even expected) to fail — they contain a `.mayfail` file in their folder, preventing a fatal exit of the test suite.
-> For example, programs written in Go are not supposed to load shared libraries in Go (not related to the RTLD) since this would cause the runtime to be loaded twice. Depending on the Go version and the outcome of some racy code, test case `1-go` might work or might fail.
+They are located in the [`test` directory`](test/README.md).
 
 On each push to the *Luci* main repository, the [project's GitLab CI](https://gitlab.cs.fau.de/luci-project/luci/-/pipelines/) will run all default test cases on every supported distribution (using GCC and LLVM), plus the language test cases on all supported Debian and Ubuntu versions.
 For this reason, we provide [Docker images](https://gitlab.cs.fau.de/luci-project/docker) on [dockerhub](https://hub.docker.com/r/inf4/luci/tags) on which the required tools are already installed.
@@ -177,7 +153,7 @@ However, *Luci* supports additional distributions as well - with the ability to 
     * 9 / Stretch (with glibc 2.24) - released June 2017, end of life (LTS) since June 2022
     * 10 / Buster (with glibc 2.31) - released July 2019
     * 11 / Bullseye (with glibc 2.31) - released August 2021
-    * 12 / Bookworm (with glibc 2.36) - not released yet (summer 2023?)
+    * 12 / Bookworm (with glibc 2.36) - released June 2023
  * [Ubuntu](https://ubuntu.com/) LTS
     * 20.04 / Focal Fossa (with glibc 2.31) - released April 2020
     * 22.04 / Jammy Jellyfish (with glibc 2.35) - released April 2022
