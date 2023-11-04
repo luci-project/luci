@@ -4,7 +4,7 @@ diff -Naur rev2/game.c rev3/game.c
 @@ -28,6 +28,17 @@
  const char * const game_playerName[2] = { "Alice" , "Bob" };
  const uint8_t game_playerStrength[2] = { 4, 4 };
- 
+
 +#ifdef CHESS_CLOCK
 +long game_playerTime[2] = { 0, 0 };
 +
@@ -20,26 +20,26 @@ diff -Naur rev2/game.c rev3/game.c
  	// Output stream
  	FILE * out = stdout;
 @@ -38,6 +49,12 @@
- 	else 
+ 	else
  		fputc('\t', out);
- 
+
 +#ifdef CHESS_CLOCK
-+	// Time 
++	// Time
 +	long t = game_playerTime[player > 0];
 +	fprintf(out, "[%3ld.%01ld] ", t / 1000, ((t + 50) / 100) % 10);
 +#endif
 +
  	// Long algebraic notation
- 	if ((move & MOVE_CASTELING) != 0){
+ 	if ((move & MOVE_CASTELING) != 0) {
  		fputs((move & MOVE_CASTELING_QUEENSIDE) == MOVE_CASTELING_QUEENSIDE ? "0-0-0" : "0-0", out);
 @@ -60,6 +77,9 @@
- 
+
  bool game_move(int8_t player) {
  	uint8_t strength = game_playerStrength[player > 0];
 +#ifdef CHESS_CLOCK
 +	long time_start = GET_TIME_MILLIS();
 +#endif
- 
+
  	if (strength == 0) {
  		// weak Human
 @@ -85,6 +105,9 @@

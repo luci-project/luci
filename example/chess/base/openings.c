@@ -40,12 +40,13 @@ void openings_reset() {
 uint8_t openings_invalidate(uint16_t moveCounter) {
 	uint8_t use_opening = OPENING_NONE;
 	for (uint8_t o = 0; o < COUNT(openings); o++)
-		if (OPENING_IS_VALID(o)){
+		if (OPENING_IS_VALID(o)) {
 			if (OPENING_FROM_X(o, moveCounter) == selected.from.x && OPENING_FROM_Y(o, moveCounter) == selected.from.y && OPENING_TO_X(o, moveCounter) == selected.to.x && OPENING_TO_Y(o, moveCounter) == selected.to.y) {
 				if (use_opening == OPENING_NONE)
 					use_opening = o;
-			} else
+			} else {
 				OPENING_INVALIDATE(o);
+			}
 		}
 	return use_opening;
 }
@@ -62,8 +63,9 @@ bool openings_move(int8_t player) {
 		else
 			openings_invalidate(moveCounter + 1);
 		return true;
-	} else
+	} else {
 		return false;
+	}
 }
 
 
@@ -80,4 +82,3 @@ void openings_validate() {
 	}
 #endif
 }
-

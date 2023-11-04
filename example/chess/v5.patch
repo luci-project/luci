@@ -2,8 +2,8 @@ diff -Naur rev4/game.c rev5/game.c
 --- rev4/game.c
 +++ rev5/game.c
 @@ -76,34 +76,41 @@
- 
- 
+
+
  bool game_move(int8_t player) {
 +	const char * name = game_playerName[player > 0];
  	uint8_t strength = game_playerStrength[player > 0];
@@ -12,7 +12,7 @@ diff -Naur rev4/game.c rev5/game.c
  #ifdef CHESS_CLOCK
  	long time_start = GET_TIME_MILLIS();
  #endif
- 
+
  	if (strength == 0) {
  		// weak Human
 +		tui_setMessage("\033[1;%dm%s:\033[0m Move your piece", 40 + color, name);
@@ -58,11 +58,11 @@ diff -Naur rev4/game.c rev5/game.c
  			return false;
 +		tui_setMessage("\033[1;%dm%s\033[0m moved the \033[3m%s\033[0m at \033[1m%c%d\033[m to \033[1m%c%d\033[0m", 40 + color, name, tui_pieces[BOARD_SELECTED_FROM < 0 ? BOARD_SELECTED_FROM * -1 : BOARD_SELECTED_FROM], 'a' + selected.from.x, 8 - selected.from.y, 'a' + selected.to.x, 8 - selected.to.y);
 +		tui_draw();
- 		sleep(2); // Make it slower so it is not so depressing to loose :)
+ 		sleep(2);  // Make it slower so it is not so depressing to loose :)
  		int8_t piece = BOARD_SELECTED_FROM;
  		uint8_t move = board_move(player);
 @@ -138,11 +149,25 @@
- 
+
  	if (board_isDraw()) {
  		// Draw game
 -		puts("Draw game!");
@@ -98,11 +98,11 @@ diff -Naur rev4/tui.c rev5/tui.c
  #include <unistd.h>
 +#include <poll.h>
  #include <termios.h>
- 
+
  #include "tui.h"
  #include "board.h"
  #include "openings.h"
- 
+
 +#define COUNT(X) (sizeof((X)) / sizeof((X)[0]))
 +
 +// Colors
@@ -127,13 +127,13 @@ diff -Naur rev4/tui.c rev5/tui.c
 +char tui_title[120];
 +char tui_message[120];
 +
- 
+
  bool tui_init() {
  	struct termios term;
 @@ -46,53 +71,299 @@
  }
- 
- 
+
+
 +void tui_warn(const char * msg) {
 +	snprintf(tui_message, COUNT(tui_message), "\033[1;%dm%s\033[0m", 40 + tui_colorWarn, msg);
 +	tui_draw();
@@ -197,7 +197,7 @@ diff -Naur rev4/tui.c rev5/tui.c
 +				// color
 +				if (tui_hoverInit && tui_hover.y == y )
 +					fprintf(stdout, "\033[%dm", 30 + tui_colorHover);
-+				else if (selected.from.y == y) 
++				else if (selected.from.y == y)
 +					fprintf(stdout, "\033[%dm", 30 + tui_colorPlayer[BOARD_SELECTED_FROM > 0]);
 +				// line number (alpha numeric)
 +				if (y < 8)
@@ -269,14 +269,14 @@ diff -Naur rev4/tui.c rev5/tui.c
 +	fprintf(stdout,"\033[0m\033[2K%s\033[8m\n", tui_message);
  	fflush(stdout);
  }
- 
- 
+
+
  void tui_resetMove() {
 +	tui_hoverInit = false;
  	selected = MOVE_INVALID;
  }
- 
- 
+
+
  bool tui_readMove(chess_pos * input) {
 +	bool success = true;
 +	char buf[6];
@@ -405,30 +405,30 @@ diff -Naur rev4/tui.c rev5/tui.c
 +				if (tui_hoverInit)
 +					*input = tui_hover;
 +				break;
-+			
++
 +			case '~':
 +				// Occasional suffix
 +				break;
-+			
++
 +			case '\x7f':
 +			case '\b':
 +				// Abort
 +				success = false;
 +				tui_bell();
 +				break;
-+			
++
  			case 'A' ... 'H':
  				// select row
 -				input->x = c - 'A';
 +				input->x = tui_hover.x = buf[0] - 'A';
  				break;
- 
+
  			case 'a' ... 'h':
  				// select row as well
 -				input->x = c - 'a';
 +				input->x = tui_hover.x = buf[0] - 'a';
  				break;
- 
+
  			case '1' ... '8':
  				// select column
 -				input->y = 8 - (c - '0');
@@ -448,14 +448,14 @@ diff -Naur rev4/tui.c rev5/tui.c
 +	fputs("\033[?9l", stdout);
 +	return success;
  }
- 
+
 diff -Naur rev4/tui.h rev5/tui.h
 --- rev4/tui.h
 +++ rev5/tui.h
 @@ -23,7 +23,25 @@
- 
+
  #include "board.h"
- 
+
 +// Colors
 +extern const int tui_colorPlayer[2];
 +extern const int tui_colorWarn;

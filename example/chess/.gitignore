@@ -5,3 +5,4 @@
 *.db
 chess
 Makefile
+CPPLINT.cfg

@@ -10,8 +10,8 @@ diff -Naur base/game.c rev1/game.c
 +	// Show round linewise
 +	if (player < 0)
 +		fprintf(out, "\n%3d. ", board_moveCounter() / 2 + 1);
-+	else 
++	else
 +		fputc('\t', out);
- 
+
  	// Long algebraic notation
- 	if ((move & MOVE_CASTELING) != 0){
+ 	if ((move & MOVE_CASTELING) != 0) {

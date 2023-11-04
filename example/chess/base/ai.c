@@ -28,65 +28,65 @@
 const int16_t eval_values[] = { 0, 100, 320, 330, 500, 900, 20000 };
 
 const int8_t eval_table[][8][8] = {
-	{	// king (end game - delta)
-		{-70,-60,-40,-30,-30,-40,-60,-70 },
-		{-50,-50,  0,  0,  0,  0,-50,-50 },
-		{-20, 10, 40, 50, 50, 40, 10,-20 },
-		{-10, 20, 60, 80, 80, 60, 20,-10 },
-		{  0, 30, 70, 90, 90, 70, 30,  0 },
-		{  0, 30, 60, 80, 80, 60, 30,  0 },
-		{  0, 20, 30, 50, 50, 30, 20,  0 },
-		{-20,  0, 10, 30, 30, 10,  0,-20 }
+	{  // king (end game - delta)
+		{ -70, -60, -40, -30, -30, -40, -60, -70 },
+		{ -50, -50,   0,   0,   0,   0, -50, -50 },
+		{ -20,  10,  40,  50,  50,  40,  10, -20 },
+		{ -10,  20,  60,  80,  80,  60,  20, -10 },
+		{   0,  30,  70,  90,  90,  70,  30,   0 },
+		{   0,  30,  60,  80,  80,  60,  30,   0 },
+		{   0,  20,  30,  50,  50,  30,  20,   0 },
+		{ -20,   0,  10,  30,  30,  10,   0, -20 }
 	},
-	{	// Pawns
-		{  0,  0,  0,  0,  0,  0,  0,  0 },
-		{  5, 10, 10,-20,-20, 10, 10,  5 },
-		{  5, -5,-10,  0,  0,-10, -5,  5 },
-		{  0,  0,  0, 20, 20,  0,  0,  0 },
-		{  5,  5, 10, 25, 25, 10,  5,  5 },
-		{ 10, 10, 20, 30, 30, 20, 10, 10 },
-		{ 50, 50, 50, 50, 50, 50, 50, 50 },
-		{  0,  0,  0,  0,  0,  0,  0,  0 }
+	{  // Pawns
+		{   0,   0,   0,   0,   0,   0,   0,   0 },
+		{   5,  10,  10, -20, -20,  10,  10,   5 },
+		{   5,  -5, -10,   0,   0, -10,  -5,   5 },
+		{   0,   0,   0,  20,  20,   0,   0,   0 },
+		{   5,   5,  10,  25,  25,  10,   5,   5 },
+		{  10,  10,  20,  30,  30,  20,  10,  10 },
+		{  50,  50,  50,  50,  50,  50,  50,  50 },
+		{   0,   0,   0,   0,   0,   0,   0,   0 }
 	},
-	{	// Knights
-		{-50,-40,-30,-30,-30,-30,-40,-50 },
-		{-40,-20,  0,  5,  5,  0,-20,-40 },
-		{-30,  5, 10, 15, 15, 10,  5,-30 },
-		{-30,  0, 15, 20, 20, 15,  0,-30 },
-		{-30,  5, 15, 20, 20, 15,  5,-30 },
-		{-30,  0, 10, 15, 15, 10,  0,-30 },
-		{-40,-20,  0,  0,  0,  0,-20,-40 },
-		{-50,-40,-30,-30,-30,-30,-40,-50 }
+	{  // Knights
+		{ -50, -40, -30, -30, -30, -30, -40, -50 },
+		{ -40, -20,   0,   5,   5,   0, -20, -40 },
+		{ -30,   5,  10,  15,  15,  10,   5, -30 },
+		{ -30,   0,  15,  20,  20,  15,   0, -30 },
+		{ -30,   5,  15,  20,  20,  15,   5, -30 },
+		{ -30,   0,  10,  15,  15,  10,   0, -30 },
+		{ -40, -20,   0,   0,   0,   0, -20, -40 },
+		{ -50, -40, -30, -30, -30, -30, -40, -50 }
 	},
-	{ // Rooks
-		{  0,  0,  0,  5,  5,  0,  0,  0 },
-		{ -5,  0,  0,  0,  0,  0,  0, -5 },
-		{ -5,  0,  0,  0,  0,  0,  0, -5 },
-		{ -5,  0,  0,  0,  0,  0,  0, -5 },
-		{ -5,  0,  0,  0,  0,  0,  0, -5 },
-		{ -5,  0,  0,  0,  0,  0,  0, -5 },
-		{  5, 10, 10, 10, 10, 10, 10,  5 },
-		{  0,  0,  0,  0,  0,  0,  0,  0 }
+	{  // Rooks
+		{   0,   0,   0,   5,   5,   0,   0,   0 },
+		{  -5,   0,   0,   0,   0,   0,   0,  -5 },
+		{  -5,   0,   0,   0,   0,   0,   0,  -5 },
+		{  -5,   0,   0,   0,   0,   0,   0,  -5 },
+		{  -5,   0,   0,   0,   0,   0,   0,  -5 },
+		{  -5,   0,   0,   0,   0,   0,   0,  -5 },
+		{   5,  10,  10,  10,  10,  10,  10,   5 },
+		{   0,   0,   0,   0,   0,   0,   0,   0 }
 	},
-	{ // Queen
-		{-20,-10,-10, -5, -5,-10,-10,-20 },
-		{-10,  0,  5,  0,  0,  0,  0,-10 },
-		{-10,  5,  5,  5,  5,  5,  0,-10 },
-		{  0,  0,  5,  5,  5,  5,  0, -5 },
-		{ -5,  0,  5,  5,  5,  5,  0, -5 },
-		{-10,  0,  5,  5,  5,  5,  0,-10 },
-		{-10,  0,  0,  0,  0,  0,  0,-10 },
-		{-20,-10,-10, -5, -5,-10,-10,-20 }
+	{  // Queen
+		{ -20, -10, -10,  -5,  -5, -10, -10, -20 },
+		{ -10,   0,   5,   0,   0,   0,   0, -10 },
+		{ -10,   5,   5,   5,   5,   5,   0, -10 },
+		{   0,   0,   5,   5,   5,   5,   0,  -5 },
+		{  -5,   0,   5,   5,   5,   5,   0,  -5 },
+		{ -10,   0,   5,   5,   5,   5,   0, -10 },
+		{ -10,   0,   0,   0,   0,   0,   0, -10 },
+		{ -20, -10, -10,  -5,  -5, -10, -10, -20 }
 	},
-	{ // King (middle game)
-		{ 20, 30, 10,  0,  0, 10, 30, 20 },
-		{ 20, 20,  0,  0,  0,  0, 20, 20 },
-		{-10,-20,-20,-20,-20,-20,-20,-10 },
-		{-20,-30,-30,-40,-40,-30,-30,-20 },
-		{-30,-40,-40,-50,-50,-40,-40,-30 },
-		{-30,-40,-40,-50,-50,-40,-40,-30 },
-		{-30,-40,-40,-50,-50,-40,-40,-30 },
-		{-30,-40,-40,-50,-50,-40,-40,-30 }
+	{  // King (middle game)
+		{  20,  30,  10,   0,   0,  10,  30,  20 },
+		{  20,  20,   0,   0,   0,   0,  20,  20 },
+		{ -10, -20, -20, -20, -20, -20, -20, -10 },
+		{ -20, -30, -30, -40, -40, -30, -30, -20 },
+		{ -30, -40, -40, -50, -50, -40, -40, -30 },
+		{ -30, -40, -40, -50, -50, -40, -40, -30 },
+		{ -30, -40, -40, -50, -50, -40, -40, -30 },
+		{ -30, -40, -40, -50, -50, -40, -40, -30 }
 	}
 };
 
@@ -97,7 +97,7 @@ void ai_reset() {
 #define AI_NEGAMAXMOV_CALL()	int16_t val = (-1) * ai_negamax(depth - 1, (-1) * b, (-1) * a, player * (-1), false);
 
 #define AI_NEGAMAXMOV_EVAL(TOY, TOX)								\
-			if ( val > bestVal ){									\
+			if ( val > bestVal ) {									\
 				bestVal = val;										\
 				if (record)											\
 					selected = MOVE(fromY, fromX, (TOY), (TOX));	\
@@ -109,7 +109,7 @@ void ai_reset() {
 
 #define AI_NEGAMAXMOV(TOY, TOX)																		\
 	do {																							\
-		if (VALID_FIELD((TOY),(TOX)) && board_canMove(MOVE(fromY, fromX, (TOY), (TOX)), player)){	\
+		if (VALID_FIELD((TOY), (TOX)) && board_canMove(MOVE(fromY, fromX, (TOY), (TOX)), player)) {	\
 			int8_t oldFrom = board[fromY][fromX];													\
 			int8_t oldTo = board[(TOY)][(TOX)];														\
 			board[fromY][fromX] = NONE;																\
@@ -119,14 +119,14 @@ void ai_reset() {
 			AI_NEGAMAXMOV_CALL();																	\
 			board[fromY][fromX] = oldFrom;															\
 			board[(TOY)][(TOX)] = oldTo;															\
-			AI_NEGAMAXMOV_EVAL((TOY),(TOX))															\
+			AI_NEGAMAXMOV_EVAL((TOY), (TOX))														\
 		}																							\
-	} while(0)
-__attribute__ ((hot))
+	} while (0)
+__attribute__((hot))
 int16_t ai_negamax(int8_t depth, int16_t a, int16_t b, int8_t player, bool record) {
-	if (!board_hasKing(player))
+	if (!board_hasKing(player)) {
 		return mininf;
-	else if (depth <= 0) {
+	} else if (depth <= 0) {
 		int16_t values = 0;
 		uint8_t pieces[3] = { 0 };
 		uint8_t queens[3] = { 0 };
@@ -144,7 +144,7 @@ int16_t ai_negamax(int8_t depth, int16_t a, int16_t b, int8_t player, bool recor
 				}
 			}
 		// Endgame check
-		if ((queens[0] == 0 || (queens[0] == 1 && pieces[0] <= 3)) && (queens[2] == 0 || (queens[2] == 1 && pieces[2] <= 3)))
+		if ((queens[0] == 0 || (queens[0] == 1 && pieces[0] <= 3)) && (queens[2] == 0 || (queens[2] == 1 && pieces[2] <= 3))) {
 			for (int8_t y = 0; y < 8; y++)
 				for (int8_t x = 0; x < 8; x++) {
 					// Use the delta table for the king endgame
@@ -153,10 +153,10 @@ int16_t ai_negamax(int8_t depth, int16_t a, int16_t b, int8_t player, bool recor
 					else if (board[y][x] == -1 * KING)
 						values -= eval_table[0][7 - y][x];
 				}
+		}
 		return values * player;
-	}
-	// calculate best move
-	else {
+	} else {
+		// calculate best move
 		int16_t bestVal = mininf;
 		for (uint8_t fromY = 0; fromY < 8; fromY++)
 			for (uint8_t fromX = 0; fromX < 8; fromX++) {
@@ -216,7 +216,7 @@ int16_t ai_negamax(int8_t depth, int16_t a, int16_t b, int8_t player, bool recor
 						default:
 							assert(fig == ROOK || fig == BISHOP || fig == QUEEN);
 							// bishop or queen
-							if (fig != ROOK)
+							if (fig != ROOK) {
 								for (int8_t i = -8; i <= 8; i++)
 									if (i != 0) {
 										AI_NEGAMAXMOV(fromY + i, fromX + i);
@@ -224,8 +224,9 @@ int16_t ai_negamax(int8_t depth, int16_t a, int16_t b, int8_t player, bool recor
 										AI_NEGAMAXMOV(fromY + i, fromX - i);
 										AI_NEGAMAXMOV(fromY - i, fromX + i);
 									}
+							}
 							// rook or queen
-							if (fig != BISHOP)
+							if (fig != BISHOP) {
 								for (int8_t i = -8; i <= 8; i++)
 									if (i != 0) {
 										AI_NEGAMAXMOV(fromY + i, fromX);
@@ -233,6 +234,7 @@ int16_t ai_negamax(int8_t depth, int16_t a, int16_t b, int8_t player, bool recor
 										AI_NEGAMAXMOV(fromY, fromX + i);
 										AI_NEGAMAXMOV(fromY, fromX - i);
 									}
+							}
 					}
 			}
 		return bestVal;
@@ -241,7 +243,7 @@ int16_t ai_negamax(int8_t depth, int16_t a, int16_t b, int8_t player, bool recor
 
 int16_t ai_move(int8_t player, uint8_t level) {
 	assert(level > 0);
-	if (!openings_move(player)){
+	if (!openings_move(player)) {
 		selected = MOVE_INVALID;
 		return ai_negamax(level, mininf, maxinf, player, true) * player;
 	}

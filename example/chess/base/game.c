@@ -34,7 +34,7 @@ void game_describe(int8_t player, int8_t piece, uint8_t move) {
 	fputc('\n', out);
 
 	// Long algebraic notation
-	if ((move & MOVE_CASTELING) != 0){
+	if ((move & MOVE_CASTELING) != 0) {
 		fputs((move & MOVE_CASTELING_QUEENSIDE) == MOVE_CASTELING_QUEENSIDE ? "0-0-0" : "0-0", out);
 		if (board_isCheck(player * (-1)))
 			fputc('#', out);
@@ -91,7 +91,7 @@ bool game_move(int8_t player) {
 		ai_move(player, strength);
 		if (SELECTED_IS_INVALID)
 			return false;
-		sleep(2); // Make it slower so it is not so depressing to loose :)
+		sleep(2);  // Make it slower so it is not so depressing to loose :)
 		int8_t piece = BOARD_SELECTED_FROM;
 		uint8_t move = board_move(player);
 		assert(move != MOVE_NOT_ALLOWED && "AI did illegal move");
@@ -147,4 +147,3 @@ int main() {
 
 	return 0;
 }
-

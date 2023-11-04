@@ -23,12 +23,12 @@
 
 #define INVALID (9)
 
-#define VALID_FIELD(Y,X) ((X) >= 0 && (X) < 8 && (Y) >= 0 && (Y) < 8)
-#define VALID_POS(P) (VALID_FIELD((P).y,(P).x))
+#define VALID_FIELD(Y, X) ((X) >= 0 && (X) < 8 && (Y) >= 0 && (Y) < 8)
+#define VALID_POS(P) (VALID_FIELD((P).y, (P).x))
 #define VALID_MOVE(M) (VALID_POS((M).from) && VALID_POS((M).to))
 
-#define POS(Y,X) (chess_pos){ .y = (Y), .x = (X) }
-#define MOVE(FROMY,FROMX,TOY,TOX) (chess_move){ .from = POS(FROMY,FROMX), .to = POS(TOY,TOX) }
+#define POS(Y, X) (chess_pos) { .y = (Y), .x = (X) }
+#define MOVE(FROMY, FROMX, TOY, TOX) (chess_move) { .from = POS(FROMY, FROMX), .to = POS(TOY, TOX) }
 
 #define POS_INVALID POS(INVALID, INVALID)
 #define POS_IS_INVALID(P) ((P).x == INVALID || (P).y == INVALID)

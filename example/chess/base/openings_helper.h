@@ -19,11 +19,11 @@
 #define CHESS_OPENINGS_HELPER_H
 
 #define OPENING_IS_VALID(X) ((opening_invalid[(X)/8] & (1 << ((X) % 8))) == 0)
-#define OPENING_INVALIDATE(X) do { opening_invalid[(X)/8] |= (1 << ((X) % 8)); } while(0)
-#define OPENING_FROM_X(O,M) (((openings[O][(M) * 2 - 2]) >> 4) & 7)
-#define OPENING_FROM_Y(O,M) (openings[O][(M) * 2 - 2] & 7)
-#define OPENING_TO_X(O,M) (((openings[O][(M) * 2 - 1]) >> 4) & 7)
-#define OPENING_TO_Y(O,M) (openings[O][(M) * 2 - 1] & 7)
+#define OPENING_INVALIDATE(X) do { opening_invalid[(X)/8] |= (1 << ((X) % 8)); } while (0)
+#define OPENING_FROM_X(O, M) (((openings[O][(M) * 2 - 2]) >> 4) & 7)
+#define OPENING_FROM_Y(O, M) (openings[O][(M) * 2 - 2] & 7)
+#define OPENING_TO_X(O, M) (((openings[O][(M) * 2 - 1]) >> 4) & 7)
+#define OPENING_TO_Y(O, M) (openings[O][(M) * 2 - 1] & 7)
 #define OPENING_NONE (0xff)
 
 #define A1 0x07
