@@ -95,7 +95,7 @@ bool ObjectRelocatable::preload() {
 				if (section.allocate()) {
 					size_t additional_size = 0;
 					if (this->file_previous == nullptr && section.type() == SHT_PROGBITS && (strcmp(section.name(), ".init", 5) == 0 || strcmp(section.name(), ".fini", 5) == 0)) {
-						// The init/fini section consists only from calls.
+						// The init/fini section consists only of calls.
 						// They need to be fixed after mapping
 						init_sections.push_back(section);
 						// We need an additional byte for the return instruction
@@ -409,7 +409,7 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 		auto plt_entry = base + needed_symbol.value();
 		if (!needed_symbol.undefined()) {
 			// Special case: We have a newer version of a function
-			if (!is_latest_version() && is(needed_symbol.type()).in(STT_FUNC, STT_GNU_IFUNC, STT_SECTION)) {
+			if (!is_latest_version() && is(needed_symbol.type()).in(STT_FUNC, STT_GNU_IFUNC)) {
 				auto latest_symbol = this->file.current->resolve_internal_symbol(needed_symbol.name());
 				if (latest_symbol.has_value() && needed_symbol.type() == latest_symbol->type()) {
 					relocations.insert(reloc, latest_symbol.value());
