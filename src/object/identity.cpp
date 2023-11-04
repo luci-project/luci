@@ -194,7 +194,7 @@ bool ObjectIdentity::watch(bool force, bool close_existing) {
 			LOG_DEBUG << "Watching for modifications at " << this->path << endl;
 			wd = inotify.value();
 		} else {
-			LOG_ERROR << "Cannot watch for modification of " << this->path << ": " << inotify.error_message() << endl;
+			LOG_INFO << "Cannot watch for modification of " << this->path << ": " << inotify.error_message() << endl;
 			wd = -1;
 		}
 	}

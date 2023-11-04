@@ -57,7 +57,7 @@ void Loader::filemodification_detect(unsigned long now, TreeSet<Pair<unsigned lo
 					} else */ if ((event->mask & IN_IGNORED) != 0) {
 						// Reinstall watch
 						if (!object_file.watch(true))
-							LOG_ERROR << "Unable to watch for updates of " << object_file.path << endl;
+							LOG_INFO << "Unable to watch for updates of " << object_file.path << endl;
 					} else {
 						// Ignore update if already in list
 						auto it = worklist_load.begin();
