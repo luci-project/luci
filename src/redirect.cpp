@@ -106,7 +106,8 @@ static bool all_tasks(TreeSet<pid_t> & tids) {
  *  \return `true` if a 32bit relative jump is possible
  */
 static bool check_relative_jump(uintptr_t from, uintptr_t to) {
-	return Math::abs(from + 5 - to) < (2UL << 31);
+	from += 5;
+	return (from < to ? (to - from) : (from - to)) < (2UL << 31);
 }
 
 /*! \brief Create a static (permanent) redirection
@@ -124,7 +125,7 @@ static bool static_redirect(Object & object, uintptr_t from, uintptr_t to) {
 
 	// Check if we could do a relative jmp
 	if (check_relative_jump(from, to)) {
-		uint32_t rel = static_cast<uint32_t>(from + 5 - to);
+		uint32_t rel = static_cast<uint32_t>(to - from - 5);
 		// jmp $rel
 		*(m++) = 0xe9;
 		*(m++) = (rel >> 0) & 0xff;
@@ -184,7 +185,7 @@ static void trap_handler(int signal, siginfo *si, ucontext *context) {
 	if (i) {
 		auto & entry = i->value;
 		// Trap address
-		auto trap_address = rip  - trap.offset;
+		auto trap_address = rip - trap.offset;
 		LOG_DEBUG << "Redirecting " << reinterpret_cast<void*>(trap_address) << " (" << entry.from_object << ") to " << reinterpret_cast<void*>(entry.to_address) << endl;
 		// Set new RIP to the target address
 		rip = entry.to_address;
@@ -264,9 +265,9 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 	RedirectionEntry::Type type = RedirectionEntry::ONLY_DYNAMIC;
 	size_t bytes_to_preserve = traps[mode].size;
 	if (make_static) {
-		bytes_to_preserve = check_relative_jump(from_address, to_address) ? 5 : 16;
+		bytes_to_preserve = check_relative_jump(from_address + from_object.base, to_address) ? 5 : 16;
 		if (from_size < bytes_to_preserve) {
-			LOG_INFO << "Not enough space at " << reinterpret_cast<void*>(from_address) << " for static redirection -- will only use dynamic" << endl;
+			LOG_INFO << "Not enough space at " << reinterpret_cast<void*>(from_address) << " (" << from_size << " bytes but " << bytes_to_preserve << " required) for static redirection -- will only use dynamic" << endl;
 		} else {
 			type = RedirectionEntry::MAKE_STATIC;
 		}
@@ -274,7 +275,7 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 
 	// Entry
 	GuardedWriter _(redirection_sync);
-	auto e = redirection_entries.find(from_address);
+	auto e = redirection_entries.find(from_address + from_object.base);
 	if (e) {
 		auto & val = e->value;
 		if (val.type == RedirectionEntry::MADE_STATIC) {
@@ -286,7 +287,7 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 				} else {
 					// Update
 					val.to_address = to_address;
-					return static_redirect(from_object, from_address, to_address);
+					return static_redirect(from_object, from_address + from_object.base, to_address);
 				}
 			}
 		} else if (&(val.from_object) == &from_object && val.to_address == to_address && val.type == type) {
@@ -294,7 +295,7 @@ bool add(Object & from_object, uintptr_t from_address, uintptr_t to_address, siz
 			return true;
 		} else {
 			// delete entry
-			redirection_entries.erase(from_address);
+			redirection_entries.erase(from_address + from_object.base);
 		}
 	}
 
