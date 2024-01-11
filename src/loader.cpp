@@ -42,7 +42,7 @@ static uintptr_t symbol_trampoline_address_callback(size_t size) {
 }
 
 Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
- : config(config), symbol_trampoline(symbol_trampoline_address_callback), dependencies(lookup.end()) {
+ : config(config), symbol_trampoline(symbol_trampoline_address_callback), pid(Syscall::getpid()), dependencies(lookup.end()) {
 	default_flags.bind_global = 1;
 
 	if (config.dynamic_update) {
@@ -50,6 +50,8 @@ Loader::Loader(uintptr_t luci_self, const char * sopath, struct Config config)
 	} else {
 		default_flags.immutable_source = 1;
 	}
+
+	// Start handler thread
 	start_handler_threads();
 
 	// Flags for vDSO and Luci

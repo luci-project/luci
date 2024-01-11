@@ -129,9 +129,20 @@ void Loader::filemodification_load(unsigned long now, TreeSet<Pair<unsigned long
 			break;
 		}
 	}
-	if (updated && !relocate(true)) {
-		LOG_ERROR << "Updating relocations failed!" << endl;
-		assert(false);
+	if (updated) {
+		// Stop main process
+		if (config.stop_on_update)
+			Syscall::kill(pid, SIGSTOP);
+
+		// Perform relocation
+		if (!relocate(true)) {
+			LOG_ERROR << "Updating relocations failed!" << endl;
+			assert(false);
+		}
+
+		// Continue main process
+		if (config.stop_on_update)
+			Syscall::kill(pid, SIGCONT);
 	}
 }
 
@@ -249,6 +260,13 @@ void Loader::userfault_handle() {
 }
 
 void Loader::helper_loop() {
+	const char * name = "Luci Helper";
+	Syscall::prctl(PR_SET_NAME, reinterpret_cast<unsigned long>(name));
+
+	// Set custom process group
+	if (config.stop_on_update)
+		Syscall::setpgid(0, 0);
+
 	// Set signal handler
 	struct sigaction action;
 	Memory::set(&action, 0, sizeof(struct sigaction));

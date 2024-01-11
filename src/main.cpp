@@ -61,6 +61,7 @@ struct Opts {
 	bool dependencyCheck{};
 	bool modificationTime{};
 	bool forceUpdate{};
+	bool stopOnUpdate{};
 	bool skipIdentical{};
 	bool debugSymbols{};
 	bool dynamicWeak{};
@@ -170,6 +171,9 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	// Force dynamic updates
 	if (config_loader.dynamic_update)
 		config_loader.force_update = opts.forceUpdate || config_file.value_or_default<bool>("LD_FORCE_UPDATE", false);
+	// Stop process during relocation at updates
+	if (config_loader.dynamic_update)
+		config_loader.stop_on_update = opts.stopOnUpdate || config_file.value_or_default<bool>("LD_STOP_ON_UPDATE", false);
 	// Ignore identical updates
 	if (config_loader.skip_identical)
 		config_loader.skip_identical = opts.skipIdentical || config_file.value_or_default<bool>("LD_SKIP_IDENTICAL", false);
@@ -409,6 +413,7 @@ int main(int argc, char* argv[]) {
 				{'N',  "bind-not",         nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
 				{'V',  "version",          nullptr,  &Opts::showVersion,      false, "Show version information" },
 				{'s',  "static",           nullptr,  &Opts::linkstatic,       false, "Perform static linking as well" },
+				{'\0', "stop-on-update",   nullptr,  &Opts::stopOnUpdate,     false, "Stop the process during update according to Intels requirements for cross processor code modification. Make sure to disable job control. This option can also be enabled by setting the environment variable LD_STOP_ON_UPDATE to 1" },
 				{'\0', "early-statusinfo", nullptr,  &Opts::earlyStatusInfo,  false, "Output status info during loading the binary, so that it will also contain details about the initial libraries. This option can also be enabled by setting the environment variable LD_EARLY_STATUS_INFO to 1" },
 				{'\0', "dbgsym",           nullptr,  &Opts::debugSymbols,     false, "Search for external debug symbols to improve detection of binary updatability. This option can also be enabled by setting the environment variable LD_DEBUG_SYMBOLS to 1" },
 				{'\0', "dbgsym-root",      nullptr,  &Opts::debugSymbolsRoot, false, "Set root directory for external debug symbols. This option can also be configured using the environment variable LD_DEBUG_SYMBOLS_ROOT" },

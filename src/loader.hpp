@@ -43,6 +43,9 @@ struct Loader {
 		/*! \brief support dynamic weak definitions? */
 		bool dynamic_weak = false;
 
+		/*! \brief Stop process during update (required for cross processor code modification according to intel)? */
+		bool stop_on_update = false;
+
 		/*! \brief use modification time to detect changes? */
 		bool use_mtime = false;
 
@@ -142,6 +145,9 @@ struct Loader {
 
 	/*! \brief Pointer to handler thread */
 	Thread * handler_thread = nullptr;
+
+	/*! \brief Process PID */
+	pid_t pid;
 
 	/*! \brief Descriptor for status info output */
 	int statusinfofd = -1;
