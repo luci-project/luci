@@ -389,13 +389,29 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 	// Special case: reading address of GOTPCRELX
 	if (is(reloc.type()).in(Elf::R_X86_64_REX_GOTPCRELX, Elf::R_X86_64_GOTPCRELX)) {
 		auto * instruction = reinterpret_cast<uint8_t*>(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0) + reloc.offset() - 2);
-		// check if instruction is MOV (+ register)
-		if (*instruction == 0x8b) {
+		if (instruction[0] == 0x8b) {
+			// instruction is MOV (+ register)
 			LOG_DEBUG << "Rewriting MOV with GOTPCRELX relocation to LEA at " << reinterpret_cast<void*>(instruction) << endl;
 			// Addend must be -4
 			assert(reloc.addend() == -4);
 			// Change to LEA
-			*instruction += 2;
+			instruction[0] = 0x8d;
+		} else if (instruction[0] == 0xff && instruction[1] == 0x15) {
+			// instruction is CALL [rip + ...]
+			LOG_DEBUG << "Rewriting indirect CALL with GOTPCRELX relocation to NOP, direct CALL at " << reinterpret_cast<void*>(instruction) << endl;
+			// Addend must be -4
+			assert(reloc.addend() == -4);
+			// Change to NOP; CALL
+			instruction[0] = 0x90;
+			instruction[1] = 0xe8;
+		} else if (instruction[0] == 0xff && instruction[1] == 0x25) {
+			// instruction is JMP [rip + ...]
+			LOG_DEBUG << "Rewriting indirect JMP with GOTPCRELX relocation to NOP, direct JMP at " << reinterpret_cast<void*>(instruction) << endl;
+			// Addend must be -4
+			assert(reloc.addend() == -4);
+			// Change to NOP; JMP
+			instruction[0] = 0x90;
+			instruction[1] = 0xe9;
 		}
 	}
 	// find symbol
