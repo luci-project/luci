@@ -6,9 +6,10 @@
 
 #include <dlh/container/optional.hpp>
 #include <dlh/container/vector.hpp>
-#include <dlh/container/tree.hpp>
+#include <dlh/container/hash.hpp>
 #include <dlh/container/list.hpp>
 #include <dlh/container/pair.hpp>
+#include <dlh/container/tree.hpp>
 #include <dlh/socket_client.hpp>
 #include <dlh/rwlock.hpp>
 #include <dlh/mutex.hpp>
@@ -116,8 +117,8 @@ struct Loader {
 	#endif
 	};
 
-	/*! \brief libraries to exclude */
-	Vector<const char *> library_exclude = { "ld-linux-x86-64.so.2" , "libdl.so.2" };
+	/*! \brief libraries to exclude in dependencies */
+	HashSet<const char *> library_exclude{ "ld-linux-x86-64.so.2" , "libdl.so.2" };
 
 	/*! \brief List of all loaded objects (for symbol resolving) */
 	ObjectIdentityList lookup;
