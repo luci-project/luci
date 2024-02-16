@@ -44,6 +44,7 @@ struct Opts {
 	const char * logfile{};
 	Vector<const char *> libpath{};
 	Vector<const char *> libload{};
+	Vector<const char *> libexclude{};
 	Vector<const char *> preload{};
 	const char * libpathconf{ STR(LIBPATH_CONF) };
 	const char * luciconf{ STR(LDLUCI_CONF) };
@@ -323,14 +324,23 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 			LOG_DEBUG << "Library config has " << loader->library_path_config.size() << " search path entries!" << endl;
 		}
 
+		// Exclude Library
+		for (const char * lib : opts.libexclude)
+			loader->library_exclude.insert(lib);
+
+		char * exclude_libs = const_cast<char*>(config_file.value("LD_EXCLUDE"));
+		if (exclude_libs != nullptr && *exclude_libs != '\0') {
+			for (const char * lib : String::split_any_inplace(exclude_libs, ";:"))
+				loader->library_exclude.insert(lib);
+		}
+
 		// Preload Library
 		for (auto & lib : opts.preload)
 			preload.push_back(lib);
 
 		char * preload_libs = const_cast<char*>(config_file.value("LD_PRELOAD"));
 		if (preload_libs != nullptr && *preload_libs != '\0') {
-			// TODO: Split by ';' and ':'
-			for (auto & lib : String::split_inplace(preload_libs, ';'))
+			for (auto & lib : String::split_any_inplace(preload_libs, ";:"))
 				preload.push_back(lib);
 		}
 	}
@@ -346,7 +356,6 @@ enum LibName {
 static bool load_library_by_name(Loader * loader, const char * lib, enum LibName libname) {
 	// Try as namespec
 	StringStream<255> filename;
-	// TODO: static libraries (.a)
 	switch (libname) {
 		case LIB_NAME_COLON:
 			filename << lib + 1;
@@ -388,10 +397,11 @@ int main(int argc, char* argv[]) {
 				{'a',  "logfile-append",   nullptr,  &Opts::logfileAppend,    false, "Append output to log file (instead of truncate). Requires logfile, can also be enabled by setting the environment variable LD_LOGFILE_APPEND to 1" },
 				{'e',  "entry",            "SYM",    &Opts::entry,            false, "Overwrite default start entry point with custom symbol or address (use preceeding '+' for relative adressing)" },
 				{'l',  "library",          "NAME",   &Opts::libload,          false, "Add library namespec to link/load (in the given order). Prefix with ':' for filename" },
+				{'x',  "exclude",          "FILE",   &Opts::libexclude,       false, "Skip and exclude library, even when required as dependency. By default, this is used for the systems default RTLD 'ld-linux-x86-64.so.2' and 'libdl'. This can also be specified using the environment variable LD_EXCLUDE - separate mutliple files by semicolon." },
 				{'L',  "library-path",     "DIR",    &Opts::libpath,          false, "Add library search path (this parameter may be used multiple times to specify additional directories). This can also be specified with the environment variable LD_LIBRARY_PATH - separate mutliple directories by semicolon." },
 				{'c',  "library-conf",     "FILE",   &Opts::libpathconf,      false, "Library path configuration" },
 				{'C',  "luci-conf",        "FILE",   &Opts::luciconf,         false, "Luci loader configuration file" },
-				{'P',  "preload",          "FILE",   &Opts::preload,          false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple directories by semicolon." },
+				{'P',  "preload",          "FILE",   &Opts::preload,          false, "Library to be loaded first (this parameter may be used multiple times to specify addtional libraries). This can also be specified with the environment variable LD_PRELOAD - separate mutliple files by semicolon." },
 				{'S',  "statusinfo",       "FILE",   &Opts::statusinfo,       false, "File (named pipe) for logging successful and failed updates (latter would require a restart). Disabled if empty. This option can also be activated by setting the environment variable LD_STATUS_INFO" },
 				{'d',  "debughash",        "SOCKET", &Opts::debughash,        false, "Socket URI (unix / tcp / udp) for retrieving debug data hashes. Disabled if empty. This option can also be activated by setting the environment variable LD_DEBUG_HASH" },
 				{'u',  "update",           nullptr,  &Opts::dynamicUpdate,    false, "Enable dynamic updates. This option can also be enabled by setting the environment variable LD_DYNAMIC_UPDATE to 1" },
