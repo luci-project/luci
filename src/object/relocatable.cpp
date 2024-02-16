@@ -58,12 +58,23 @@ bool ObjectRelocatable::preload() {
 	Optional<Elf::Section> tbss;
 
 	// Check availability of external symbols on updates
-	if (this->file_previous != nullptr && !file.loader.config.force_update)
+	if (this->file_previous != nullptr && !file.loader.config.force_update) {
+		unsigned missing = 0;
 		for (const auto & sym : symbol_table())
 			if (sym.undefined() && sym.bind() == STB_GLOBAL && !file.loader.resolve_symbol(sym.name(), nullptr, file.ns, &file).has_value()) {
-				LOG_WARNING << "Missing external symbol " << sym.name() << " -- abort updating object!" << endl;
-				return false;
+				if (String::compare(sym.name(), "_GLOBAL_OFFSET_TABLE_") == 0) {
+					LOG_INFO << "Missing external symbol " << sym.name() << " -- ignoring!" << endl;
+				} else {
+					LOG_WARNING << "Missing external symbol " << sym.name() << " -- abort updating object!" << endl;
+					missing++;
+				}
 			}
+		if (missing > 0) {
+			LOG_WARNING << "Abort updating " << file << " due to " << missing << " missing symbols!" << endl;
+			return false;
+		}
+	}
+
 
 	for (const auto & section : this->sections) {
 		if (section.size() == 0)
