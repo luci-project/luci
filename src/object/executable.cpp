@@ -18,21 +18,26 @@ bool ObjectExecutable::preload_segments(bool setup_relro) {
 	if (setup_relro)
 		for (const auto & segment : this->segments)
 			if (Elf::PT_GNU_RELRO == segment.type()) {
-				assert(segment.virt_size() == segment.size());
-				relro.emplace(segment);
+				// TODO: Check how to handle relro with different size
+				if (segment.virt_size() == segment.size()) {
+					relro.emplace(segment);
+				} else {
+					LOG_DEBUG << "Ignore relocation read-only since virtual size of " << segment.virt_size() << " bytes differs from memory size with " << segment.size() << " bytes" << endl;
+				}
 			}
 
 	// LOAD segments
 	for (const auto & segment : this->segments)
 		if (Elf::PT_LOAD == segment.type() && segment.virt_size() > 0) {
-			if (relro && segment.offset() == relro->offset() && segment.virt_addr() == relro->virt_addr()) {
+			// TODO: Support relro for segments other than 4k alignment
+			if (relro && segment.offset() == relro->offset() && segment.virt_addr() == relro->virt_addr() && segment.alignment() == 0x1000) {
 				LOG_DEBUG << "Relocation read-only at " << reinterpret_cast<void*>(relro->virt_addr()) << " with " << relro->size() << " bytes" << endl;
 				// Relro section
 				memory_map.emplace_back(*this, *relro, base);
 				// Rest of data section (if any)
-				if (segment.virt_size() - relro->size() > 0) {
-					assert((relro->virt_addr() + relro->size()) % Page::SIZE == 0);
-					memory_map.emplace_back(*this, segment, base, relro->size());
+				if (segment.virt_size() - relro->virt_size() > 0) {
+					assert((relro->virt_addr() + relro->virt_size()) % Page::SIZE == 0);
+					memory_map.emplace_back(*this, segment, base, relro->virt_size());
 				}
 			} else {
 				memory_map.emplace_back(*this, segment, base);
