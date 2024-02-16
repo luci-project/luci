@@ -479,20 +479,20 @@ static_assert(_count == GLIBC_TUNABLE_COUNT, "Wrong number of tunables for " OSN
 struct Tunable {  // NOLINT
 	/* Internal name of the tunable.  */
 #if GLIBC_VERSION >= GLIBC_2_33
-	const char name[42];
+	char name[42];
 #else
 	const char *name;
 #endif
 
 	/* Data type of the tunable.  */
-	enum Type {
+	enum TypeCode {
 		TUNABLE_TYPE_INT_32,
 		TUNABLE_TYPE_UINT_64,
 		TUNABLE_TYPE_SIZE_T,
 		TUNABLE_TYPE_STRING
 	};
-	struct {
-		Type type_code;
+	struct Type {
+		TypeCode type_code;
 		int64_t min;
 		int64_t max;
 	} type;
@@ -507,7 +507,7 @@ struct Tunable {  // NOLINT
 	bool initialized;
 
 	/* Specify the security level for the tunable with respect to AT_SECURE programs */
-	enum {
+	enum SecLevel {
 		/* Erase the tunable for AT_SECURE binaries so that child processes don't read it.  */
 		TUNABLE_SECLEVEL_SXID_ERASE = 0,
 
@@ -520,9 +520,28 @@ struct Tunable {  // NOLINT
 
 	/* The compatibility environment variable name.  */
 #if GLIBC_VERSION >= GLIBC_2_33
-	const char env_alias[23];
+	char env_alias[23];
 #else
 	const char *env_alias;
+#endif
+
+	constexpr Tunable(const char * name, Type type, Val val, bool initialized, SecLevel security_level, const char *env_alias)
+#if GLIBC_VERSION >= GLIBC_2_33
+	  : type(type), val(val), initialized(initialized), security_level(security_level) {
+			for (size_t i = 0; i < 42; i++)
+				if ((this->name[i] = name[i]) == '\0')
+					break;
+
+			if (env_alias == nullptr) {
+				this->env_alias[0] = '\0';
+			} else {
+				for (size_t i = 0; i < 23; i++)
+					if ((this->env_alias[i] = env_alias[i]) == '\0')
+						break;
+			}
+		}
+#else
+	  : name(name), type(type), val(val), initialized(initialized), security_level(security_level), env_alias(env_alias) {}
 #endif
 } tunables[] = {
 	TUNABLE_LIST
