@@ -165,7 +165,7 @@ $(BUILDDIR)/%.o : $(SRCFOLDER)/%.cpp $(MAKEFILE_LIST)
 
 $(BUILDINFO): FORCE
 	@echo "CXX		$@"
-	@echo 'const char * build_$(NAME)_version() { return "$(shell git describe --dirty --always --tags)"; } ' \
+	@echo 'const char * build_$(NAME)_version() { return "$(shell git describe --dirty --always --tags 2>/dev/null || echo unknown)"; } ' \
 	'const char * build_$(NAME)_date() { return "$(shell date -R)"; }' \
 	'const char * build_$(NAME)_flags() { return "$(CXXFLAGS)"; }' \
 	'const char * build_$(NAME)_compatibility() { return "$(OS) $(OSVERSION) on $(PLATFORM)"; }' | $(CXX) $(CXXFLAGS) -x c++ -c -o $@ -
