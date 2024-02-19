@@ -24,6 +24,9 @@
 struct Loader {
 	const struct Config {
 		/*! \brief enable dynamic updates? */
+		bool position_independent = true;
+
+		/*! \brief enable dynamic updates? */
 		bool dynamic_update = false;
 
 		/*! \brief enable dynamic updates of functions using the dl* interface? */
@@ -242,8 +245,8 @@ struct Loader {
 	/*! \brief Next Namespace */
 	mutable namespace_t next_namespace;
 
-	/*! \brief next unused address for library */
-	mutable uintptr_t next_library_address = LIBADDRESS;
+	/*! \brief next unused address for object */
+	mutable uintptr_t next_library_address = 0;
 
 	/*! \brief helper loop for file modification detection and userfault handling (executed in new thread) */
 	void helper_loop();

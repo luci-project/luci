@@ -679,9 +679,9 @@ uintptr_t Loader::next_address(size_t size) const {
 				next = end;
 
 	// Default address
-	if (next == 0) {
-		next = LIBADDRESS;
-	}
+	if (next == 0)
+		next = config.position_independent ? LIBADDRESS : PDCADDRESS;
+
 	next = Math::align_up(next, Page::SIZE);
 	next_library_address = Math::align_up(next + size, Page::SIZE);
 	return next;

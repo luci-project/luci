@@ -55,6 +55,7 @@ struct Opts {
 	const char * detectOutdated{ nullptr };
 	const char * debugSymbolsRoot{ nullptr };
 	unsigned delayOutdated{1};
+	bool noPIE{};
 	bool logtimeAbs{};
 	bool logfileAppend{};
 	bool dynamicUpdate{};
@@ -161,6 +162,12 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	}
 
 	Loader::Config config_loader;
+	// Position dependent
+	if (opts.noPIE && !opts.linkstatic) {
+		LOG_WARNING << "Position dependent code is only possible when using Luci as static linker!" << endl;
+	} else {
+		config_loader.position_independent = !opts.noPIE;
+	}
 	// Dynamic updates
 	config_loader.dynamic_update = opts.dynamicUpdate || config_file.value_or_default<bool>("LD_DYNAMIC_UPDATE", false);
 	// Dynamic updates of dl-funcs
@@ -422,12 +429,13 @@ int main(int argc, char* argv[]) {
 				{'n',  "bind-now",         nullptr,  &Opts::bindNow,          false, "Resolve all symbols at program start (instead of lazy resolution). This option can also be enabled by setting the environment variable LD_BIND_NOW to 1" },
 				{'N',  "bind-not",         nullptr,  &Opts::bindNot,          false, "Do not update GOT after resolving a symbol. This option cannot be used in conjunction with bind-now. It can be enabled by setting the environment variable LD_BIND_NOT to 1" },
 				{'V',  "version",          nullptr,  &Opts::showVersion,      false, "Show version information" },
-				{'s',  "static",           nullptr,  &Opts::linkstatic,       false, "Perform static linking as well" },
+				{'s',  "static",           nullptr,  &Opts::linkstatic,       false, "Act as static linker as well - this mode allows binding and loading relocatable object files (.o)." },
 				{'\0', "stop-on-update",   nullptr,  &Opts::stopOnUpdate,     false, "Stop the process during update according to Intels requirements for cross processor code modification. Make sure to disable job control. This option can also be enabled by setting the environment variable LD_STOP_ON_UPDATE to 1" },
 				{'\0', "early-statusinfo", nullptr,  &Opts::earlyStatusInfo,  false, "Output status info during loading the binary, so that it will also contain details about the initial libraries. This option can also be enabled by setting the environment variable LD_EARLY_STATUS_INFO to 1" },
 				{'\0', "dbgsym",           nullptr,  &Opts::debugSymbols,     false, "Search for external debug symbols to improve detection of binary updatability. This option can also be enabled by setting the environment variable LD_DEBUG_SYMBOLS to 1" },
 				{'\0', "dbgsym-root",      nullptr,  &Opts::debugSymbolsRoot, false, "Set root directory for external debug symbols. This option can also be configured using the environment variable LD_DEBUG_SYMBOLS_ROOT" },
 				{'\0', "argv0",            nullptr,  &Opts::argv0,            false, "Explicitly specify program name (argv[0])" },
+				{'\0', "no-pie",           nullptr,  &Opts::noPIE,            false, "Use position in lower 2 GB region for static linker - required if relocatable objects are not compiled with position independent code" },
 				{'\0', "show-args",        nullptr,  &Opts::showArgs,         false, "Show the arguments passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ARGS to 1" },
 				{'\0', "show-auxv",        nullptr,  &Opts::showAuxv,         false, "Show the auxiliary array passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_AUXV to 1" },
 				{'\0', "show-env",         nullptr,  &Opts::showEnv,          false, "Show the environment variables passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ENV to 1" },
