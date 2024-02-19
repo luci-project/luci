@@ -4,7 +4,9 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Set terminal emulator
-TERMINAL=x-terminal-emulator
+if [ -z "$TERMINAL" ] ; then
+	TERMINAL=x-terminal-emulator
+fi
 
 # Set SDL driver
 SDL_VIDEODRIVER=x11
@@ -26,10 +28,10 @@ fi
 # Opening windows for...
 echo "Opening terminals..."
 # ... listening on standard error
-$TERMINAL -x /bin/bash -c "echo -e \"\e]0;Chess standard error\a\e[7m Luci & chess standard error \e[0m\" ; while true; do sleep 1; cat \"$ERR_PIPE\" ; done" &
+$TERMINAL -e /bin/bash -c "echo -e \"\e]0;Chess standard error\a\e[7m Luci & chess standard error \e[0m\" ; while true; do sleep 1; cat \"$ERR_PIPE\" ; done" &
 
 # ... Luci application (with auto input)
-$TERMINAL -x /bin/bash -c "cd \"$SCRIPT_DIR\" ; echo -e \"\e]0;Chess standard output\a\e[7m Chess standard output \e[0m\" ; ./autoplay.sh | /opt/luci/ld-luci.so -v 3 -s -u ai.o board.o game.o openings.o tui.o 2>\"$ERR_PIPE\" ; sleep 5" &
+$TERMINAL -e /bin/bash -c "cd \"$SCRIPT_DIR\" ; echo -e \"\e]0;Chess standard output\a\e[7m Chess standard output \e[0m\" ; ./autoplay.sh | /opt/luci/ld-luci.so -v 3 -s -u ai.o board.o game.o openings.o tui.o -lc $@ 2>\"$ERR_PIPE\" ; sleep 5" &
 
 # run patcher
 echo -e "\e]0;Chess interaktive programming\a\e[7m Modification (interactive programming) \e[0m"

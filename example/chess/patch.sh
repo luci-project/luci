@@ -59,6 +59,7 @@ make -B game.o
 wait
 echo -e "\e[1mRevision 3c\e[0m (re-introducing global variable)"
 make -B CDEFS=CHESS_CLOCK game.o
+wait
 
 
 # 4. Notation to stdout, ASCII Art Board -> new function
@@ -82,13 +83,13 @@ wait
 
 # 6. SDL
 echo -e "\e[1mRevision 6a\e[0m (dynamically load SDL shared library)"
-patch -p1 < v6a.patch
+patch -p1 < v6-pre.patch
 make CDEFS=CHESS_CLOCK tui.o
 # We need some time until libraries are loaded
 wait 30
 echo -e "\e[1mRevision 6b\e[0m (SDL/graphical board)"
-patch -R -p1 < v6a.patch
-patch -p1 < v6b.patch
+patch -R -p1 < v6-pre.patch
+patch -p1 < v6.patch
 make CDEFS=CHESS_CLOCK tui.o
 wait
 

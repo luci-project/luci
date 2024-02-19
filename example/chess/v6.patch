@@ -4,7 +4,7 @@ diff -Naur rev5/tui.c rev6/tui.c
 @@ -25,6 +25,9 @@
  #include <poll.h>
  #include <termios.h>
- 
+
 +#include <SDL/SDL.h>
 +#include <SDL/SDL_image.h>
 +
@@ -12,8 +12,8 @@ diff -Naur rev5/tui.c rev6/tui.c
  #include "board.h"
  #include "openings.h"
 @@ -117,6 +120,43 @@
- 
- 
+
+
 +SDL_Surface * gui_content = NULL;
 +SDL_Surface * gui_pieceSurface = NULL;
  void tui_draw() {
@@ -67,10 +67,10 @@ diff -Naur rev5/Makefile rev6/Makefile
  DEPEND = $(SOURCE:.c=.d)
 @@ -13,7 +14,7 @@
  	$(CC) $(CFLAGS) -o $@ -c $<
- 
+
  $(TARGET): $(OBJECT)
 -	$(LD) -o $@ $^
 +	$(LD) -o $@ $^ $(LDFLAGS)
- 
+
  clean:
  	rm -f $(OBJECT) $(DEPEND)

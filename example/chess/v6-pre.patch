@@ -1,10 +1,10 @@
-diff -Naur rev5/tui.c rev6/tui.c
+diff -Naur rev5/tui.c rev6pre/tui.c
 --- rev5/tui.c
 +++ rev6/tui.c
 @@ -116,7 +116,11 @@
  }
- 
- 
+
+
 +#include <dlfcn.h>
 +static void* ptr = NULL;
  void tui_draw() {
