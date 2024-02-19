@@ -53,7 +53,6 @@ ObjectRelocatable::ObjectRelocatable(ObjectIdentity & file, const Object::Data &
 
 bool ObjectRelocatable::preload() {
 	// TODO flags.immutable_source  (should always be set, right?)
-
 	Optional<Elf::Section> tdata;
 	Optional<Elf::Section> tbss;
 
@@ -253,13 +252,14 @@ bool ObjectRelocatable::adjust_offsets(uintptr_t offset, const Elf::Section & se
 }
 
 
-bool ObjectRelocatable::prepare() {
-	LOG_INFO << "Prepare " << *this << " with " << reinterpret_cast<void*>(global_offset_table) << endl;
-	bool success = true;
+void ObjectRelocatable::preprepare() {
+	if (preprepared)
+		return;
 
 	// Allocate bss space for tentative definitions
 	// this has to be done after all other relocatable objects have been preloaded
 	size_t global_bss = 0;
+	size_t common_base = 0;
 	// Check symbol table for tentative definitions
 	for (const auto & sym : symbol_table())
 		if (sym.size() != 0 && sym.section_index() == Elf::SHN_COMMON) {
@@ -285,22 +285,30 @@ bool ObjectRelocatable::prepare() {
 				global_bss = start + sym.size();
 				// This is only allowed since we have a COW mapping
 				Elf::Sym * data = const_cast<Elf::Sym *>(sym.ptr());
+				// Get free address
+				if (common_base == 0) {
+					common_base = file.loader.next_address();
+					assert(common_base > base);
+				}
 				// Fixup value (= offset)
-				data->st_value = offset + start;
+				data->st_value = (common_base - base) + start;
 				// Add to symbol list
 				symbols.insert(sym);
 			}
 		}
 	// Allocate
 	if (global_bss > 0) {
-		auto mem = memory_map.emplace_back(*this, offset, global_bss, base);
-		// increase offset to next free page
-		offset += mem->target.page_size();
+		LOG_INFO << "Common section of " << *this << " at " << reinterpret_cast<void*>(common_base) << endl;
+		auto mem = memory_map.emplace_back(*this, common_base - base, global_bss, base);
 		// And map target
 		mem->map();
 	}
 
+	preprepared = true;
+}
 
+bool ObjectRelocatable::prepare() {
+	bool success = true;
 	// Perform initial relocations
 	for (auto & relocations : relocation_tables)
 		for (const auto & reloc : relocations) {

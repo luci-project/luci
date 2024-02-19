@@ -24,6 +24,9 @@ struct ObjectRelocatable : public Object {
 	/*! \brief Luci specific fixes performed right after mapping */
 	bool fix() override;
 
+	/*! \brief Preprepare (for tentative definitions) */
+	void preprepare() override;
+
 	/*! \brief Relocate sections */
 	bool prepare() override;
 
@@ -41,6 +44,7 @@ struct ObjectRelocatable : public Object {
 
  private:
 	uintptr_t offset = 0;
+	bool preprepared = false;
 
 	Vector<Elf::Array<Elf::Relocation>> relocation_tables;
 	Vector<Elf::Section> init_sections;

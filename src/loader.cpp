@@ -255,6 +255,10 @@ ObjectIdentity * Loader::dlopen(const char * file, ObjectIdentity::Flags flags, 
 
 
 bool Loader::relocate(bool update) {
+	// Pre-Prepare
+	for (auto & o : reverse(lookup))
+		o.preprepare();
+
 	// Prepare
 	for (auto & o : reverse(lookup))
 		if (!o.prepare())

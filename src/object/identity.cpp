@@ -448,6 +448,8 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 			LOG_INFO << "Prepare new version of " << path << endl;
 			// Lazy evaluation is not possible for updated files!
 			flags.bind_now = 1;
+			// Do preprepare
+			o->preprepare();
 			// Fix relocations in dynamic objects
 			if (!o->prepare()) {
 				LOG_WARNING << "Preparing updated object " << path << " failed!" << endl;
@@ -468,6 +470,12 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 	dynamic = o->dynamic_address();
 
 	return { o, o->file_previous == nullptr ? INFO_SUCCESS_LOAD : INFO_SUCCESS_UPDATE };
+}
+
+
+void ObjectIdentity::preprepare() const {
+	// Only latest version
+	current->preprepare();
 }
 
 

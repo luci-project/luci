@@ -135,6 +135,9 @@ private:
 	/*! \brief Make memory copy of ELF */
 	bool memdup(Object::Data & data);
 
+	/*! \brief Pre-prepare (for tentative definitions) */
+	void preprepare() const;
+
 	/*! \brief Prepare dependencies */
 	bool prepare() const;
 

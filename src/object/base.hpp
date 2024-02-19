@@ -123,6 +123,9 @@ struct Object : public Elf {
 	/*! \brief allocate required segments in memory */
 	bool map();
 
+	/*! \brief Pre-prepare (e.g., for tentative definitions) */
+	virtual void preprepare() {}
+
 	/*! \brief Prepare relocations */
 	virtual bool prepare() { return true; }
 
