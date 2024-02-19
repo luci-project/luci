@@ -54,6 +54,7 @@
 
   #elif defined(COMPATIBILITY_DEBIAN_BUSTER)
    #define OSVERSION "10 (Buster)"
+   // Its actually 2.28, but due to backports behaves like 2.31
    #define GLIBC_VERSION GLIBC_2_31
    #define GLIBC_PTHREAD_IN_LIBC 0
    #define GLIBC_RTLD_GLOBAL_SIZE 3992
@@ -157,9 +158,9 @@
    #define OSVERSION "37"
    #define GLIBC_VERSION GLIBC_2_36
    #define GLIBC_PTHREAD_IN_LIBC 1
-   #define GLIBC_RTLD_GLOBAL_SIZE 4328
+   #define GLIBC_RTLD_GLOBAL_SIZE 4336
    #define GLIBC_RTLD_GLOBAL_RO_SIZE 896
-   #define GLIBC_LINK_MAP_SIZE 1184
+   #define GLIBC_LINK_MAP_SIZE 1192
    #define GLIBC_TUNABLE_COUNT 37
    #define GLIBC_TUNABLE_SIZE 4144
 
