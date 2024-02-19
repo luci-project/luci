@@ -78,10 +78,20 @@ Make sure you meet the Python3 Packages requirements by using [pip](https://pypi
     make -C bean/elfo
 
 
+### Docker
+
+Of course you can use a container for build and testing.
+After cloning this repository with all submodules, you can use the helper script [`docker.sh`](tools/docker.sh) (located in the `tools` folder) to start an development environment:
+
+    tools/docker.sh debian:bookworm
+
+This will fetch the `debian:bookworm` docker image, install the required build tools and create a copy of the source repository located in `/builds/luci` -- ready for you to start with `make` to build the project.
+
+
 Usage
 -----
 
-**Have a look at the [`example`](example/) folder and run [`demo.sh`](example/demo.sh) for a quick demonstration!**
+**Have a look at the [`example`](example/) folder, especially the [Fibonacci demos](example/fibonacci/README.md) for a quick demonstration!**
 
 If you want to run a custom binary `~/a.out` (with parameter `foo`) with *Luci*, you can either start the *Luci* dynamic linker/loader with the binary as argument
 
@@ -126,10 +136,10 @@ Test cases
 They are located in the [`test` directory`](test/README.md).
 
 On each push to the *Luci* main repository, the [project's GitLab CI](https://gitlab.cs.fau.de/luci-project/luci/-/pipelines/) will run all default test cases on every supported distribution (using GCC and LLVM), plus the language test cases on all supported Debian and Ubuntu versions.
-For this reason, we provide [Docker images](https://gitlab.cs.fau.de/luci-project/docker) on [dockerhub](https://hub.docker.com/r/inf4/luci/tags) on which the required tools are already installed.
+For this reason, we provide [Docker images](https://gitlab.cs.fau.de/luci-project/docker) on [Docker Hub](https://hub.docker.com/r/inf4/luci/tags) on which the required tools are already installed.
 You can use it for testing instead (and save time and bandwidth on subsequent runs):
 
-    ./tools/docker-inf4.sh almalinux 9 ./test/run.sh -u "2-.*"
+    ./tools/docker.sh inf4/luci:almalinux-9 ./test/run.sh -u "2-.*"
 
 
 Compatibility
@@ -196,12 +206,3 @@ Author & License
 ----------------
 
 The *Luci* project is being developed by [Bernhard Heinloth](https://sys.cs.fau.de/person/heinloth) of the [Department of Computer Science 4](https://sys.cs.fau.de/) at [Friedrich-Alexander-Universität Erlangen-Nürnberg](https://www.fau.eu/) and is available under the [GNU Affero General Public License, Version 3 (AGPL v3)](LICENSE.md).
-
-
-Related Work
-------------
-
-### Patching shared libraries
-
- - [libpulp](https://github.com/SUSE/libpulp), a framework for userspace live-patching, requires the compiler to be compiled with patchable function entries and needs libpulp.so preloaded. Depends on ptrace
- - [libcare](https://github.com/cloudlinux/libcare) is employed during build time, analyzes the assembly & adds new sections (like kpatch)
