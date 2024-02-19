@@ -69,7 +69,7 @@ struct RedirectionEntry {
 /*! \brief Collection of active redirection entries */
 static HashMap<uintptr_t, RedirectionEntry> redirection_entries;
 /*! \brief Helper to synchronize concurrent collection access */
-static RWLock redirection_sync;
+static RWLock<Mutex> redirection_sync;
 
 /*! \brief Check if a string contains (only) numeric characters
  *  \param str string to be checked

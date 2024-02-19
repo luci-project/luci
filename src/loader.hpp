@@ -11,8 +11,8 @@
 #include <dlh/container/pair.hpp>
 #include <dlh/container/tree.hpp>
 #include <dlh/socket_client.hpp>
+#include <dlh/mutex_rec.hpp>
 #include <dlh/rwlock.hpp>
-#include <dlh/mutex.hpp>
 #include <dlh/thread.hpp>
 
 #include "object/identity.hpp"
@@ -130,7 +130,7 @@ struct Loader {
 	ObjectIdentity * target = nullptr;
 
 	/*! \brief synchronize lookup access */
-	mutable RWLock lookup_sync;
+	mutable RWLock<MutexRecursive> lookup_sync;
 
 	/*! \brief thread local storage */
 	TLS tls;
