@@ -199,6 +199,9 @@ struct link_map {
 		int malloced;
 	} l_runpath_dirs;
 	struct link_map **l_initfini;
+#if defined(COMPATIBILITY_FEDORA_37)
+	struct link_map *l_init_called_next;
+#endif
 	void *l_reldeps;
 	uint32_t l_reldepsmax;
 	uint32_t l_used;
