@@ -34,6 +34,8 @@ VERSIONS := versions.txt
 BASEADDRESS = 0x6ffff0000000
 # Default library start address
 LIBADDRESS = 0x600000000000
+# Default position dependent address
+PDCADDRESS = 0x400000
 # Default config file path
 LIBPATH_CONF = /opt/$(NAME)/libpath.conf
 LDLUCI_CONF = /opt/$(NAME)/ld-$(NAME).conf
@@ -58,7 +60,7 @@ CXXFLAGS += -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-jump-tables -fno-
 CXXFLAGS += -fno-builtin -fno-exceptions -fno-stack-protector -mno-red-zone
 CXXFLAGS += -ffreestanding -ffunction-sections -fdata-sections -nostdlib -nostdinc
 CXXFLAGS += -Wall -Wextra -Wno-switch -Wno-nonnull-compare -Wno-unused-variable -Wno-comment
-CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBADDRESS=$(LIBADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DLDLUCI_CONF=$(LDLUCI_CONF) -DSONAME=$(SONAME) -DSOPATH=$(SOPATH)
+CXXFLAGS += -static-libgcc -DBASEADDRESS=$(BASEADDRESS)UL -DLIBADDRESS=$(LIBADDRESS)UL -DPDCADDRESS=$(PDCADDRESS)UL -DLIBPATH_CONF=$(LIBPATH_CONF) -DLDLUCI_CONF=$(LDLUCI_CONF) -DSONAME=$(SONAME) -DSOPATH=$(SOPATH)
 CXXFLAGS += -fvisibility=hidden
 
 BUILDINFO = $(BUILDDIR)/.build_$(NAME).o
@@ -132,6 +134,13 @@ test: $(TARGET_FILE)
 	$(VERBOSE) uname -m | sed -e "s/^x86_64$$/x64/" | xargs test "$(PLATFORM)" =
 	$(VERBOSE) ./tools/docker.sh $(OS):$(OSVERSION) /bin/sh -c "./test/run.sh && ./test/run.sh -u"
 
+test-all-prepared:
+	$(call each_version,test)
+
+test-prepared: $(TARGET_FILE)
+	$(VERBOSE) uname -m | sed -e "s/^x86_64$$/x64/" | xargs test "$(PLATFORM)" =
+	$(VERBOSE) ./tools/docker.sh inf4/luci:$(OS)-$(OSVERSION) /bin/sh -c "./test/run.sh && ./test/run.sh -u"
+
 $(PATCH_OFFSETS_LOCAL):
 	@echo "GEN		$@"
 	$(VERBOSE) tools/patch_offsets.sh > $@
@@ -201,10 +210,10 @@ $(BUILDDIR): ; @mkdir -p $@
 
 $(DEPFILES):
 
-ifeq ($(filter-out all clean install-only,$(MAKECMDGOALS)),$(MAKECMDGOALS))
+ifeq ($(filter-out all clean mrproper install-only,$(MAKECMDGOALS)),$(MAKECMDGOALS))
 -include $(DEPFILES)
 endif
 
 FORCE:
 
-.PHONY: install install-only all clean mrproper
+.PHONY: test test-all test-prepared test-all-prepared install install-only all version version-all lint tidy clean mrproper
