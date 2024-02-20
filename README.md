@@ -69,6 +69,8 @@ Use
 
 to build *Luci* for every supported distribution/version.
 
+> **Please note:** Debian Stretch and OpenSUSE Leap 15 have by default old versions of GCC, which do not support C++20. For building Luci, use a different system (e.g. via Docker) instead. The reference system is Ubuntu Jammy (22.04).
+
 For a full-featured experience, please install the tools provided in the [Bean](https://gitlab.cs.fau.de/luci-project/elfo) and [Elfo](https://gitlab.cs.fau.de/luci-project/elfo) submodules.
 Make sure you meet the Python3 Packages requirements by using [pip](https://pypi.org/project/pip/), for Debian/Ubuntu with
 
