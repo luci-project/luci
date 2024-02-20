@@ -42,9 +42,22 @@ check-style:
     - make lint
     - make tidy
 
-
 .test-gcc:
   stage: test-gcc
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  script:
+    - make
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+  retry: 1
+
+.test-gcc-build:
+  stage: test-gcc-build
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
   dependencies:
     - fetch-artifacts
   script:
@@ -54,61 +67,54 @@ check-style:
     - ./test/run.sh -c GCC -u
   retry: 1
 
+# Stretch GCC doesn't support C++20, so we have to use an existing build
 test-debian-stretch-gcc:
   image: inf4/luci:debian-stretch
-  stage: test-gcc
-  dependencies:
-    - build-luci
-    - fetch-artifacts
-  script:
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
-  retry: 1
+  extends: .test-gcc
 
 test-debian-buster-gcc:
   image: inf4/luci:debian-buster
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-debian-bullseye-gcc:
   image: inf4/luci:debian-bullseye
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-debian-bookworm-gcc:
   image: inf4/luci:debian-bookworm
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-ubuntu-focal-gcc:
   image: inf4/luci:ubuntu-focal
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-ubuntu-jammy-gcc:
   image: inf4/luci:ubuntu-jammy
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-almalinux-9-gcc:
   image: inf4/luci:almalinux-9
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-oraclelinux-9-gcc:
   image: inf4/luci:oraclelinux-9
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-rhel-9-gcc:
   image: inf4/luci:rhel-9
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-fedora-36-gcc:
   image: inf4/luci:fedora-36
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-fedora-37-gcc:
   image: inf4/luci:fedora-37
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 test-opensuseleap-15-gcc:
   image: inf4/luci:opensuseleap-15
-  extends: .test-gcc
+  extends: .test-gcc-build
 
 
 .test-llvm:
