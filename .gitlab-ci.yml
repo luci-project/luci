@@ -103,6 +103,7 @@ test-opensuseleap-15-gcc:
   extends: .test-gcc
 
 
+# We have to remove capabilities since CI container have not sufficient permissions and userfaultfd would fail.
 .test-gcc-build:
   stage: test-gcc-build
   variables:
@@ -112,6 +113,7 @@ test-opensuseleap-15-gcc:
   script:
     - echo -e "\e[0Ksection_start:`date +%s`:make[collapsed=true]\r\e[0KBuilding Luci"
     - make
+    - setcap -r ld-luci-*.so || true
     - echo -e "\e[0Ksection_end:`date +%s`:make\r\e[0K"
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
