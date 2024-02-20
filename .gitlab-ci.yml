@@ -46,9 +46,9 @@ check-style:
 .test-gcc:
   stage: test-gcc
   dependencies:
-    - build-luci
     - fetch-artifacts
   script:
+    - make
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
@@ -56,7 +56,15 @@ check-style:
 
 test-debian-stretch-gcc:
   image: inf4/luci:debian-stretch
-  extends: .test-gcc
+  stage: test-gcc
+  dependencies:
+    - build-luci
+    - fetch-artifacts
+  script:
+    - ./test/run.sh -c GCC -R
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+  retry: 1
 
 test-debian-buster-gcc:
   image: inf4/luci:debian-buster
