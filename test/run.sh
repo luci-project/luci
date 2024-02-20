@@ -189,7 +189,8 @@ if $DEBUG_OUTPUT ; then
 fi
 
 # Title line
-echo -e "\n\e[1;4mRunning Tests on ${OS} ${OSVERSION} (${PLATFORM}) with ${COMPILER}\e[0m"
+SECTION="test_${OS}_${OSVERSION}_${PLATFORM}_${COMPILER}_${LD_NAME}_${LD_DYNAMIC_UPDATE}"
+echo -e "\n\e[0Ksection_start:$(date +%s):${SECTION,,}\r\e[0K\e[1;4mRunning Tests on ${OS} ${OSVERSION} (${PLATFORM}) with ${COMPILER}\e[0m"
 echo "using ${LD_NAME} RTLD at ${LD_PATH}"
 if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
 	echo "with dynamic updates enabled"
@@ -370,15 +371,16 @@ for TEST in ${TESTS} ; do
 	fi
 done
 
+echo -e "\e[0Ksection_end:$(date +%s):${SECTION,,}\r\e[0K"
 if [[ ${#FAILED[@]} -eq 0 ]] ; then
-	echo -e "\n\e[32mTests finished successfully\e[0m"
+	echo -e "\e[32mTests finished successfully\e[0m"
 	exit 0
 else
 	if [[ ${FATAL} -eq 0 ]] ; then
-		echo -e "\n\e[33m${#FAILED[@]} test(s) failed (but none fatal):\e[0m"
+		echo -e "\e[33m${#FAILED[@]} test(s) failed (but none fatal):\e[0m"
 		EXITCODE=0
 	else
-		echo -e "\n\e[31m${#FAILED[@]} test(s) failed (with ${FATAL} fatal):\e[0m"
+		echo -e "\e[31m${#FAILED[@]} test(s) failed (with ${FATAL} fatal):\e[0m"
 		EXITCODE=1
 	fi
 	for TEST in "${FAILED[@]}" ; do
