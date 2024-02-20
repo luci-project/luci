@@ -1,6 +1,7 @@
 stages:
   - build
   - test-gcc
+  - test-gcc-build
   - test-llvm
   - test-lang
 
@@ -42,7 +43,6 @@ check-style:
     - make lint
     - make tidy
 
-# For distributions with GCC that don't support C++20, we use the existing build
 .test-gcc:
   stage: test-gcc
   dependencies:
@@ -54,66 +54,108 @@ check-style:
     - ./test/run.sh -c GCC -u
   retry: 1
 
-.test-gcc-build:
-  stage: test-gcc
-  variables:
-    GIT_SUBMODULE_STRATEGY: recursive
-  dependencies:
-    - fetch-artifacts
-  script:
-    - make
-    - ./test/run.sh -c GCC -R
-    - ./test/run.sh -c GCC
-    - ./test/run.sh -c GCC -u
-  retry: 1
-
 test-debian-stretch-gcc:
   image: inf4/luci:debian-stretch
   extends: .test-gcc
 
 test-debian-buster-gcc:
   image: inf4/luci:debian-buster
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-debian-bullseye-gcc:
   image: inf4/luci:debian-bullseye
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-debian-bookworm-gcc:
   image: inf4/luci:debian-bookworm
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-ubuntu-focal-gcc:
   image: inf4/luci:ubuntu-focal
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-ubuntu-jammy-gcc:
   image: inf4/luci:ubuntu-jammy
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-almalinux-9-gcc:
   image: inf4/luci:almalinux-9
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-oraclelinux-9-gcc:
   image: inf4/luci:oraclelinux-9
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-rhel-9-gcc:
   image: inf4/luci:rhel-9
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-fedora-36-gcc:
   image: inf4/luci:fedora-36
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-fedora-37-gcc:
   image: inf4/luci:fedora-37
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 test-opensuseleap-15-gcc:
   image: inf4/luci:opensuseleap-15
   extends: .test-gcc
+
+
+.test-gcc-build:
+  stage: test-gcc-build
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  dependencies:
+    - fetch-artifacts
+  script:
+    - echo -e "\e[0Ksection_start:`date +%s`:make[collapsed=true]\r\e[0KBuilding Luci"
+    - make
+    - echo -e "\e[0Ksection_end:`date +%s`:make\r\e[0K"
+    - ./test/run.sh -c GCC
+    - ./test/run.sh -c GCC -u
+  retry: 1
+
+test-debian-buster-gcc-build:
+  image: inf4/luci:debian-buster
+  extends: .test-gcc-build
+
+test-debian-bullseye-gcc-build:
+  image: inf4/luci:debian-bullseye
+  extends: .test-gcc-build
+
+test-debian-bookworm-gcc-build:
+  image: inf4/luci:debian-bookworm
+  extends: .test-gcc-build
+
+test-ubuntu-focal-gcc-build:
+  image: inf4/luci:ubuntu-focal
+  extends: .test-gcc-build
+
+test-ubuntu-jammy-gcc-build:
+  image: inf4/luci:ubuntu-jammy
+  extends: .test-gcc-build
+
+test-almalinux-9-gcc-build:
+  image: inf4/luci:almalinux-9
+  extends: .test-gcc-build
+
+test-oraclelinux-9-gcc-build:
+  image: inf4/luci:oraclelinux-9
+  extends: .test-gcc-build
+
+test-rhel-9-gcc-build:
+  image: inf4/luci:rhel-9
+  extends: .test-gcc-build
+
+test-fedora-36-gcc-build:
+  image: inf4/luci:fedora-36
+  extends: .test-gcc-build
+
+test-fedora-37-gcc-build:
+  image: inf4/luci:fedora-37
+  extends: .test-gcc-build
 
 
 .test-llvm:

@@ -190,7 +190,7 @@ fi
 
 # Title line
 SECTION="test_${OS}_${OSVERSION}_${PLATFORM}_${COMPILER}_${LD_NAME}_${LD_DYNAMIC_UPDATE}"
-echo -e "\n\e[0Ksection_start:$(date +%s):${SECTION,,}\r\e[0K\e[1;4mRunning Tests on ${OS} ${OSVERSION} (${PLATFORM}) with ${COMPILER}\e[0m"
+echo -e "\n\e[0Ksection_start:$(date +%s):${SECTION,,}[collapsed=true]\r\e[0K\e[1;4mRunning Tests on ${OS} ${OSVERSION} (${PLATFORM}) with ${COMPILER}\e[0m"
 echo "using ${LD_NAME} RTLD at ${LD_PATH}"
 if [ $LD_DYNAMIC_UPDATE -ne 0 ] ; then
 	echo "with dynamic updates enabled"
