@@ -42,13 +42,13 @@ check-style:
     - make lint
     - make tidy
 
+# For distributions with GCC that don't support C++20, we use the existing build
 .test-gcc:
   stage: test-gcc
   dependencies:
     - build-luci
     - fetch-artifacts
   script:
-    - make
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
@@ -67,7 +67,6 @@ check-style:
     - ./test/run.sh -c GCC -u
   retry: 1
 
-# Stretch GCC doesn't support C++20, so we have to use an existing build
 test-debian-stretch-gcc:
   image: inf4/luci:debian-stretch
   extends: .test-gcc
@@ -114,7 +113,7 @@ test-fedora-37-gcc:
 
 test-opensuseleap-15-gcc:
   image: inf4/luci:opensuseleap-15
-  extends: .test-gcc-build
+  extends: .test-gcc
 
 
 .test-llvm:
