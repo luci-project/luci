@@ -151,6 +151,7 @@ $(LIBBEAN):
 
 $(SOPATH)$(TARGET_FILE): $(TARGET_FILE)
 	@echo "CPY		$@"
+	@mkdir -p $(SOPATH)
 	$(VERBOSE) cp $< $@
 
 $(SOPATH)$(SONAME): $(SOPATH)$(TARGET_FILE)
