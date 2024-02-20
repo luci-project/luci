@@ -55,7 +55,7 @@ check-style:
   retry: 1
 
 .test-gcc-build:
-  stage: test-gcc-build
+  stage: test-gcc
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
   dependencies:
