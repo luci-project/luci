@@ -6,7 +6,7 @@
 int main() {
 	for (int i = 0; i < 5; i++) {
 		if (i > 0)
-			sleep(4);
+			sleep(10);
 		std::cout << "Run #" << i << std::endl;
 		for (int j = -1; j <= 2; j++) {
 			try {

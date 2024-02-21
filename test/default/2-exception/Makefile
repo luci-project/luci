@@ -16,8 +16,8 @@ SHARED_LIBS = $(addsuffix .so,$(addprefix lib$(LIBFOO)-,0 1 2) lib$(LIBBAR) $(ad
 
 $(EXEC): $(BIN) $(SHARED_LIBS) $(MAKEFILE_LIST)
 	@echo "#!/bin/bash" > $@
-	@echo "for vers in foo-0 foo-1 baz-1 foo-2 baz-2 ; do ln -f -s lib\$${vers}.so lib\$${vers%-*}.so && echo "Using lib\$${vers}.so" >&2 ; sleep 4 ; done & " >> $@
-	@echo "sleep 2" >> $@
+	@echo "for vers in foo-0 foo-1 baz-1 foo-2 baz-2 ; do ln -f -s lib\$${vers}.so lib\$${vers%-*}.so && echo "Using lib\$${vers}.so" >&2 ; sleep 10 ; done & " >> $@
+	@echo "sleep 5" >> $@
 	@echo "./$<" >> $@
 	@chmod +x $@
 

@@ -16,7 +16,7 @@ build-luci:
     paths:
       - "ld-luci-*.so"
       - "versions.txt"
-  retry: 1
+  retry: 3
 
 fetch-artifacts:
   image: busybox:1.35
@@ -32,7 +32,7 @@ fetch-artifacts:
     paths:
       - "bean/elfo/elfo-*"
       - "bean/bean-*"
-  retry: 1
+  retry: 3
 
 check-style:
   image: inf4/luci:ubuntu-jammy
@@ -52,7 +52,7 @@ check-style:
     - ./test/run.sh -c GCC -R
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 1
+  retry: 3
 
 test-debian-stretch-gcc:
   image: inf4/luci:debian-stretch
@@ -117,7 +117,7 @@ test-opensuseleap-15-gcc:
     - echo -e "\e[0Ksection_end:`date +%s`:make\r\e[0K"
     - ./test/run.sh -c GCC
     - ./test/run.sh -c GCC -u
-  retry: 1
+  retry: 3
 
 test-debian-buster-gcc-build:
   image: inf4/luci:debian-buster
@@ -169,7 +169,7 @@ test-fedora-37-gcc-build:
     - ./test/run.sh -c LLVM -R
     - ./test/run.sh -c LLVM
     - ./test/run.sh -c LLVM -u
-  retry: 1
+  retry: 3
 
 test-debian-stretch-llvm:
   image: inf4/luci:debian-stretch
@@ -229,7 +229,7 @@ test-opensuseleap-15-llvm:
     - ./test/run.sh -g lang -R
     - ./test/run.sh -g lang
     - ./test/run.sh -g lang -u
-  retry: 1
+  retry: 3
 
 test-debian-stretch-lang:
   image: inf4/luci:debian-stretch
