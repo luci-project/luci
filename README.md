@@ -1,7 +1,7 @@
 > I want to get rid of all the diseases plaguing mankind — and replace them with worse ones!
 
-*Luci* — the linker/loader daemon
-===============================
+*Luci* — linker/loader daemon
+=============================
 
 *Luci* is a linker/loader daemon experiment for academic purposes with hackability (not performance!) in mind - a platform for prototypes!
 Its main purpose is to demonstrate dynamic software updating on off-the-shelf binaries.
@@ -13,7 +13,7 @@ Its main purpose is to demonstrate dynamic software updating on off-the-shelf bi
    This allows generic [interactive/live programming](https://en.wikipedia.org/wiki/Interactive_programming) without having to prepare or adapt the source code.
  * **Shared Libraries**:
    *Luci* is able to automatically update compatible shared libraries during runtime in a process:
-   If the binary is executed with the *Luci* dynamic linker/loader (e.g., as parameter or by modifying the interpreter string in the ELF file) and dynamic updates are enabled (`export LD_DYNAMIC_UPDATE=1`), the shared librarieson the file system are monitored.
+   If the binary is executed with the *Luci* dynamic linker/loader (e.g., as parameter or by modifying the interpreter string in the ELF file), the shared librarieson the file system are monitored.
    On a change (symbolic link or file itself) *Luci* will check if it can update the file (e.g., the writable section must be identical), load it and relink it.
    It creates a memory alias of the writable section(s) in the new version and updates entries in the *Global Offset Table*s to point to the symbols of the new version.
    However, if the update is not possible or *Luci* detects the use of outdated code, it informs the user.
@@ -21,6 +21,16 @@ Its main purpose is to demonstrate dynamic software updating on off-the-shelf bi
    By combining the previous methods, *Luci* is able to update all parts of a process, including the executable binary.
    In addition, it reconstructs stripped symbols and internal relocations, and has the ability to update certain (endless) loops by redirecting to the new version at appropriate points -- thus using binary patching techniques.
    Apart from an identical wirtable section, it has no other restrictions on the binaries.
+
+
+Demo
+----
+
+![Hello world demo screencast](demo.gif)
+
+The screencast shows a *Hello World* example that is modified twice at runtime by simply recompiling the binary.
+It was recorded on a standard Ubuntu 22.04 / Jammy, using only the default compiler & linker flags (no custom build tools, no debug symbols, no whatsoever).
+The default dynamic linker/loader is changed to *Luci* (using `elfo-setinterp`) before start to load with the application and automatically detect & apply the changes by relinking the code.
 
 
 Idea & Concept
