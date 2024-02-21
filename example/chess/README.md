@@ -1,15 +1,18 @@
 Luci Chess Interactive Programming
 ==================================
 
-This example is based on [chessba.sh](https://github.com/thelazt/chessbash) and [SPiChess](https://gitlab.cs.fau.de/i4/spic/chess).
+This example is based on [chessba.sh](https://github.com/thelazt/chessbash) and [SPiChess](https://gitlab.cs.fau.de/i4/spic/chess) and demonstrates the development steps from a simple text-based output to advanced user-interfaces using interactive programming.
 
-![Chessboard](images/board.png)
+![Chessboard](images/variants.png)
 
 
 Prerequisites
 -------------
 
-  * [X Window System](https://en.wikipedia.org/wiki/X_Window_System) and [SDL](https://www.libsdl.org/) libraries
+  * [X Window System](https://en.wikipedia.org/wiki/X_Window_System) and [SDL](https://www.libsdl.org/) development libraries.
+    - `apt install xterm libsdl-image1.2-dev` in Debian/Ubuntu:
+    - `dnf install SDL_image-devel` in RHEL, OracleLinux, Fedora and AlmaLinux (with preceding `dnf install epel-release almalinux-release-devel`)
+    - `zypper install SDL_image-devel` in OpenSUSE Leap
   * Terminal emulator with support for color and Unicode characters - [GNOME Terminal](https://wiki.gnome.org/Apps/Terminal) is recommended
 
 
@@ -30,16 +33,18 @@ Setup
     cat err.pipe
     ```
   * Copy the base version, compile and run it with *Luci*
-    (with parameter `-s` for static linking, `-u` for dynamic updates and, optionally, `-v 3` for increased verbosity)
+    (with parameter `-s` for static linking, `-u` for dynamic updates, `-lc` to employ the C standard librar and, optionally, `-v 3` for increased verbosity)
     ```
     cp base/* .
     make ai.o board.o game.o openings.o tui.o
-    /opt/luci/ld-luci.so -v 3 -s -u ai.o board.o game.o openings.o tui.o 2> err.pipe
+    /opt/luci/ld-luci.so -v 3 -s -u ai.o board.o game.o openings.o tui.o -lc 2> err.pipe
     ```
+    **Please note:** In case position independent code is not default on the system, you have to append the `--no-pie` parameter to Luci.
+
     This will start an interactive game, player 2 is controlled by the user, using algebraic notation for the move.
     Alternatively, `autoplay.sh` can be used to enter dummy moves:
     ```
-    ./autoplay.sh | /opt/luci/ld-luci.so -v 3 -s -u ai.o board.o game.o openings.o tui.o 2> err.pipe
+    ./autoplay.sh | /opt/luci/ld-luci.so -v 3 -s -u ai.o board.o game.o openings.o tui.o -lc 2> err.pipe
     ```
   * Finally, open a new terminal window and change to the example directory, make the changes (or apply the patches) and compile the changed files:
     ```
@@ -47,7 +52,23 @@ Setup
     make game.o
     ```
 
-➜ to have these steps performed automatically, run `demo.sh`.
+➜ to have these steps performed automatically, run `demo.sh` (with parameter `--no-pie` in case of non Debian/Ubuntu systems).
+
+
+### Docker
+
+You can execute the demo with another distribution in a Docker container as well.
+Hereby, you have to authorize docker for X via
+
+	export DISPLAY=:0.0
+	xhost +local:docker
+
+and pass the parameters `--env="DISPLAY" -v "/tmp/.X11-unix/:/tmp/.X11-unix/"` in `docker run`.
+These parameters are already passed when using the `tools/docker.sh` helper script.
+
+Install a terminal emulator like `xterm` and check if it executes with a separate X window.
+
+➜ to have the docker container configured automatically, run `demo-docker.sh`.
 
 
 Run
@@ -137,9 +158,9 @@ However, this time the `game.c` will be compiled first -- it will now reference 
 Therefore, you have to compile `tui.c` and then recompile `game.c` to make the changes take effect.
 
 
-### Revision 6a: Dynamic library
+### Revision 6-pre: Dynamic library
 
-At startup, the standard C library (libc) was loaded implicitly (due to an implicit `-lc` parameter).
+At startup, the standard C library (libc) was loaded (due to the `-lc` parameter).
 But now a new library should be loaded dynamically:
 `libSDL_image.so` via `dlopen` in an existing, frequently called function.
 
@@ -148,7 +169,7 @@ This library has several dependencies, which in turn have dependencies.
 Since dynamic updates of shared libraries are enabled, all files will be parsed and this can take several seconds.
 
 
-### Revision 6b: Using the new dynamic library
+### Revision 6: Using the new dynamic library
 
 First, remove the code that loads the dynamic library -- it is no longer needed, the library is now loaded in the process.
 It is now equivalent to *Luci* started with `-lSDL_image`.
