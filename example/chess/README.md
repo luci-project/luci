@@ -68,14 +68,16 @@ These parameters are already passed when using the `tools/docker.sh` helper scri
 
 Install a terminal emulator like `xterm` and check if it executes with a separate X window.
 
-➜ to have the docker container configured automatically, run `demo-docker.sh`.
+➜ to have the docker container configured automatically, run `demo-docker.sh` with the desired image as argument, for example:
+
+	./demo-docker.sh inf4/luci:ubuntu-jammy
 
 
 Run
 ---
 
-Below is a sequence of possible changes to the code in the `base' directory, each step demonstrating a different feature of *Luci*.
-For each change described, there is also a corresponding patch file.
+Below is a sequence of possible changes to the code in the `base` directory, each step demonstrating a different feature of *Luci*.
+For each change described, there is also a corresponding patch file (`v1.patch` ... `v6.patch`).
 
 
 ### Base version

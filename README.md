@@ -28,7 +28,7 @@ Demo
 
 ![Hello world demo screencast](demo.gif)
 
-The screencast shows a *Hello World* example that is modified twice at runtime by simply recompiling the binary.
+This screencast shows a *Hello World* example that is modified twice at runtime by simply recompiling the binary.
 It was recorded on a standard Ubuntu 22.04 / Jammy, using only the default compiler & linker flags (no custom build tools, no debug symbols, no whatsoever).
 The default dynamic linker/loader is changed to *Luci* (using `elfo-setinterp`) before start to load with the application and automatically detect & apply the changes by relinking the code.
 
