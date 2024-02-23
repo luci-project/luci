@@ -23,8 +23,12 @@
 
 struct Loader {
 	const struct Config {
-		/*! \brief enable dynamic updates? */
+		/*! \brief use position independent code? */
+#if defined(COMPATIBILITY_DEBIAN) || defined(COMPATIBILITY_UBUNTU)
 		bool position_independent = true;
+#else
+		bool position_independent = false;
+#endif
 
 		/*! \brief enable dynamic updates? */
 		bool dynamic_update = false;

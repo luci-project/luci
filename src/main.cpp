@@ -55,7 +55,8 @@ struct Opts {
 	const char * detectOutdated{ nullptr };
 	const char * debugSymbolsRoot{ nullptr };
 	unsigned delayOutdated{1};
-	bool noPIE{};
+	bool pie{};
+	bool noPie{};
 	bool logtimeAbs{};
 	bool logfileAppend{};
 	bool dynamicUpdate{};
@@ -163,10 +164,16 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 
 	Loader::Config config_loader;
 	// Position dependent
-	if (opts.noPIE && !opts.linkstatic) {
+	if (opts.noPie && !opts.linkstatic) {
 		LOG_WARNING << "Position dependent code is only possible when using Luci as static linker!" << endl;
-	} else {
-		config_loader.position_independent = !opts.noPIE;
+	} else if (opts.pie && !opts.linkstatic) {
+		LOG_WARNING << "Position independent code is only possible when using Luci as static linker!" << endl;
+	} else if (opts.pie && opts.noPie) {
+		LOG_ERROR << "Please select either position independent code (--pie) or position dependent code (--no-pie), not both (ignoring)!" << endl;
+	} else if (opts.noPie) {
+		config_loader.position_independent = false;
+	} else if (opts.pie) {
+		config_loader.position_independent = true;
 	}
 	// Dynamic updates
 	config_loader.dynamic_update = opts.dynamicUpdate || config_file.value_or_default<bool>("LD_DYNAMIC_UPDATE", false);
@@ -435,7 +442,8 @@ int main(int argc, char* argv[]) {
 				{'\0', "dbgsym",           nullptr,  &Opts::debugSymbols,     false, "Search for external debug symbols to improve detection of binary updatability. This option can also be enabled by setting the environment variable LD_DEBUG_SYMBOLS to 1" },
 				{'\0', "dbgsym-root",      nullptr,  &Opts::debugSymbolsRoot, false, "Set root directory for external debug symbols. This option can also be configured using the environment variable LD_DEBUG_SYMBOLS_ROOT" },
 				{'\0', "argv0",            nullptr,  &Opts::argv0,            false, "Explicitly specify program name (argv[0])" },
-				{'\0', "no-pie",           nullptr,  &Opts::noPIE,            false, "Use position in lower 2 GB region for static linker - required if relocatable objects are not compiled with position independent code" },
+				{'\0', "pie",              nullptr,  &Opts::pie,              false, "Use position anywhere in memory for static linker - recommended if relocatable objects are compiled with position independent code. Default for Debian-like distributions. Cannot be used together with --no-pie" },
+				{'\0', "no-pie",           nullptr,  &Opts::noPie,            false, "Use position in lower 2 GB region for static linker - required if relocatable objects are not compiled with position independent code. Default for RedHat-like distributions. Cannot be used together with --pie" },
 				{'\0', "show-args",        nullptr,  &Opts::showArgs,         false, "Show the arguments passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ARGS to 1" },
 				{'\0', "show-auxv",        nullptr,  &Opts::showAuxv,         false, "Show the auxiliary array passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_AUXV to 1" },
 				{'\0', "show-env",         nullptr,  &Opts::showEnv,          false, "Show the environment variables passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ENV to 1" },
