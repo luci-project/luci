@@ -1,4 +1,4 @@
-CFLAGS = --std=c11 -MD -MP -Wall -D_GNU_SOURCE
+CFLAGS += --std=c11 -MD -MP -Wall -D_GNU_SOURCE
 SOURCE = $(wildcard *.c)
 OBJECT = $(SOURCE:.c=.o)
 DEPEND = $(SOURCE:.c=.d)

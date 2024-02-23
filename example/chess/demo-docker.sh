@@ -17,17 +17,23 @@ if [ -f "/.dockerenv" ] ; then
 		ubuntu|debian)
 			ln -fs /usr/share/zoneinfo/Europe/Berlin /etc/localtime
 			export DEBIAN_FRONTEND=noninteractive
+			if [ -f /etc/apt/sources.list.d/debian.sources ] ; then
+				sed -i -e 's/^Components: .*/Components: main contrib non-free/' /etc/apt/sources.list.d/debian.sources
+			else
+				sed -i -e 's/^\(.*\.debian\.org\/.*main.*\)/\1 contrib non-free/' /etc/apt/sources.list
+			fi
 			apt-get update
-			apt-get install -y xterm libsdl-image1.2-dev fonts-ubuntu-console
-			TERMINAL=xterm $REL_DIR/demo.sh
+			apt-get install -y xterm libsdl-image1.2-dev
+			if [ "$VERSION_CODENAME" = "stretch" ] ; then
+				apt-get install -y fonts-dejavu
+			else
+				apt-get install -y fonts-ubuntu-console
+			fi
 			;;
 
 		almalinux)
 			dnf install -y epel-release almalinux-release-devel
 			dnf install -y patch SDL_image-devel xterm dejavu-sans-mono-fonts
-
-			# Full support
-			TERMINAL=xterm $REL_DIR/demo.sh --no-pie
 			;;
 
 		fedora)
@@ -43,8 +49,6 @@ if [ -f "/.dockerenv" ] ; then
 			rpm -i "https://www.libsdl.org/projects/SDL_image/release/SDL_image-devel-1.2.12-1.x86_64.rpm"
 			ln -s libpng16.so.16 /lib64/libpng.so.3
 			echo -e "\n\e[31mIncompatible libPNG - SDL chess pieces might not be visible!\e[0m\n"
-
-			TERMINAL=xterm $REL_DIR/demo.sh --no-pie
 			;;
 
 		rhel)
@@ -63,8 +67,6 @@ if [ -f "/.dockerenv" ] ; then
 			rpm -i "https://www.libsdl.org/projects/SDL_image/release/SDL_image-devel-1.2.12-1.x86_64.rpm"
 			ln -s libpng.so /lib64/libpng.so.3
 			echo -e "\n\e[31mIncompatible libPNG - SDL chess pieces might not be visible!\e[0m\n"
-
-			TERMINAL=xterm $REL_DIR/demo.sh --no-pie
 			;;
 
 		ol)
@@ -72,15 +74,11 @@ if [ -f "/.dockerenv" ] ; then
 			rpm -i "https://www.libsdl.org/release/SDL-1.2.15-1.x86_64.rpm"
 			rpm -i "https://www.libsdl.org/release/SDL-devel-1.2.15-1.x86_64.rpm"
 			dnf install -y patch SDL_image-devel xterm dejavu-sans-mono-fonts
-
-			# Full support
-			TERMINAL=xterm $REL_DIR/demo.sh --no-pie
 			;;
 
 		opensuse-*)
 			zypper install -y patch SDL_image-devel xterm ubuntu-fonts
 			echo -e "\n\e[31mNo unicode fonts installed, hence the Unicode example might look weird!\e[0m\n"
-			TERMINAL=xterm $REL_DIR/demo.sh --no-pie
 			;;
 
 		*)
@@ -89,22 +87,47 @@ if [ -f "/.dockerenv" ] ; then
 			;;
 	esac
 
+	export TERMINAL=xterm
+	export CFLAGS=
+	export LDFLAGS=
+
+	cd "$REL_DIR"
+
+	# Iterate over arguments, export all in the style of 'KEY=VALUE'
+	args=()
+	for var in "$@" ; do
+		if [[ $var =~ ^[A-Z_][A-Z0-9_]*=.*$ ]]; then
+			# Hack: Use hash for space, e.g. CFLAGS=-O3#-fno-pic
+			export "${var//#/ }"
+			echo export "${var//#/ }"
+		else
+			args+=("$var")
+		fi
+	done
+
+	echo ./demo.sh "${args[@]}"
+	./demo.sh "${args[@]}"
+
 	# Spawn bash to examine files
 	echo -e "\n\e[2mDemo finished. Starting Bash in container - type 'exit' to quit!\e[0m\n"
-	cd $REL_DIR
 	exec /bin/bash
-elif [ $# -eq 1 ] ; then
+elif [ $# -ge 1 ] ; then
 	if [ -z "$DISPLAY" ] ; then
 		export DISPLAY=:0.0
 	fi
 	xhost +local:docker
 
 	SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]%""}" )/../../" &> /dev/null && pwd)
-	"${SCRIPT_DIR%"$REL_DIR/demo-docker.sh"}/tools/docker.sh" $1 "$DOCKERBASE/$REL_DIR/demo-docker.sh"
+
+	IMAGE="$1"
+	shift
+	"${SCRIPT_DIR%"$REL_DIR/demo-docker.sh"}/tools/docker.sh" "$IMAGE" "$DOCKERBASE/$REL_DIR/demo-docker.sh" "$@"
 else
-	echo "Usage: $0 [DOCKER-IMAGE]"
+	echo "Usage: $0 [DOCKER-IMAGE] [ENV|ARGS...]"
 	echo
-	echo "Starts a container for the chess demo (with X)"
+	echo "Starts a container for the chess demo (with X windows)."
+	echo "Environment variables must be uppercase and the definition must not contain a space."
+	echo "(Use # instead, it will be replaced: 'CFLAGS=-O3#-fno-pie')"
 	echo
 	echo "Supported Docker Images:"
 	echo "   [original]            [prepared]"

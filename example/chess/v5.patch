@@ -180,7 +180,7 @@ diff -Naur rev4/tui.c rev5/tui.c
 +
 +
  void tui_draw() {
--	const char * pieces = "kqrbnp PNBRQK" + 6;
+-	const char * const pieces = &("kqrbnp PNBRQK"[6]);
 -	puts("\ec");
 -	for (int y = 0; y < 8; y++) {
 -		printf("        +---+---+---+---+---+---+---+---+\n     %d  ", 8 - y);

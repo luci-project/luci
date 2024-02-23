@@ -59,9 +59,9 @@ diff -Naur rev5/Makefile rev6/Makefile
 --- rev5/Makefile
 +++ rev6/Makefile
 @@ -1,5 +1,6 @@
- CFLAGS = --std=c11 -MD -MP -Wall
+ CFLAGS += --std=c11 -MD -MP -Wall
  CFLAGS += $(addprefix -D,_GNU_SOURCE $(CDEFS))
-+LDFLAGS = -lSDL -lSDL_image
++LDFLAGS += -lSDL -lSDL_image
  SOURCE = $(wildcard *.c)
  OBJECT = $(SOURCE:.c=.o)
  DEPEND = $(SOURCE:.c=.d)

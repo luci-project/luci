@@ -66,8 +66,8 @@ diff -Naur rev2/Makefile rev3/Makefile
 --- rev2/Makefile
 +++ rev3/Makefile
 @@ -1,4 +1,5 @@
--CFLAGS = --std=c11 -MD -MP -Wall -D_GNU_SOURCE
-+CFLAGS = --std=c11 -MD -MP -Wall
+-CFLAGS += --std=c11 -MD -MP -Wall -D_GNU_SOURCE
++CFLAGS += --std=c11 -MD -MP -Wall
 +CFLAGS += $(addprefix -D,_GNU_SOURCE $(CDEFS))
  SOURCE = $(wildcard *.c)
  OBJECT = $(SOURCE:.c=.o)

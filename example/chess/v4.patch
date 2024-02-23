@@ -2,17 +2,17 @@ diff -Naur rev3/game.c rev4/game.c
 --- rev3/game.c	2023-10-27 12:46:59.158342209 +0200
 +++ rev4/game.c	2023-10-27 12:52:27.274069983 +0200
 @@ -41,7 +41,7 @@
- 
+
  void game_describe(int8_t player, int8_t piece, uint8_t move) {
  	// Output stream
 -	FILE * out = stdout;
 +	FILE * out = stderr;
- 
+
  	// Show round linewise
  	if (player < 0)
 @@ -133,6 +133,9 @@
- 
- 
+
+
  bool game_step(int8_t player) {
 +	// Output board
 +	tui_draw();
@@ -25,10 +25,10 @@ diff -Naur rev3/tui.c rev4/tui.c
 +++ rev4/tui.c
 @@ -46,6 +46,20 @@
  }
- 
- 
+
+
 +void tui_draw() {
-+	const char * pieces = "kqrbnp PNBRQK" + 6;
++	const char * const pieces = &("kqrbnp PNBRQK"[6]);
 +	puts("\ec");
 +	for (int y = 0; y < 8; y++) {
 +		printf("        +---+---+---+---+---+---+---+---+\n     %d  ", 8 - y);
@@ -49,9 +49,8 @@ diff -Naur rev3/tui.h rev4/tui.h
 +++ rev4/tui.h
 @@ -24,6 +24,7 @@
  #include "board.h"
- 
+
  bool tui_init();
 +void tui_draw();
  void tui_resetMove();
  bool tui_readMove(chess_pos * input);
- 

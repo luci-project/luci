@@ -33,18 +33,16 @@ Setup
     cat err.pipe
     ```
   * Copy the base version, compile and run it with *Luci*
-    (with parameter `-s` for static linking, `-u` for dynamic updates, `-lc` to employ the C standard librar and, optionally, `-v 3` for increased verbosity)
+    (with parameter `-s` for static linking, `-u` for dynamic updates and `-lc` to employ the C standard library)
     ```
     cp base/* .
     make ai.o board.o game.o openings.o tui.o
-    /opt/luci/ld-luci.so -v 3 -s -u ai.o board.o game.o openings.o tui.o -lc 2> err.pipe
+    /opt/luci/ld-luci.so -s -u ai.o board.o game.o openings.o tui.o -lc 2> err.pipe
     ```
-    **Please note:** In case position independent code is not default on the system, you have to append the `--no-pie` parameter to Luci.
-
     This will start an interactive game, player 2 is controlled by the user, using algebraic notation for the move.
     Alternatively, `autoplay.sh` can be used to enter dummy moves:
     ```
-    ./autoplay.sh | /opt/luci/ld-luci.so -v 3 -s -u ai.o board.o game.o openings.o tui.o -lc 2> err.pipe
+    ./autoplay.sh | /opt/luci/ld-luci.so -s -u ai.o board.o game.o openings.o tui.o -lc 2> err.pipe
     ```
   * Finally, open a new terminal window and change to the example directory, make the changes (or apply the patches) and compile the changed files:
     ```
@@ -52,7 +50,7 @@ Setup
     make game.o
     ```
 
-➜ to have these steps performed automatically, run `demo.sh` (with parameter `--no-pie` in case of non Debian/Ubuntu systems).
+➜ to have these steps performed automatically, run `demo.sh` (any arguments are passed to Luci).
 
 
 ### Docker
@@ -68,9 +66,11 @@ These parameters are already passed when using the `tools/docker.sh` helper scri
 
 Install a terminal emulator like `xterm` and check if it executes with a separate X window.
 
-➜ to have the docker container configured automatically, run `demo-docker.sh` with the desired image as argument, for example:
+➜ to have the docker container configured automatically, run `demo-docker.sh` with the desired image as first argument (optionally followed by environment variables or parameters for Luci), for example:
 
-	./demo-docker.sh inf4/luci:ubuntu-jammy
+	./demo-docker.sh inf4/luci:debian-bullseye CC=clang CFLAGS="-O1#-fno-pie" -v4 --no-pie
+
+(Requires Luci to be built for the distribution, e.g. by running `make all` in the base folder prior to executing this script)
 
 
 Run
@@ -182,6 +182,7 @@ Compile, and you should see a nice chessboard.
 
 Limitations
 -----------
+
  * no customizations in `main` possible (they will be ignored)
  * customizations in the game loop will only take effect in the next round
  * Visibility: no `static` functions, otherwise the compiler already does the linking.
