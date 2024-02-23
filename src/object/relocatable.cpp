@@ -99,6 +99,7 @@ bool ObjectRelocatable::preload() {
 		switch (section.type()) {
 			case SHT_NOBITS:
 			case SHT_PROGBITS:
+			case SHT_X86_64_UNWIND:  // EH_FRAME
 			case SHT_INIT_ARRAY:
 			case SHT_FINI_ARRAY:
 			case SHT_PREINIT_ARRAY:
@@ -223,7 +224,7 @@ bool ObjectRelocatable::adjust_offsets(uintptr_t offset, const Elf::Section & se
 
 			case SHT_REL:
 				// Fixup relocations to this section
-				if (linked.info_link() && static_cast<int16_t>(linked.info()) == index)
+				if (static_cast<int16_t>(linked.info()) == index)
 					for (auto rel : linked.get_array<RelocationWithoutAddend>()) {
 						// This is only allowed since we have a COW mapping
 						Elf::Rel * data = const_cast<Elf::Rel *>(rel.ptr());
@@ -236,7 +237,7 @@ bool ObjectRelocatable::adjust_offsets(uintptr_t offset, const Elf::Section & se
 
 			case SHT_RELA:
 				// Fixup relocations to this section
-				if (linked.info_link() && static_cast<int16_t>(linked.info()) == index)
+				if (static_cast<int16_t>(linked.info()) == index)
 					for (auto rel : linked.get_array<RelocationWithAddend>()) {
 						// This is only allowed since we have a COW mapping
 						Elf::Rela * data = const_cast<Elf::Rela *>(rel.ptr());
@@ -312,9 +313,10 @@ bool ObjectRelocatable::prepare() {
 	// Perform initial relocations
 	for (auto & relocations : relocation_tables)
 		for (const auto & reloc : relocations) {
-			// LOG_INFO << "Relocate " << (void*)reloc.offset() << " = " << (void*)reloc.symbol().address() << endl;
-			if (relocate(reloc) == nullptr)
+			if (relocate(reloc) == nullptr) {
+				LOG_WARNING << "Failed relocation of offset " << reinterpret_cast<void*>(reloc.offset()) << " with " << reinterpret_cast<void*>(reloc.symbol().address()) << endl;
 				success = false;
+			}
 		}
 
 	// Add ret statement to section which need fixing
@@ -406,18 +408,19 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 		}
 */
 	// Special case: reading address of GOTPCRELX
+	// TODO: This should only applied to locally defined symbols (but would require a GOT otherwise)
 	if (is(reloc.type()).in(Elf::R_X86_64_REX_GOTPCRELX, Elf::R_X86_64_GOTPCRELX)) {
 		auto * instruction = reinterpret_cast<uint8_t*>(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0) + reloc.offset() - 2);
 		if (instruction[0] == 0x8b) {
 			// instruction is MOV (+ register)
-			LOG_DEBUG << "Rewriting MOV with GOTPCRELX relocation to LEA at " << reinterpret_cast<void*>(instruction) << endl;
+			LOG_TRACE << "Rewriting MOV with GOTPCRELX relocation to LEA at " << reinterpret_cast<void*>(instruction) << endl;
 			// Addend must be -4
 			assert(reloc.addend() == -4);
 			// Change to LEA
 			instruction[0] = 0x8d;
 		} else if (instruction[0] == 0xff && instruction[1] == 0x15) {
 			// instruction is CALL [rip + ...]
-			LOG_DEBUG << "Rewriting indirect CALL with GOTPCRELX relocation to NOP, direct CALL at " << reinterpret_cast<void*>(instruction) << endl;
+			LOG_TRACE << "Rewriting indirect CALL with GOTPCRELX relocation to NOP, direct CALL at " << reinterpret_cast<void*>(instruction) << endl;
 			// Addend must be -4
 			assert(reloc.addend() == -4);
 			// Change to NOP; CALL
@@ -425,7 +428,7 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 			instruction[1] = 0xe8;
 		} else if (instruction[0] == 0xff && instruction[1] == 0x25) {
 			// instruction is JMP [rip + ...]
-			LOG_DEBUG << "Rewriting indirect JMP with GOTPCRELX relocation to NOP, direct JMP at " << reinterpret_cast<void*>(instruction) << endl;
+			LOG_TRACE << "Rewriting indirect JMP with GOTPCRELX relocation to NOP, direct JMP at " << reinterpret_cast<void*>(instruction) << endl;
 			// Addend must be -4
 			assert(reloc.addend() == -4);
 			// Change to NOP; JMP
@@ -456,7 +459,7 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 			// Local symbol
 			relocations.insert(reloc, needed_symbol);
 			auto value = relocator.value_internal(this->base, plt_entry, this->file.tls_module_id, this->file.tls_offset);
-			LOG_TRACE << "Relocating local symbol " << needed_symbol.name() << " @ " << reinterpret_cast<void*>(base + needed_symbol.value()) << " in " << *this << " to " << reinterpret_cast<void*>(value) << endl;
+			LOG_INFO << "Relocating local symbol " << needed_symbol.name() << " @ " << reinterpret_cast<void*>(base + needed_symbol.value()) << " in " << *this << " to " << reinterpret_cast<void*>(value) << " @ " << reinterpret_cast<void*>(relocator.address(this->base)) << endl;
 			return reinterpret_cast<void*>(relocator.fix_value_internal(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), value));
 		} else {
 			// external symbol
@@ -467,7 +470,7 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 				const auto & external_symobj = external_symbol->object();
 				auto value = relocator.value_external(this->base, external_symbol.value(), external_symobj.base, external_symobj.base + external_symbol->value(), file.tls_module_id, file.tls_offset);
 				// Special case for PLT: Trampoline in case a function is unreachable
-				if (!relocator.valid_value(value) && external_symbol.value().type() == Elf::STT_FUNC && is(reloc.type()).in(Elf::R_X86_64_PLT32, Elf::R_X86_64_PC32)) {
+				if (!relocator.valid_value(value) && is(external_symbol.value().type()).in(Elf::STT_FUNC, Elf::STT_GNU_IFUNC) && is(reloc.type()).in(Elf::R_X86_64_PLT32, Elf::R_X86_64_PC32)) {
 					auto trampoline_address = reinterpret_cast<uintptr_t>(file.loader.symbol_trampoline.set(external_symbol.value()));
 					if (reloc.type() == Elf::R_X86_64_PLT32) {
 						value = relocator.value(this->base, external_symbol.value(), external_symobj.base, trampoline_address, file.tls_module_id, file.tls_offset);
