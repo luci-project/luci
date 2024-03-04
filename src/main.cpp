@@ -80,6 +80,7 @@ struct Opts {
 	bool showAuxv{};
 	bool showEnv{};
 	bool showHelp{};
+	bool debug{};
 };
 
 // Symbols defined by the linker
@@ -175,6 +176,8 @@ static Loader * setup(uintptr_t luci_base, const char * luci_path, struct Opts &
 	} else if (opts.pie) {
 		config_loader.position_independent = true;
 	}
+	// Debug
+	config_loader.debugger = opts.debug || config_file.value_or_default<bool>("LD_DEBUG", false);
 	// Dynamic updates
 	config_loader.dynamic_update = opts.dynamicUpdate || config_file.value_or_default<bool>("LD_DYNAMIC_UPDATE", false);
 	// Dynamic updates of dl-funcs
@@ -447,6 +450,7 @@ int main(int argc, char* argv[]) {
 				{'\0', "show-args",        nullptr,  &Opts::showArgs,         false, "Show the arguments passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ARGS to 1" },
 				{'\0', "show-auxv",        nullptr,  &Opts::showAuxv,         false, "Show the auxiliary array passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_AUXV to 1" },
 				{'\0', "show-env",         nullptr,  &Opts::showEnv,          false, "Show the environment variables passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ENV to 1" },
+				{'g',  "debug",            nullptr,  &Opts::debug,            false, "Provide debugger like GDB with all versions of the employed binaries for better debugging. This can be enabled by setting the environment variable LD_DEBUG to 1" },
 				{'h',  "help",             nullptr,  &Opts::showHelp,         false, "Show this help" }
 			},
 			File::exists,

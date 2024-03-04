@@ -103,6 +103,9 @@ struct Loader {
 		/*! \brief Show auxiliary vectors before starting process? */
 		bool show_auxv = false;
 
+		/*! \brief Support debuger by preserving older versions on the file system? */
+		bool debugger = true;
+
 		/*! \brief Root directory for debug symbols (if nullptr system root is used) */
 		const char * debug_symbols_root = nullptr;
 

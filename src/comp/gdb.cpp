@@ -4,6 +4,8 @@
 
 #include "comp/gdb.hpp"
 
+#include <dlh/stream/string.hpp>
+#include <dlh/syscall.hpp>
 #include <dlh/assert.hpp>
 #include <dlh/log.hpp>
 
@@ -17,9 +19,35 @@ EXPORT void _dl_debug_state(void) {
 
 namespace GDB {
 
+/* When debugger support is enabled, this will create a flat list containing all versions of the object in the debug structure.
+ * Hence GDB is able to resolve symbols in each version - and set breakpoints to all symbols having the same name. */
+static List<GLIBC::DL::link_map, GLIBC::DL::link_map, &GLIBC::DL::link_map::l_next, &GLIBC::DL::link_map::l_prev> flat_link_map;
+void refresh(const Loader & loader) {
+	if (r_debug.base.r_brk != nullptr && loader.config.debugger) {
+		auto i = flat_link_map.begin();
+		for (const auto & o : loader.lookup)
+			for (Object * c = o.current; c != nullptr; c = c->file_previous) {
+				if (i == flat_link_map.end() || i->l_versions != c) {
+					i = flat_link_map.insert(i, o.glibc_link_map);
+					i->l_addr = c->base;
+					if (c->data.fd < 0) {
+						i->l_name = const_cast<char*>(o.path.str);
+					} else {
+						StringStream<100> procfsfd;
+						procfsfd << "/proc/" << loader.pid << "/fd/" << c->data.fd;
+						i->l_name = String::duplicate(procfsfd.str());
+					}
+					i->l_versions = reinterpret_cast<void*>(c);  // Hack. This field is reserved for symbol versioning, but we use it for object comparison instead.
+				}
+				++i;
+			}
+		r_debug.base.r_map = &flat_link_map.front();
+	}
+}
+
 void notify(State state) {
 	r_debug.base.r_state = state;
-	if (r_debug.base.r_brk != 0)
+	if (r_debug.base.r_brk != nullptr)
 		r_debug.base.r_brk();
 }
 
@@ -42,10 +70,17 @@ static bool set_dynamic_debug(const ObjectIdentity * object) {
 
 void init(const Loader & loader) {
 	r_debug.base.r_version = 1;
-	r_debug.base.r_map = &loader.lookup.front();
 	r_debug.base.r_brk = _dl_debug_state;
 	r_debug.base.r_state = State::RT_CONSISTENT;
 	r_debug.base.r_ldbase = loader.self->current->data.addr;
+
+	if (loader.config.debugger) {
+		// Create initial flat copy
+		refresh(loader);
+	} else {
+		// Just use the existing map (part of object identity)
+		r_debug.base.r_map = &loader.lookup.front().glibc_link_map;
+	}
 
 	assert(r_debug.base.r_map != nullptr);
 
@@ -54,7 +89,7 @@ void init(const Loader & loader) {
 		LOG_WARNING << "GDB debug structure not assigned in loader" << endl;
 
 	// Set for target binary (in case Luci is started as interpreter)
-	if (!set_dynamic_debug(r_debug.base.r_map))
+	if (!set_dynamic_debug(&loader.lookup.front()))
 		LOG_WARNING << "GDB debug structure not assigned in target" << endl;
 
 	notify(State::RT_CONSISTENT);

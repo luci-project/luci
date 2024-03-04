@@ -20,7 +20,7 @@ enum State {
 struct RDebug {
 	int r_version;		/* Version number for this protocol.  */
 
-	const ObjectIdentity *r_map;	/* Head of the chain of loaded objects.  */
+	const GLIBC::DL::link_map *r_map;	/* Head of the chain of loaded objects.  */
 
 	/* This is the address of a function internal to the run-time linker,
 	   that will always be called when the linker begins to map in a
@@ -52,8 +52,10 @@ struct RDebugExtended {
 
 
 void init(const Loader & loader);
+void refresh(const Loader & loader);
 void notify(State state = RT_CONSISTENT);
 static inline void breakpoint() {
 	asm volatile("int3" ::: "memory");
 }
+
 }  // namespace GDB

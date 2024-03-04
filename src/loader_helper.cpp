@@ -10,6 +10,8 @@
 #include <dlh/file.hpp>
 #include <dlh/log.hpp>
 
+#include "comp/gdb.hpp"
+
 const unsigned long SECOND_NS = 1'000'000'000UL;
 
 static void helper_signal(int signum) {
@@ -135,10 +137,13 @@ void Loader::filemodification_load(unsigned long now, TreeSet<Pair<unsigned long
 			Syscall::kill(pid, SIGSTOP);
 
 		// Perform relocation
+		GDB::notify(GDB::RT_ADD);
 		if (!relocate(true)) {
 			LOG_ERROR << "Updating relocations failed!" << endl;
 			assert(false);
 		}
+		GDB::refresh(*this);
+		GDB::notify(GDB::RT_CONSISTENT);
 
 		// Continue main process
 		if (config.stop_on_update)

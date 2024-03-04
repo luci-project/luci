@@ -76,14 +76,11 @@ bool ObjectRelocatable::preload() {
 
 
 	for (const auto & section : this->sections) {
+		offset_sections.push_back(offset);
+
 		if (section.size() == 0)
 			continue;
 		if (section.tls() && section.allocate()) {
-			// Fixup section entry,
-			assert(section.virt_addr() == 0);
-			Elf::Shdr * data = const_cast<Elf::Shdr *>(section.ptr());
-			data->sh_addr = offset;
-
 			if (section.type() == SHT_NOBITS) {
 				tbss = section;
 			} else {
@@ -112,11 +109,6 @@ bool ObjectRelocatable::preload() {
 						// We need an additional byte for the return instruction
 						additional_size = 1;
 					}
-
-					// Fixup section entry,
-					assert(section.virt_addr() == 0);
-					Elf::Shdr * data = const_cast<Elf::Shdr *>(section.ptr());
-					data->sh_addr = offset;
 
 					// Fixup symbols & relocations
 					bool changed = adjust_offsets(offset, section);
@@ -152,7 +144,7 @@ bool ObjectRelocatable::preload() {
 		if (tdata.has_value()) {
 			tls_size = tdata->size();
 			tls_alignment = tdata->alignment();
-			tls_image = tdata->virt_addr();
+			tls_image = offset_sections.at(this->sections.index(tdata.value()));
 			tls_image_size = tdata->size();
 		}
 
@@ -163,9 +155,9 @@ bool ObjectRelocatable::preload() {
 				// Fixup BSS symbols & relocations
 				adjust_offsets(tls_size, tbss.value());
 			}
-			tls_size += tdata->size();
+			tls_size += tbss->size();
 			// Adjust BSS
-			tls_alignment = Math::max(tls_alignment, tdata->alignment());
+			tls_alignment = Math::max(tls_alignment, tbss->alignment());
 		}
 
 		this->file.tls_module_id = this->file.loader.tls.add_module(this->file, tls_size, tls_alignment, tls_image, tls_image_size, this->file.tls_offset);
@@ -322,7 +314,7 @@ bool ObjectRelocatable::prepare() {
 	// Add ret statement to section which need fixing
 	for (auto & section : this->init_sections) {
 		assert(section.size() > 0 && section.type() == SHT_PROGBITS);
-		char * end = reinterpret_cast<char *>(base + section.virt_addr() + section.size());
+		char * end = reinterpret_cast<char *>(base + offset_sections.at(this->sections.index(section)) + section.size());
 		LOG_INFO << "Add retq instruction to " << reinterpret_cast<void*>(end) << " at " << section.name() << endl;
 		*end = static_cast<char>(0xc3);  // retq
 	}
@@ -459,7 +451,7 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 			// Local symbol
 			relocations.insert(reloc, needed_symbol);
 			auto value = relocator.value_internal(this->base, plt_entry, this->file.tls_module_id, this->file.tls_offset);
-			LOG_INFO << "Relocating local symbol " << needed_symbol.name() << " @ " << reinterpret_cast<void*>(base + needed_symbol.value()) << " in " << *this << " to " << reinterpret_cast<void*>(value) << " @ " << reinterpret_cast<void*>(relocator.address(this->base)) << endl;
+			LOG_TRACE << "Relocating local symbol " << needed_symbol.name() << " @ " << reinterpret_cast<void*>(base + needed_symbol.value()) << " in " << *this << " to " << reinterpret_cast<void*>(value) << " @ " << reinterpret_cast<void*>(relocator.address(this->base)) << endl;
 			return reinterpret_cast<void*>(relocator.fix_value_internal(this->base + (seg != nullptr ? seg->compose() - seg->target.address() : 0), value));
 		} else {
 			// external symbol
@@ -499,7 +491,7 @@ bool ObjectRelocatable::initialize(bool preinit) {
 		// Preinit array
 		for (const auto & section : this->sections)
 			if (section.size() > 0 && section.type() == SHT_PREINIT_ARRAY) {
-				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + section.virt_addr());
+				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + offset_sections.at(this->sections.index(section)));
 				for (size_t i = 0; i < section.size() / sizeof(void*); i++)
 					f[i](this->file.loader.argc, this->file.loader.argv, this->file.loader.envp);
 			}
@@ -515,7 +507,7 @@ bool ObjectRelocatable::initialize(bool preinit) {
 			for (auto & section : this->init_sections)
 				if (strcmp(section.name(), ".init") == 0) {
 					assert(section.size() > 0 && section.type() == SHT_PROGBITS);
-					auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + section.virt_addr());
+					auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + offset_sections.at(this->sections.index(section)) );
 					f(file.loader.argc, file.loader.argv, file.loader.envp);
 				}
 		}
@@ -523,7 +515,7 @@ bool ObjectRelocatable::initialize(bool preinit) {
 		// init array
 		for (const auto & section : this->sections)
 			if (section.size() > 0 && section.type() == SHT_INIT_ARRAY) {
-				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + section.virt_addr());
+				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + offset_sections.at(this->sections.index(section)) );
 				for (size_t i = 0; i < section.size() / sizeof(void*); i++) {
 					f[i](file.loader.argc, file.loader.argv, file.loader.envp);
 				}

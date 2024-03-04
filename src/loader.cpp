@@ -214,6 +214,7 @@ ObjectIdentity * Loader::open(const char * filepath, ObjectIdentity::Flags flags
 			if (!priority && dependencies == lookup.end())
 				dependencies = i;
 			Object * o = i->load(addr, type);
+			GDB::refresh(*this);
 			GDB::notify(GDB::RT_CONSISTENT);
 			if (o != nullptr) {
 				return i.operator->();
@@ -744,7 +745,7 @@ bool Loader::start_handler_threads() {
 			for (auto & object_file : lookup)
 				object_file.watch(true, false);
 
-			if ((handler_thread = Thread::create(&kickoff_helper_loop, this, true, true, true)) == nullptr) {
+			if ((handler_thread = Thread::create(&kickoff_helper_loop, this, true, true, !config.debugger)) == nullptr) {
 				LOG_ERROR << "Creating (file modification) handler thread failed" << endl;
 				success = false;
 			} else {

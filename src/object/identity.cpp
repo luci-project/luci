@@ -83,6 +83,7 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 	return object;
 }
 
+static unsigned debug_counter = 0;
 
 ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, Elf::ehdr_type & type) const {
 	// Not updatable: Allow only one (current) version
@@ -131,15 +132,36 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 			if (flags.immutable_source) {
 				data.addr = mmap.value();
 			} else {
-				// It seems like a populated privated mapping is not enough if the underlying file is changed (= undefined behaviour in linux).
-				// So we have to copy the content into an anonymous, non-file backed memory
-				if (auto anon = Syscall::mmap(NULL, data.size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) {
+				int new_data_fd = -1;
+				// In case a debugger is supported, we make our memory copy of the ELF accessible by gdb using procfs.
+				// For relocatable objects, this also provides a section table containing addresses and a fixed symbol table.
+				if (loader.config.debugger) {
+					StringStream<NAME_MAX + 9> dbgmemfd;
+					dbgmemfd << name << " (v" << (current != nullptr ? current->version() + 1 : 0) << ')';
+					const char * dbgmemfdstr = dbgmemfd.str();
+					if (auto memfd = Syscall::memfd_create(dbgmemfdstr, MFD_CLOEXEC)) {
+						new_data_fd = memfd.value();
+						if (auto ftruncate = Syscall::ftruncate(new_data_fd, data.size)) {
+							LOG_DEBUG << "Creating memory file for " << dbgmemfdstr << " at memfd " << new_data_fd << endl;
+						} else {
+							LOG_ERROR << "Allocating space for memory copy of " << dbgmemfdstr << " failed: " << ftruncate.error_message() << endl;
+							Syscall::close(new_data_fd);
+							new_data_fd = -1;
+						}
+					} else {
+						LOG_ERROR << "Creating memory file " << dbgmemfdstr << " failed: " << memfd.error_message() << endl;
+						Syscall::close(new_data_fd);
+						new_data_fd = -1;
+					}
+				}
+
+				if (auto anon = Syscall::mmap(NULL, data.size, PROT_READ | PROT_WRITE, new_data_fd == -1 ? MAP_PRIVATE | MAP_ANONYMOUS : MAP_SHARED, new_data_fd, 0)) {
 					LOG_INFO << "Creating a full in-memory copy of " << *this << endl;
 					data.addr = Memory::copy(anon.value(), mmap.value(), data.size);
 					// cleaning up
 					Syscall::munmap(mmap.value(), data.size);
 					Syscall::close(data.fd);
-					data.fd = -1;
+					data.fd = new_data_fd;
 				} else {
 					LOG_ERROR << "Mapping anonymous memory for " << *this << " failed: " << anon.error_message() << endl;
 					Syscall::close(data.fd);
@@ -418,6 +440,7 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 			}
 		}
 	}
+
 	// Add to list
 	current = o;
 
@@ -468,6 +491,17 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 	// Initialize GLIBC specific stuff
 	base = o->base;
 	dynamic = o->dynamic_address();
+	if (o->file_previous == nullptr) {
+		switch (type) {
+			case Elf::ET_EXEC: glibc_link_map.l_type = GLIBC::DL::link_map::lt_executable; break;
+			case Elf::ET_DYN: glibc_link_map.l_type = GLIBC::DL::link_map::lt_library; break;
+			case Elf::ET_REL: glibc_link_map.l_type = GLIBC::DL::link_map::lt_loaded; break;
+		}
+		glibc_link_map.l_relocated = 1;
+		glibc_link_map.l_init_called = 1;
+		glibc_link_map.l_global = 1;
+		glibc_link_map.l_visited = 1;
+	}
 
 	return { o, o->file_previous == nullptr ? INFO_SUCCESS_LOAD : INFO_SUCCESS_UPDATE };
 }
