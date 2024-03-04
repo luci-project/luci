@@ -500,7 +500,9 @@ Pair<Object *, ObjectIdentity::Info> ObjectIdentity::create(Object::Data & data,
 		glibc_link_map.l_relocated = 1;
 		glibc_link_map.l_init_called = 1;
 		glibc_link_map.l_global = 1;
+#if GLIBC_VERSION >= GLIBC_2_35 || defined(COMPATIBILITY_RHEL_9_LIKE)
 		glibc_link_map.l_visited = 1;
+#endif
 	}
 
 	return { o, o->file_previous == nullptr ? INFO_SUCCESS_LOAD : INFO_SUCCESS_UPDATE };

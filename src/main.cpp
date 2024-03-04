@@ -450,7 +450,7 @@ int main(int argc, char* argv[]) {
 				{'\0', "show-args",        nullptr,  &Opts::showArgs,         false, "Show the arguments passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ARGS to 1" },
 				{'\0', "show-auxv",        nullptr,  &Opts::showAuxv,         false, "Show the auxiliary array passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_AUXV to 1" },
 				{'\0', "show-env",         nullptr,  &Opts::showEnv,          false, "Show the environment variables passed to the process (on standard error). It can be enabled by setting the environment variable LD_SHOW_ENV to 1" },
-				{'g',  "debug",            nullptr,  &Opts::debug,            false, "Provide debugger like GDB with all versions of the employed binaries for better debugging. This can be enabled by setting the environment variable LD_DEBUG to 1" },
+				{'g',  "debug",            nullptr,  &Opts::debug,            false, "Provide debugger like GDB with file images of each version of the employed binaries (even when they've been overwritten meanwhile) for better debugging. This can be enabled by setting the environment variable LD_DEBUG to 1" },
 				{'h',  "help",             nullptr,  &Opts::showHelp,         false, "Show this help" }
 			},
 			File::exists,
