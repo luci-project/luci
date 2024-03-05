@@ -28,22 +28,33 @@ bool ObjectExecutable::preload_segments(bool setup_relro) {
 
 	// LOAD segments
 	for (const auto & segment : this->segments)
-		if (Elf::PT_LOAD == segment.type() && segment.virt_size() > 0) {
-			// TODO: Support relro for segments other than 4k alignment
-			if (relro && segment.offset() == relro->offset() && segment.virt_addr() == relro->virt_addr() && segment.alignment() == 0x1000) {
-				LOG_DEBUG << "Relocation read-only at " << reinterpret_cast<void*>(relro->virt_addr()) << " with " << relro->size() << " bytes" << endl;
-				// Relro section
-				memory_map.emplace_back(*this, *relro, base);
-				// Rest of data section (if any)
-				if (segment.virt_size() - relro->virt_size() > 0) {
-					assert((relro->virt_addr() + relro->virt_size()) % Page::SIZE == 0);
-					memory_map.emplace_back(*this, segment, base, relro->virt_size());
+		switch (segment.type()) {
+			case Elf::PT_LOAD:
+				if (segment.virt_size() > 0) {
+					// TODO: Support relro for segments other than 4k alignment
+					if (relro && segment.offset() == relro->offset() && segment.virt_addr() == relro->virt_addr() && segment.alignment() == 0x1000) {
+						LOG_DEBUG << "Relocation read-only at " << reinterpret_cast<void*>(relro->virt_addr()) << " with " << relro->size() << " bytes" << endl;
+						// Relro section
+						memory_map.emplace_back(*this, *relro, base);
+						// Rest of data section (if any)
+						if (segment.virt_size() - relro->virt_size() > 0) {
+							assert((relro->virt_addr() + relro->virt_size()) % Page::SIZE == 0);
+							memory_map.emplace_back(*this, segment, base, relro->virt_size());
+						}
+					} else {
+						memory_map.emplace_back(*this, segment, base);
+					}
 				}
-			} else {
-				memory_map.emplace_back(*this, segment, base);
-			}
-		} else if (Elf::PT_TLS == segment.type() && segment.virt_size() > 0 && this->file.tls_module_id == 0) {
-			this->file.tls_module_id = this->file.loader.tls.add_module(this->file, segment.virt_size(), segment.alignment(), segment.virt_addr(), segment.size(), this->file.tls_offset);
+				break;
+
+			case Elf::PT_TLS:
+				if (segment.virt_size() > 0 && this->file.tls_module_id == 0)
+					this->file.tls_module_id = this->file.loader.tls.add_module(this->file, segment.virt_size(), segment.alignment(), segment.virt_addr(), segment.size(), this->file.tls_offset);
+				break;
+
+			case Elf::PT_GNU_EH_FRAME:
+				eh_frame = base + segment.virt_addr();
+				break;
 		}
 
 	// Shared data on updates

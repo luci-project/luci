@@ -379,8 +379,8 @@ static bool load_library_by_name(Loader * loader, const char * lib, enum LibName
 			break;
 		case LIB_NAME_SHARED:
 			filename << "lib" << lib << ".so";
-			// Special case: shared libc / libm is suffixed by '.6'
-			if ((lib[0] == 'c' || lib[0] == 'm') && lib[1] == '\0')
+			// Special case: common shared libc / libm / libstdc++ are suffixed by '.6'
+			if (((lib[0] == 'c' || lib[0] == 'm') && lib[1] == '\0') || String::compare(lib, "stdc++") == 0)
 				filename << ".6";
 			break;
 		case LIB_NAME_STATIC:

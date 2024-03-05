@@ -50,6 +50,19 @@ ObjectRelocatable::ObjectRelocatable(ObjectIdentity & file, const Object::Data &
 	}
 }
 
+// Custom header is required for the supplied Error Handling Frame
+// https://refspecs.linuxfoundation.org/LSB_1.3.0/gLSB/gLSB/ehframehdr.html
+struct ErrorHandlingFrameHeader {
+	uint8_t version = 1;              // mnust be 1
+	uint8_t eh_frame_ptr_enc = 0x04;  // DW_EH_PE_udata8 (8 bit signed pointer)
+	uint8_t eh_fde_count_enc = 0xff;  // DW_EH_PE_omit (= no binary binary search table)
+	uint8_t table_enc = 0xff;         // DW_EH_PE_omit (= no binary binary search table)
+	uintptr_t eh_frame_ptr;           // Pointer to the actual error handling frame
+	uintptr_t fde_count = 0;          // 0 entries in binary search table;
+	/* binary search table would follow */
+
+	explicit ErrorHandlingFrameHeader(uintptr_t eh_frame_ptr) : eh_frame_ptr(eh_frame_ptr) {}
+} __attribute__((packed));
 
 bool ObjectRelocatable::preload() {
 	// TODO flags.immutable_source  (should always be set, right?)
@@ -102,12 +115,18 @@ bool ObjectRelocatable::preload() {
 			case SHT_PREINIT_ARRAY:
 				if (section.allocate()) {
 					size_t additional_size = 0;
-					if (this->file_previous == nullptr && section.type() == SHT_PROGBITS && (strcmp(section.name(), ".init", 5) == 0 || strcmp(section.name(), ".fini", 5) == 0)) {
+					if (this->file_previous == nullptr && section.type() == SHT_PROGBITS && (String::compare(section.name(), ".init", 5) == 0 || String::compare(section.name(), ".fini", 5) == 0)) {
 						// The init/fini section consists only of calls.
 						// They need to be fixed after mapping
 						init_sections.push_back(section);
 						// We need an additional byte for the return instruction
 						additional_size = 1;
+					}
+
+					if (section.type() == SHT_PROGBITS && String::compare(section.name(), ".eh_frame") == 0) {
+						eh_section.emplace(section);
+						// We will add an aligned error handling frame header at the end of the section.
+						additional_size += 16 + sizeof(ErrorHandlingFrameHeader) * 8;
 					}
 
 					// Fixup symbols & relocations
@@ -144,7 +163,7 @@ bool ObjectRelocatable::preload() {
 		if (tdata.has_value()) {
 			tls_size = tdata->size();
 			tls_alignment = tdata->alignment();
-			tls_image = offset_sections.at(this->sections.index(tdata.value()));
+			tls_image = offset_sections[this->sections.index(tdata.value())];
 			tls_image_size = tdata->size();
 		}
 
@@ -165,7 +184,6 @@ bool ObjectRelocatable::preload() {
 
 	return !memory_map.empty();
 }
-
 
 bool ObjectRelocatable::fix() {
 	// TODO: add _start routine etc
@@ -311,10 +329,18 @@ bool ObjectRelocatable::prepare() {
 			}
 		}
 
+
+	// Add error handling frame header
+	if (eh_section.has_value()) {
+		uintptr_t eh_start = base + offset_sections[this->sections.index(eh_section.value())];
+		eh_frame = reinterpret_cast<uintptr_t>(new (reinterpret_cast<void*>((eh_start + eh_section->size() + 16) & ~0xf)) ErrorHandlingFrameHeader(eh_start));
+		LOG_DEBUG << "Error handling frame at " << reinterpret_cast<void*>(eh_start) << " has header at " << reinterpret_cast<void*>(eh_frame) << endl;
+	}
+
 	// Add ret statement to section which need fixing
 	for (auto & section : this->init_sections) {
 		assert(section.size() > 0 && section.type() == SHT_PROGBITS);
-		char * end = reinterpret_cast<char *>(base + offset_sections.at(this->sections.index(section)) + section.size());
+		char * end = reinterpret_cast<char *>(base + offset_sections[this->sections.index(section)] + section.size());
 		LOG_INFO << "Add retq instruction to " << reinterpret_cast<void*>(end) << " at " << section.name() << endl;
 		*end = static_cast<char>(0xc3);  // retq
 	}
@@ -491,7 +517,7 @@ bool ObjectRelocatable::initialize(bool preinit) {
 		// Preinit array
 		for (const auto & section : this->sections)
 			if (section.size() > 0 && section.type() == SHT_PREINIT_ARRAY) {
-				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + offset_sections.at(this->sections.index(section)));
+				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + offset_sections[this->sections.index(section)]);
 				for (size_t i = 0; i < section.size() / sizeof(void*); i++)
 					f[i](this->file.loader.argc, this->file.loader.argv, this->file.loader.envp);
 			}
@@ -507,7 +533,7 @@ bool ObjectRelocatable::initialize(bool preinit) {
 			for (auto & section : this->init_sections)
 				if (strcmp(section.name(), ".init") == 0) {
 					assert(section.size() > 0 && section.type() == SHT_PROGBITS);
-					auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + offset_sections.at(this->sections.index(section)) );
+					auto f = reinterpret_cast<Elf::DynamicTable::func_init_t>(base + offset_sections[this->sections.index(section)]);
 					f(file.loader.argc, file.loader.argv, file.loader.envp);
 				}
 		}
@@ -515,10 +541,9 @@ bool ObjectRelocatable::initialize(bool preinit) {
 		// init array
 		for (const auto & section : this->sections)
 			if (section.size() > 0 && section.type() == SHT_INIT_ARRAY) {
-				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + offset_sections.at(this->sections.index(section)) );
-				for (size_t i = 0; i < section.size() / sizeof(void*); i++) {
+				auto * f = reinterpret_cast<Elf::DynamicTable::func_init_t *>(base + offset_sections[this->sections.index(section)]);
+				for (size_t i = 0; i < section.size() / sizeof(void*); i++)
 					f[i](file.loader.argc, file.loader.argv, file.loader.envp);
-				}
 			}
 	}
 	return true;

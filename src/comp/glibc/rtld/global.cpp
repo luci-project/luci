@@ -141,12 +141,7 @@ static int _dl_find_object(uintptr_t address, GLIBC::RTLD::GlobalRO::dl_find_obj
 					result->dlfo_map_start = mem.target.address();
 					result->dlfo_map_end = mem.target.address() + mem.target.size;
 					result->dlfo_link_map = &object_file.glibc_link_map;
-					result->dlfo_eh_frame = 0;
-					for (const auto & s : obj->Elf::segments)
-						if (s.type() == Elf::PT_GNU_EH_FRAME) {
-							result->dlfo_eh_frame = obj->base + s.virt_addr();
-							break;
-						}
+					result->dlfo_eh_frame = obj->eh_frame;
 					return 0;
 				}
 	return -1;

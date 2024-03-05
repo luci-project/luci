@@ -48,6 +48,7 @@ struct ObjectRelocatable : public Object {
 
 	Vector<Elf::Array<Elf::Relocation>> relocation_tables;
 	Vector<Elf::Section> init_sections;
+	Optional<Elf::Section> eh_section;
 	Vector<uintptr_t> offset_sections;
 
 	HashSet<ElfSymbolHelper, SymbolComparison> symbols;

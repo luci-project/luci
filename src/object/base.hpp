@@ -52,6 +52,9 @@ struct Object : public Elf {
 	/*! \brief File relative address of global offset table (for dynamic objects) */
 	uintptr_t global_offset_table = 0;
 
+	/*! \brief Error handling frame (header) */
+	uintptr_t eh_frame = 0;
+
 	/*! \brief preparation status */
 	enum {
 		STATUS_MAPPED,
