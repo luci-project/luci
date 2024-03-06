@@ -141,7 +141,7 @@ ObjectIdentity::Info ObjectIdentity::open(uintptr_t addr, Object::Data & data, E
 					const char * dbgmemfdstr = dbgmemfd.str();
 					if (auto memfd = Syscall::memfd_create(dbgmemfdstr, MFD_CLOEXEC)) {
 						new_data_fd = memfd.value();
-						if (auto ftruncate = Syscall::ftruncate(new_data_fd, data.size)) {
+						if (auto ftruncate = Syscall::ftruncate(new_data_fd, static_cast<off_t>(data.size))) {
 							LOG_DEBUG << "Creating memory file for " << dbgmemfdstr << " at memfd " << new_data_fd << endl;
 						} else {
 							LOG_ERROR << "Allocating space for memory copy of " << dbgmemfdstr << " failed: " << ftruncate.error_message() << endl;

@@ -516,13 +516,9 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc, Vector<Elf::Rel
 			if (auto external_symbol = file.loader.resolve_symbol(needed_symbol.name(), nullptr, file.ns, &file, mode)) {
 				relocations.insert(reloc, external_symbol.value());
 				const auto & external_symobj = external_symbol->object();
-				if (external_symbol.value().type() == STT_GNU_IFUNC) {
-					if (postpone != nullptr) {
-						postpone->push_back(reloc);
-						return nullptr;
-					} else {
-						plt_entry = ifunc(plt_entry);
-					}
+				if (postpone != nullptr && external_symbol.value().type() == STT_GNU_IFUNC) {
+					postpone->push_back(reloc);
+					return nullptr;
 				}
 
 				auto value = relocator.value_external(this->base, external_symbol.value(), external_symobj.base, external_symobj.base + external_symbol->value(), file.tls_module_id, file.tls_offset);
