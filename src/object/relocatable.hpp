@@ -38,7 +38,7 @@ struct ObjectRelocatable : public Object {
 	Optional<VersionedSymbol> resolve_symbol(uintptr_t addr) const override;
 	Optional<ElfSymbolHelper> resolve_internal_symbol(const SymbolHelper & needle) const override;
 
-	void* relocate(const Elf::Relocation & reloc) const;
+	void* relocate(const Elf::Relocation & reloc, Vector<Elf::Relocation> * postpone = nullptr) const;
 
 	bool initialize(bool preinit = false) override;
 

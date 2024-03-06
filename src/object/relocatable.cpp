@@ -321,13 +321,27 @@ void ObjectRelocatable::preprepare() {
 bool ObjectRelocatable::prepare() {
 	bool success = true;
 	// Perform initial relocations
+	Vector<Elf::Relocation> postpone;
+	size_t postpone_count = 0;
 	for (auto & relocations : relocation_tables)
-		for (const auto & reloc : relocations) {
-			if (relocate(reloc) == nullptr) {
-				LOG_WARNING << "Failed relocation of offset " << reinterpret_cast<void*>(reloc.offset()) << " with " << reinterpret_cast<void*>(reloc.symbol().address()) << endl;
-				success = false;
+		for (const auto & reloc : relocations)
+			if (relocate(reloc, &postpone) == nullptr) {
+				if (postpone.size() > postpone_count) {
+					LOG_TRACE << "Postpone relocation of offset " << reinterpret_cast<void*>(reloc.offset()) << endl;
+					postpone_count = postpone.size();
+				} else {
+					LOG_WARNING << "Failed relocation of offset " << reinterpret_cast<void*>(reloc.offset()) << " with " << reinterpret_cast<void*>(reloc.symbol().address()) << endl;
+					success = false;
+				}
 			}
+	// Postponed relocations: indirect function symbols have to be resolved after all other relocations.
+	for (const auto & reloc : postpone) {
+		void * x = relocate(reloc);
+		if (x == nullptr) {
+			LOG_WARNING << "Failed postponed relocation of offset " << reinterpret_cast<void*>(reloc.offset()) << " with " << reinterpret_cast<void*>(reloc.symbol().address()) << endl;
+			success = false;
 		}
+	}
 
 
 	// Add error handling frame header
@@ -357,7 +371,7 @@ bool ObjectRelocatable::update() {
 		// Update only if target has changed (relocation does not point to latest version).
 		// And if this is not the latest version, then omit (shared) data section relocations
 		// since they are performed in the latest version of this object
-		if (!r.value.object().is_latest_version() && is(r.value.type()).in(STT_FUNC, STT_SECTION))
+		if (!r.value.object().is_latest_version() && is(r.value.type()).in(STT_FUNC, STT_GNU_IFUNC, STT_SECTION))
 			relocate(r.key);
 	}
 
@@ -413,7 +427,15 @@ Optional<VersionedSymbol> ObjectRelocatable::resolve_symbol(uintptr_t addr) cons
 	return Optional<VersionedSymbol>{};
 }
 
-void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
+static uintptr_t ifunc(uintptr_t ptr) {
+	assert(ptr != NULL);
+	typedef uintptr_t (*indirect_t)();
+	indirect_t func = reinterpret_cast<indirect_t>(ptr);
+	auto r = func();
+	return r;
+}
+
+void* ObjectRelocatable::relocate(const Elf::Relocation & reloc, Vector<Elf::Relocation> * postpone) const {
 	// Initialize relocator object
 	Relocator relocator(reloc, 0);
 
@@ -464,6 +486,14 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 		// We omit the PLT and directly link the target, hence replacing `plt_entry` with `base + symbol.value()``
 		auto plt_entry = base + needed_symbol.value();
 		if (!needed_symbol.undefined()) {
+			if (needed_symbol.type() == STT_GNU_IFUNC) {
+				if (postpone != nullptr) {
+					postpone->push_back(reloc);
+					return nullptr;
+				} else {
+					plt_entry = ifunc(plt_entry);
+				}
+			}
 			// Special case: We have a newer version of a function
 			if (!is_latest_version() && is(needed_symbol.type()).in(STT_FUNC, STT_GNU_IFUNC)) {
 				auto latest_symbol = this->file.current->resolve_internal_symbol(needed_symbol.name());
@@ -486,6 +516,15 @@ void* ObjectRelocatable::relocate(const Elf::Relocation & reloc) const {
 			if (auto external_symbol = file.loader.resolve_symbol(needed_symbol.name(), nullptr, file.ns, &file, mode)) {
 				relocations.insert(reloc, external_symbol.value());
 				const auto & external_symobj = external_symbol->object();
+				if (external_symbol.value().type() == STT_GNU_IFUNC) {
+					if (postpone != nullptr) {
+						postpone->push_back(reloc);
+						return nullptr;
+					} else {
+						plt_entry = ifunc(plt_entry);
+					}
+				}
+
 				auto value = relocator.value_external(this->base, external_symbol.value(), external_symobj.base, external_symobj.base + external_symbol->value(), file.tls_module_id, file.tls_offset);
 				// Special case for PLT: Trampoline in case a function is unreachable
 				if (!relocator.valid_value(value) && is(external_symbol.value().type()).in(Elf::STT_FUNC, Elf::STT_GNU_IFUNC) && is(reloc.type()).in(Elf::R_X86_64_PLT32, Elf::R_X86_64_PC32)) {
