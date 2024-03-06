@@ -38,7 +38,7 @@ if [ -f "/.dockerenv" ] ; then
 
 		fedora)
 			# official SDL2
-			#dnf install -y patch SDL_image-devel xterm dejavu-sans-mono-fonts
+			#dnf install -y patch SDL_image-devel xterm dejavu-sans-mono-fonts mesa-dri-drivers
 			#echo -e "\n\e[31mIncompatible SDL2 - Luci might currently not able to load some of the shared objects due to TLS DESC relocations!\e[0m\n"
 
 			# custom SDL (1.2)

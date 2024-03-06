@@ -27,8 +27,11 @@
 
 #define COUNT(X) (sizeof(X)/sizeof(X[0]))
 
-_Static_assert(COUNT(openings) < OPENING_NONE, "Too much opening moves, cannot handle them");
-_Static_assert(RAND_MAX > OPENINGS_GOOD, "Maximum random number is smaller than the possible openings");
+#ifndef __cplusplus
+#define static_assert(CHECK, MSG) _Static_assert(CHECK, MSG)
+#endif
+static_assert(COUNT(openings) < OPENING_NONE, "Too much opening moves, cannot handle them");
+static_assert(RAND_MAX > OPENINGS_GOOD, "Maximum random number is smaller than the possible openings");
 
 uint8_t opening_invalid[COUNT(openings) / 8 + 1];
 

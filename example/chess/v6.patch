@@ -34,11 +34,11 @@ diff -Naur rev5/tui.c rev6/tui.c
 +	const int color[2][2] = { { 0xFFCE9E, 0xFFB56B }, { 0xD18b47 , 0xB8732E } };
 +	for (int y = 0; y < 8; y++)
 +		for (int x = 0; x < 8; x++) {
-+			SDL_Rect field = { offset + x * size + 1, offset + y * size + 1, size - 2, size - 2 };
++			SDL_Rect field = { (short)(offset + x * size + 1), (short)(offset + y * size + 1), size - 2, size - 2 };
 +			SDL_FillRect(gui_content, &field, color[(x + y) % 2][(selected.from.x == x && selected.from.y == y) || (selected.to.x == x && selected.to.y == y)]);
 +			if (board[y][x] != 0) {
-+				SDL_Rect src = { (board[y][x] + 6) * piece_width, 0, piece_width, piece_height};
-+				SDL_Rect dest = { offset + x * size + (size - piece_width) / 2 , offset + y * size + (size - piece_height) / 2, piece_width, piece_height};
++				SDL_Rect src = { (short)((board[y][x] + 6) * piece_width), (short)(0), piece_width, piece_height};
++				SDL_Rect dest = { (short)(offset + x * size + (size - piece_width) / 2), (short)(offset + y * size + (size - piece_height) / 2), piece_width, piece_height};
 +				SDL_BlitSurface(gui_pieceSurface, &src, gui_content, &dest);
 +			}
 +		}

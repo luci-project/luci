@@ -141,7 +141,7 @@ bool board_canMove(chess_move move, int8_t player) {
 
 	int8_t from = board[move.from.y][move.from.x];
 	int8_t to = board[move.to.y][move.to.x];
-	pieces_t piece = from * player;
+	pieces_t piece = (pieces_t)(from * player);
 	if (from == 0 || from * player <= 0 || to * player > 0) {
 		return false;
 	} else if (piece == PAWN) {

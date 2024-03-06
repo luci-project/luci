@@ -52,6 +52,8 @@ Setup
 
 ➜ to have these steps performed automatically, run `demo.sh` (any arguments are passed to Luci).
 
+> **Please note:** You might have to manually specifiy if the object files are position-independent (`--pie` parameter for Luci) depending on your compiler flags and the default settings in your distribution.
+
 
 ### Docker
 

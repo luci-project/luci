@@ -107,7 +107,7 @@ void ai_reset() {
 			if (a >= b )											\
 				return bestVal;										\
 
-#define AI_NEGAMAXMOV(TOY, TOX)																		\
+#define AI_NEGAMAXMOV_NARROW(TOY, TOX)																\
 	do {																							\
 		if (VALID_FIELD((TOY), (TOX)) && board_canMove(MOVE(fromY, fromX, (TOY), (TOX)), player)) {	\
 			int8_t oldFrom = board[fromY][fromX];													\
@@ -122,6 +122,9 @@ void ai_reset() {
 			AI_NEGAMAXMOV_EVAL((TOY), (TOX))														\
 		}																							\
 	} while (0)
+
+#define AI_NEGAMAXMOV(TOY, TOX)	AI_NEGAMAXMOV_NARROW((uint8_t)(TOY), (uint8_t)(TOX))
+
 __attribute__((hot))
 int16_t ai_negamax(int8_t depth, int16_t a, int16_t b, int8_t player, bool record) {
 	if (!board_hasKing(player)) {

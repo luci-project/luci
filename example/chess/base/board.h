@@ -27,7 +27,7 @@
 #define VALID_POS(P) (VALID_FIELD((P).y, (P).x))
 #define VALID_MOVE(M) (VALID_POS((M).from) && VALID_POS((M).to))
 
-#define POS(Y, X) (chess_pos) { .y = (Y), .x = (X) }
+#define POS(Y, X) (chess_pos) { .y = (uint8_t)(Y), .x = (uint8_t)(X) }
 #define MOVE(FROMY, FROMX, TOY, TOX) (chess_move) { .from = POS(FROMY, FROMX), .to = POS(TOY, TOX) }
 
 #define POS_INVALID POS(INVALID, INVALID)
