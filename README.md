@@ -19,7 +19,7 @@ Its main purpose is to demonstrate dynamic software updating on off-the-shelf bi
    However, if the update is not possible or *Luci* detects the use of outdated code, it informs the user.
  * **Whole Process**:
    By combining the previous methods, *Luci* is able to update all parts of a process, including the executable binary.
-   In addition, it reconstructs stripped symbols and internal relocations, and has the ability to update certain (endless) loops by redirecting to the new version at appropriate points -- thus using binary patching techniques.
+   In addition, it reconstructs stripped symbols and internal relocations, and has the ability to update certain (endless) loops by redirecting to the new version at appropriate points — thus using binary patching techniques.
    Apart from an identical wirtable section, it has no other restrictions on the binaries.
 
 
@@ -125,6 +125,31 @@ You are able to control the behavior not only by the configuration file but also
 To list the available settings, run
 
     /opt/luci/ld-luci.so -h
+
+
+### Optional Inferface for Updating
+
+While Lucis approach does not require the application to be customized for / aware of dynamic updates, it still provides an interface to control the update point or transfer data structures.
+
+A manual update point can be specified by calling `__luci_update()`, a symbol provided by Luci.
+
+    extern void __luci_update() __attribute__((weak));
+    // ...
+    if (__luci_update)
+        __luci_update();
+
+While new files are automatically detected and parsed, they are not applied to applications using this symbol until the update point is reached.
+A return value of `1` indicates an update, while a call with no update pending will immediately return with a value of `0`.
+
+To handle structural changes, it is possible to serialize and deserialize the data between versions using
+
+    void * __luci_serialize(int);
+	void __luci_deserialize(void*);
+
+If present, the serialize function is called in the old version just before an update.
+Its parameter is set to `1` if the corresponding object is due to be updated (accordingly, each object can have its own set of serialization mechanisms).
+The return value is passed to the deserialization function in the updated version, which is called immediately after the update.
+Accordingly, this value should contain a pointer to the payload data in heap-allocated memory in a compatible format.
 
 
 ### Debug Symbols

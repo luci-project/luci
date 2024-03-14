@@ -284,6 +284,45 @@ bool Loader::relocate(bool update) {
 	return true;
 }
 
+
+void Loader::update() {
+	// Perform relocation
+	GDB::notify(GDB::RT_ADD);
+	if (!relocate(true)) {
+		LOG_ERROR << "Updating relocations failed!" << endl;
+		assert(false);
+	}
+	update_pending = false;
+	GDB::refresh(*this);
+	GDB::notify(GDB::RT_CONSISTENT);
+}
+
+
+extern "C" __attribute__((visibility("default"))) int __luci_update() {
+	Loader * loader = Loader::instance();
+	if (loader->update_pending) {
+		GuardedWriter _{loader->lookup_sync};
+		if (logger.visible(Log::DEBUG)) {
+			uintptr_t addr = reinterpret_cast<uintptr_t>(__builtin_extract_return_addr(__builtin_return_address(0)));
+			for (const auto & object_file : loader->lookup) {
+				for (Object * o = object_file.current; o != nullptr; o = o->file_previous) {
+					uintptr_t start = 0;
+					uintptr_t end = 0;
+					if (o->memory_range(start, end) && start <= addr && end > addr) {
+						LOG_DEBUG << "Reached update point at " << object_file << endl;
+						break;
+					}
+				}
+			}
+		}
+		loader->update();
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+
 extern "C" uintptr_t __stack_chk_guard;
 bool Loader::prepare(Object * start) {
 	// Setup DLH vdso

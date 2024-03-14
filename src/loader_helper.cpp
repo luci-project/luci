@@ -132,18 +132,21 @@ void Loader::filemodification_load(unsigned long now, TreeSet<Pair<unsigned long
 		}
 	}
 	if (updated) {
+		// Check for update hooks
+		for (const auto & o : lookup) {
+			if (o.hook.update_point) {
+				update_pending = true;
+				LOG_INFO << "Waiting for reaching custom update point to apply changes" << endl;
+				return;
+			}
+		}
+
 		// Stop main process
 		if (config.stop_on_update)
 			Syscall::kill(pid, SIGSTOP);
 
-		// Perform relocation
-		GDB::notify(GDB::RT_ADD);
-		if (!relocate(true)) {
-			LOG_ERROR << "Updating relocations failed!" << endl;
-			assert(false);
-		}
-		GDB::refresh(*this);
-		GDB::notify(GDB::RT_CONSISTENT);
+		// Perform update routine
+		update();
 
 		// Continue main process
 		if (config.stop_on_update)

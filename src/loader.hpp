@@ -21,6 +21,8 @@
 #include "symbol.hpp"
 #include "tls.hpp"
 
+extern "C" int __luci_update();
+
 struct Loader {
 	const struct Config {
 		/*! \brief use position independent code? */
@@ -177,6 +179,9 @@ struct Loader {
 	/*! \brief has the process control? */
 	bool process_started = false;
 
+	/*! \brief are updates currently pending? */
+	bool update_pending = false;
+
 	/*! \brief Default flags for objects */
 	ObjectIdentity::Flags default_flags;
 
@@ -245,6 +250,7 @@ struct Loader {
 
  private:
 	friend void* kickoff_helper_loop(void * ptr);
+	friend int __luci_update();
 
 	/*! \brief Iterator to first pure dependency library in lookup list */
 	ObjectIdentityList::Iterator dependencies;
@@ -273,6 +279,9 @@ struct Loader {
 
 	/*! \brief relocate all loaded files for execution */
 	bool relocate(bool update = false);
+
+	/*! \brief Perform update */
+	void update();
 
 	/*! \brief resolve address of entry point */
 	uintptr_t get_entry_point(Object * start, const char * custom_entry_point = nullptr);

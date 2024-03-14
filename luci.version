@@ -37,3 +37,8 @@ GLIBC_2.35 {
 	global: __rseq_flags; __rseq_offset; __rseq_size;
 	local: *;
 };
+
+LUCI {
+	global: __luci_update;
+	local: *;
+};

@@ -153,6 +153,25 @@ private:
 	/*! \brief send status info message */
 	void status(Info msg) const;
 
+	/*! \brief custom update hooks */
+	void hook_refresh() const;
+	mutable struct {
+		/*! \brief current serialize function */
+		void* (*serialize)(int) = nullptr;
+
+		/*! \brief current deserialize function */
+		void (*deserialize)(void*) = nullptr;
+
+		/*! \brief object to which the hook function belong to */
+		Object * object = nullptr;
+
+		/*! \brief serialized payload data */
+		void * payload_data = nullptr;
+
+		/*! \brief has the current object an global update hook? */
+		bool update_point = false;
+	} hook;
+
  public:
 	/*! \brief Load/get current version
 	 * \param addr use memory mapped Elf instead of file located at path

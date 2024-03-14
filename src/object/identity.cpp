@@ -60,6 +60,26 @@ static bool supported(const Elf::Header * header) {
 }
 
 
+void ObjectIdentity::hook_refresh() const {
+	if (flags.updatable) {
+		hook.object = current;
+		if (hook.object != nullptr) {
+			if (auto sym = hook.object->resolve_symbol("__luci_serialize")) {
+				LOG_DEBUG << "Custom serialize function at " << sym->pointer() << " for " << *hook.object << endl;
+				hook.serialize = reinterpret_cast<void*(*)(int)>(sym->pointer());
+			}
+			if (auto sym = hook.object->resolve_symbol("__luci_deserialize")) {
+				LOG_DEBUG << "Custom deserialize function at " << sym->pointer() << " for " << *hook.object << endl;
+				hook.deserialize = reinterpret_cast<void (*)(void*)>(sym->pointer());
+			}
+			hook.update_point = hook.object->resolve_symbol("__luci_update").has_value();
+			if (hook.update_point)
+				LOG_DEBUG << "Custom update point in " << *hook.object << endl;
+		}
+	}
+}
+
+
 Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 	Object::Data data;
 	Object * object = nullptr;
@@ -79,6 +99,10 @@ Object * ObjectIdentity::load(uintptr_t addr, Elf::ehdr_type type) {
 	}
 
 	status(info);
+
+	// Initial hook
+	if (hook.object == nullptr)
+		hook_refresh();
 
 	return object;
 }
@@ -546,12 +570,31 @@ bool ObjectIdentity::prepare() const {  // NOLINT
 
 bool ObjectIdentity::update() const {
 	bool success = true;
+
+	// Serialize
+	hook.payload_data = nullptr;
+	if (hook.serialize) {
+		LOG_INFO << "Serializing " << *hook.object << endl;
+		hook.payload_data = hook.serialize(current == hook.object ? 0 : 1);
+	}
+
+	// Perform updates
 	for (Object * c = current; c != nullptr; c = c->file_previous) {
 		LOG_DEBUG << "Updating relocations at " << *c << endl;
 		success &= c->update();
 		if (!flags.update_outdated)
 			break;
 	}
+
+	// Update hooks to latest object
+	hook_refresh();
+
+	// Deserialize
+	if (hook.deserialize) {
+		LOG_INFO << "Deserializing " << *hook.object << endl;
+		hook.deserialize(hook.payload_data);
+	}
+
 	return success;
 }
 

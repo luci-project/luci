@@ -316,7 +316,8 @@ static bool update_relocate(const Bean::SymbolRelocation & rel, uintptr_t to, co
 static void update_skip(uintptr_t from, uintptr_t to, const char * reason, ObjectData * objs) {
 	LOG_DEBUG << "Skipping " << objs->from << " at " << reinterpret_cast<void*>(from) << " (to " << objs->from  << " at " << reinterpret_cast<void*>(to) << ")";
 	if (reason != nullptr)
-		LOG_INFO_APPEND << ": " << reason << endl;
+		LOG_DEBUG_APPEND << ": " << reason;
+	LOG_DEBUG_APPEND << endl;
 }
 
 
