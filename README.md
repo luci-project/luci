@@ -151,6 +151,8 @@ Its parameter is set to `1` if the corresponding object is due to be updated (ac
 The return value is passed to the deserialization function in the updated version, which is called immediately after the update.
 Accordingly, this value should contain a pointer to the payload data in heap-allocated memory in a compatible format.
 
+The manual update points and the serialization are independent of each other.
+
 
 ### Debug Symbols
 

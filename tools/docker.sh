@@ -67,7 +67,7 @@ elif [ $# -ge 1 ] ; then
 	# Permissions
 	DOCKERARGS+=(--cap-add=SYS_PTRACE --security-opt seccomp=unconfined --security-opt apparmor=unconfined)
 	# X
-	if [ -n ${DISPLAY+set} -a -d /tmp/.X11-unix ] ; then
+	if [ -n ${DISPLAY+set} ] && [ -d /tmp/.X11-unix ] ; then
 		DOCKERARGS+=(--env="DISPLAY" -v "/tmp/.X11-unix/:/tmp/.X11-unix/")
 	fi
 	# Luci directory

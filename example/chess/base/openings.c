@@ -27,7 +27,7 @@
 
 #define COUNT(X) (sizeof(X)/sizeof(X[0]))
 
-#ifndef __cplusplus
+#if !defined(__cplusplus) && !defined(static_assert)
 #define static_assert(CHECK, MSG) _Static_assert(CHECK, MSG)
 #endif
 static_assert(COUNT(openings) < OPENING_NONE, "Too much opening moves, cannot handle them");
