@@ -64,6 +64,45 @@
 		}
 	},
 
+	// almalinux 9.4 glibc 2.34 125.el9_5.3.alma.1
+	{
+		{ 0x7a, 0x40, 0xa2, 0x2c, 0x9a, 0x82, 0x85, 0x4f, 0x3d, 0x66, 0x76, 0x72, 0x32, 0xae, 0x36, 0x4a, 0x99, 0x17, 0x48, 0x60 },
+		{
+			{ "_dl_addr", 0x155740, 864, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x155ee0, 134, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x1561a0, 47, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x155f70, 169, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x156020, 380, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0xd8d00, 126, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
+	// almalinux 9.5 glibc 2.34 125.el9_5.1.alma.2
+	{
+		{ 0xd7, 0x8a, 0x44, 0xae, 0x94, 0xf1, 0xd3, 0x20, 0x34, 0x2e, 0x0f, 0xf6, 0xc2, 0x31, 0x5b, 0x2b, 0x58, 0x90, 0x63, 0xf8 },
+		{
+			{ "_dl_addr", 0x155c80, 864, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x156420, 134, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x1566e0, 47, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x1564b0, 169, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x156560, 380, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0xd9240, 126, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
+	// almalinux 9.6 glibc 2.34 168.el9_6.14.alma.1
+	{
+		{ 0xf4, 0x32, 0xa7, 0xd6, 0x3b, 0x4c, 0xba, 0xf9, 0xe7, 0xa3, 0x00, 0x7c, 0xe6, 0x66, 0x27, 0xbc, 0xc9, 0xde, 0x7f, 0xae },
+		{
+			{ "_dl_addr", 0x156280, 864, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x156a20, 134, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x156ce0, 47, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x156ab0, 169, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x156b60, 380, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0xd9640, 126, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
 #elif defined(COMPATIBILITY_DEBIAN_BOOKWORM)
 	// libc6 Version: 2.36-8
 	{
@@ -178,6 +217,32 @@
 			{ "__libc_dlsym", 0x14f4c0, 153, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
 			{ "__libc_dlvsym", 0x14f560, 364, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
 			{ "_Fork", 0xd4270, 116, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
+	// libc6 Version: 2.36-9+deb12u9
+	{
+		{ 0xc0, 0x47, 0x67, 0x2c, 0xae, 0x79, 0x64, 0x32, 0x46, 0x58, 0x49, 0x1e, 0x7d, 0xee, 0x26, 0x74, 0x8a, 0xe5, 0xd2, 0xf8 },
+		{
+			{ "_dl_addr", 0x14ebb0, 902, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x14f610, 127, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x14f8a0, 47, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x14f690, 153, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x14f730, 364, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0xd42f0, 116, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
+	// libc6 Version: 2.36-9+deb12u10
+	{
+		{ 0x79, 0x00, 0x5c, 0x16, 0x29, 0x3e, 0xfa, 0x45, 0xb4, 0x41, 0xfe, 0xd4, 0x5f, 0x4f, 0x29, 0xb1, 0x38, 0x55, 0x7e, 0x9e },
+		{
+			{ "_dl_addr", 0x14ebf0, 902, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x14f650, 127, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x14f8e0, 47, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x14f6d0, 153, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x14f770, 364, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0xd4330, 116, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
 		}
 	},
 
@@ -382,6 +447,19 @@
 		}
 	},
 
+	// ubuntu 22.04 libc6 Version: 2.35-0ubuntu3.9
+	{
+		{ 0xcd, 0x41, 0x0b, 0x71, 0x0f, 0x0f, 0x09, 0x4c, 0x68, 0x32, 0xed, 0xd9, 0x59, 0x31, 0x00, 0x6d, 0x88, 0x3a, 0xf4, 0x8e },
+		{
+			{ "_dl_addr", 0x1744d0, 856, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x174ed0, 193, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x175250, 199, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x174fa0, 233, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x175090, 433, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0xeab30, 134, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
 #elif defined(COMPATIBILITY_RHEL_9)
 	// glibc-2.34-40.el9_1.1.x86_64
 	{
@@ -458,6 +536,32 @@
 			{ "__libc_dlsym", 0x1566a0, 169, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
 			{ "__libc_dlvsym", 0x156750, 380, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
 			{ "_Fork", 0xd9140, 126, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
+	// rhel 9.5 glibc 2.34 125.el9_5.3
+	{
+		{ 0x7a, 0x40, 0xa2, 0x2c, 0x9a, 0x82, 0x85, 0x4f, 0x3d, 0x66, 0x76, 0x72, 0x32, 0xae, 0x36, 0x4a, 0x99, 0x17, 0x48, 0x60 },
+		{
+			{ "_dl_addr", 0x155740, 864, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x155ee0, 134, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x1561a0, 47, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x155f70, 169, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x156020, 380, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0xd8d00, 126, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
+		}
+	},
+
+	// rhel 9.6 glibc 2.34 168.el9_6.14
+	{
+		{ 0xf4, 0x32, 0xa7, 0xd6, 0x3b, 0x4c, 0xba, 0xf9, 0xe7, 0xa3, 0x00, 0x7c, 0xe6, 0x66, 0x27, 0xbc, 0xc9, 0xde, 0x7f, 0xae },
+		{
+			{ "_dl_addr", 0x156280, 864, nops_jmp, reinterpret_cast<uintptr_t>(_dl_addr_patch) },
+			{ "__libc_dlopen_mode", 0x156a20, 134, nops_jmp, reinterpret_cast<uintptr_t>(dlopen) },
+			{ "__libc_dlclose", 0x156ce0, 47, nops_jmp, reinterpret_cast<uintptr_t>(dlclose) },
+			{ "__libc_dlsym", 0x156ab0, 169, nops_jmp, reinterpret_cast<uintptr_t>(dlsym) },
+			{ "__libc_dlvsym", 0x156b60, 380, nops_jmp, reinterpret_cast<uintptr_t>(dlvsym) },
+			{ "_Fork", 0xd9640, 126, redirect_fork_syscall, reinterpret_cast<uintptr_t>(_fork_syscall) },
 		}
 	},
 
