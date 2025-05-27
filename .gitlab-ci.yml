@@ -24,9 +24,9 @@ fetch-artifacts:
   script:
     - rm -rf bean
     - mkdir -p bean/elfo
-    - 'wget --no-check-certificate -O elfo-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_NAMESPACE}%2Felfo/jobs/artifacts/master/download?job=gcc"'
+    - 'wget --no-check-certificate -O elfo-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_NAMESPACE}%2Felfo/jobs/artifacts/main/download?job=gcc"'
     - unzip -jo elfo-artifacts.zip -d bean/elfo
-    - 'wget --no-check-certificate -O bean-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_NAMESPACE}%2Fbean/jobs/artifacts/master/download?job=gcc"'
+    - 'wget --no-check-certificate -O bean-artifacts.zip --header="JOB-TOKEN: $CI_JOB_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_NAMESPACE}%2Fbean/jobs/artifacts/main/download?job=gcc"'
     - unzip -jo bean-artifacts.zip -d bean
   artifacts:
     paths:
