@@ -127,3 +127,10 @@ EXPORT int __nptl_change_stack_perm(Thread *t) {
 EXPORT void __libdl_freeres() {
 	LOG_WARNING << "GLIBC __libdl_freeres not implemented!" << endl;
 }
+
+EXPORT int _dl_readonly_area(__attribute__((unused)) const void *ptr, __attribute__((unused)) size_t size) {
+	LOG_WARNING << "GLIBC _dl_readonly_area not implemented!" << endl;
+	//  1   if the whole area [PTR, PTR+SIZE] is not writable
+	// -1   if it is writable
+	return 1;
+}
